@@ -1,1 +1,1 @@
-# Neuro-Imprinting OnDemand
+# Mind Mastery
