@@ -1,0 +1,16 @@
+{
+    "name": "thepersuasionacademy",
+    "forwardPorts": [3000],
+    "portsAttributes": {
+      "3000": {
+        "label": "Web App",
+        "visibility": "public",
+        "protocol": "http"
+      }
+    },
+    "hostRequirements": {
+      "cpus": 1,
+      "memory": "2gb",
+      "storage": "32gb"
+    }
+  }

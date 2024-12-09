@@ -1,46 +1,37 @@
-import { Minimize2, Maximize2 } from 'lucide-react';
-import { Controls } from './shared/Controls';
-import { Progress } from './shared/Progress';
-import { PlayerState, PlayerView } from './types';
+import React from 'react';
+import { Desktop as Controls } from './shared/Controls/variants/Desktop';
+import { Desktop as Progress } from './shared/Progress/variants/Desktop';
+import type { PlayerState, PlayerView } from './types';
 
 interface PiPViewProps {
   state: PlayerState;
-  onStateChange: (newState: Partial<PlayerState>) => void;
+  onStateChange: (state: Partial<PlayerState>) => void;
   onViewChange: (view: PlayerView) => void;
 }
 
 export const PiPView = ({ state, onStateChange, onViewChange }: PiPViewProps) => (
-  <div className="fixed bottom-4 right-4 w-80 bg-zinc-900 rounded-lg shadow-xl z-50 overflow-hidden">
-    <div className="relative">
-      <img src={state.coverImage} alt="Now playing" className="w-full aspect-video object-cover" />
-      <div className="absolute top-2 right-2 flex space-x-2">
-        <button onClick={() => onViewChange(PlayerView.BAR)} className="p-1.5 bg-black/50 hover:bg-black/70 rounded-full">
-          <Minimize2 className="w-4 h-4" />
-        </button>
-        <button onClick={() => onViewChange(PlayerView.FULLSCREEN)} className="p-1.5 bg-black/50 hover:bg-black/70 rounded-full">
-          <Maximize2 className="w-4 h-4" />
-        </button>
+  <div className="fixed bottom-4 right-4 h-32 w-64 bg-zinc-900/90 backdrop-blur rounded-lg shadow-lg overflow-hidden">
+    <div className="h-full flex flex-col justify-between p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex-1 overflow-hidden">
+          <p className="text-sm text-white font-medium truncate">{state.title}</p>
+          <p className="text-xs text-white/60 truncate">{state.artist}</p>
+        </div>
       </div>
-    </div>
-    
-    <div className="p-4 space-y-4">
-      <div className="space-y-1">
-        <p className="font-medium truncate">{state.title}</p>
-        <p className="text-sm text-zinc-400 truncate">{state.artist}</p>
+
+      <div className="flex flex-col gap-2">
+        <Controls
+          isPlaying={state.isPlaying}
+          onPlayPause={() => onStateChange({ isPlaying: !state.isPlaying })}
+          onNext={() => onStateChange({ currentTime: Math.min(state.duration, state.currentTime + 30) })}
+          onPrevious={() => onStateChange({ currentTime: Math.max(0, state.currentTime - 30) })}
+        />
+        <Progress
+          currentTime={state.currentTime}
+          duration={state.duration}
+          onSeek={(time: number) => onStateChange({ currentTime: time })}
+        />
       </div>
-      
-      <Controls
-        isPlaying={state.isPlaying}
-        onPlayPause={() => onStateChange({ isPlaying: !state.isPlaying })}
-        onNext={() => {}}
-        onPrevious={() => {}}
-      />
-      
-      <Progress
-        currentTime={state.currentTime}
-        duration={state.duration}
-        onSeek={(time) => onStateChange({ currentTime: time })}
-      />
     </div>
   </div>
 );
