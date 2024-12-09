@@ -18,16 +18,6 @@ interface BentoCardProps {
   tracks?: number;
 }
 
-type BentoGridVariant = "single" | "double" | "triple" | "quad";
-type BentoSpacing = "none" | "sm" | "md" | "lg" | "xl";
-
-interface BentoGridProps {
-  variant?: BentoGridVariant;
-  spacing?: BentoSpacing;
-  className?: string;
-  children: React.ReactNode;
-}
-
 export const BentoCard = ({
   title,
   description,
@@ -44,73 +34,30 @@ export const BentoCard = ({
     >
       <div className={cn(
         "glass-card rounded-2xl relative",
-        "transition-all duration-500 ease-in-out",
         "w-full h-[250px]",
-        "border border-white/10",
+        "border border-white/[0.15]",
         "hover:border-red-600 hover:shadow-[0_0_10px_rgba(171,2,43,0.6)]",
-        "overflow-hidden"
+        "overflow-hidden",
+        "transition-all duration-200",
+        "bg-zinc-900/50",
+        "shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
       )}>
-        <img 
-          src={image || "/api/placeholder/400/250"}
-          alt={title}
-          className="w-full h-full object-cover"
-        />
+        {/* Main image limited to space above overlay */}
+        <div className="absolute inset-x-0 top-0 h-[calc(100%-52px)]">
+          <img 
+            src={image || "/api/placeholder/400/250"}
+            alt={title}
+            className="w-full h-full object-cover brightness-[0.7] group-hover:brightness-100 transition-all duration-200"
+          />
+        </div>
         
-        <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
-          <div className="transform transition-all duration-500 ease-in-out">
-            <h3 className="text-xl font-semibold text-white">{title}</h3>
-            <div className="h-0 group-hover:h-auto overflow-hidden opacity-0 group-hover:opacity-100 transition-all duration-500 ease-in-out">
-              <p className="text-white/60 mt-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500 ease-in-out">{description}</p>
-              <p className="text-white/60 mt-1 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500 ease-in-out delay-75">{tracks} tracks</p>
-              {metrics && (
-                <div className="flex gap-8 mt-4">
-                  {metrics.map((metric, index) => (
-                    <div key={index} className="relative">
-                      <div className="text-xl font-semibold">{metric.value}</div>
-                      <div className="text-white/60 text-sm">{metric.label}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+        {/* Zinc-colored glassmorphic title overlay */}
+        <div className="absolute inset-x-0 bottom-0">
+          <div className="px-6 py-4 bg-zinc-900/40 backdrop-blur-md border-t border-white/[0.15]">
+            <h3 className="text-2xl font-bold text-white tracking-wide">{title}</h3>
           </div>
         </div>
       </div>
     </Link>
   );
 };
-
-export const BentoGrid = ({
-  variant = "double",
-  spacing = "lg",
-  children,
-  className
-}: BentoGridProps) => {
-  const gridCols = {
-    single: "grid-cols-1",
-    double: "grid-cols-1 md:grid-cols-2",
-    triple: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3",
-    quad: "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
-  };
-
-  const gridGaps = {
-    none: "gap-0",
-    sm: "gap-4",
-    md: "gap-6",
-    lg: "gap-8",
-    xl: "gap-12"
-  };
-
-  return (
-    <div className={cn(
-      "grid",
-      gridCols[variant],
-      gridGaps[spacing],
-      className
-    )}>
-      {children}
-    </div>
-  );
-};
-
-export type { BentoCardProps, BentoGridProps, BentoGridVariant, BentoSpacing, BentoMetric };
