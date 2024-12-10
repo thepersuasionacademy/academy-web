@@ -1,16 +1,18 @@
-// shared/Controls/index.tsx 
+// src/components/player/shared/Controls/index.tsx
 import React from 'react';
-import { Controls as Desktop } from './variants/Desktop';
-import { Controls as Mobile } from './variants/Mobile';
+import { Controls as DesktopControls } from './variants/Desktop';
+import { Controls as MobileControls } from './variants/Mobile';
 import type { ControlsProps } from './types';
 
-export const Controls = (props: ControlsProps) => (
- <>
-   <div className="hidden lg:block">
-     <Desktop {...props} />
-   </div>
-   <div className="lg:hidden">
-     <Mobile {...props} />
-   </div>
- </>
-);
+export const Controls = (props: ControlsProps) => {
+  return (
+    <>
+      <div className="hidden lg:block">
+        <DesktopControls {...props} />
+      </div>
+      <div className="lg:hidden">
+        <MobileControls {...props} />
+      </div>
+    </>
+  );
+};

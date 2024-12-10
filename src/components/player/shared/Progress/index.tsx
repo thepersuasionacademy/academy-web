@@ -1,4 +1,4 @@
-// components/player/shared/Progress/index.tsx
+// shared/Progress/index.tsx
 import React from 'react';
 import { Desktop } from './variants/Desktop';
 import { Mobile } from './variants/Mobile';
