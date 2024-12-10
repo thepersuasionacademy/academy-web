@@ -50,7 +50,7 @@ export const Mobile = ({ currentTime, duration, onSeek, onPause, onResume }: Enh
       <div className="group relative select-none">
         <div 
           ref={progressRef}
-          className="w-full bg-zinc-700 rounded-full cursor-pointer transition-all duration-200 h-1 group-hover:h-2 group-hover:-translate-y-0.5"
+          className="w-full bg-zinc-700 rounded-full cursor-pointer transition-all duration-200 h-2 group-hover:h-3"
           onMouseDown={startDragging}
         >
           <div 
@@ -61,7 +61,7 @@ export const Mobile = ({ currentTime, duration, onSeek, onPause, onResume }: Enh
             }}
           />
           <div 
-            className={`absolute h-3 w-3 bg-white rounded-full transition-opacity duration-200 ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+            className={`absolute h-4 w-4 bg-white rounded-full transition-opacity duration-200 ${isDragging ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
             style={{ 
               left: `${(displayTime / duration) * 100}%`, 
               transform: 'translateX(-50%)',

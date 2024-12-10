@@ -1,17 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import NavigationBar from '@/components/media/NavigationBar';
 import { FeaturedContent } from '@/components/media/FeaturedContent';
 import { ContentGrid } from '@/components/media/ContentGrid';
 import { MediaPlayer } from '@/components/player';
+import { SuiteView } from '@/components/media/SuiteView';
 import { categories, MediaItem } from '@/components/media/types';
 import { PlayerState, PlayerView } from '@/components/player/types';
 
 const AUDIO_SOURCES = {
-  audio: "https://mindmasterystack-streamingbucket7fe001bf-0msumefkguly.s3.us-east-2.amazonaws.com/00+-+Pre-float+Preparation.mp3"  // Your MP3 URL
+  audio: "https://mindmasterystack-streamingbucket7fe001bf-0msumefkguly.s3.us-east-2.amazonaws.com/00+-+Pre-float+Preparation.mp3"
 };
-
 
 export default function Home() {
   const [playerState, setPlayerState] = useState<PlayerState>({
@@ -26,7 +26,22 @@ export default function Home() {
     view: PlayerView.BAR
   });
 
+  const [selectedSuite, setSelectedSuite] = useState<MediaItem | null>(null);
+  const scrollPositionRef = useRef(0);
+
   const featuredContent = categories[0].items[0];
+
+  useEffect(() => {
+    if (selectedSuite) {
+      // Store current scroll position when opening suite
+      scrollPositionRef.current = window.scrollY;
+    } else {
+      // Restore scroll position when closing suite
+      requestAnimationFrame(() => {
+        window.scrollTo(0, scrollPositionRef.current);
+      });
+    }
+  }, [selectedSuite]);
 
   const handlePlay = (item: MediaItem) => {
     setPlayerState(prev => ({
@@ -37,6 +52,15 @@ export default function Home() {
       coverImage: item.image,
       duration: item.duration || 0
     }));
+  };
+
+  const handleTrackPlay = (trackId: string) => {
+    if (selectedSuite) {
+      handlePlay({
+        ...selectedSuite,
+        title: `${selectedSuite.title} - Track ${trackId}`
+      });
+    }
   };
 
   const handleLike = () => {
@@ -77,15 +101,29 @@ export default function Home() {
             const item = categories
               .flatMap(cat => cat.items)
               .find(item => item.id === itemId);
-            if (item) handlePlay(item);
+            if (item) setSelectedSuite(item);
           }}
         />
   
-  <MediaPlayer 
-  streamUrl={AUDIO_SOURCES.audio}  // Changed from AUDIO_SOURCES.hls
-  initialState={playerState}
-  onStateChange={(newState) => setPlayerState(prev => ({ ...prev, ...newState }))}
-/>
+        <MediaPlayer 
+          streamUrl={AUDIO_SOURCES.audio}
+          initialState={playerState}
+          onStateChange={(newState) => setPlayerState(prev => ({ ...prev, ...newState }))}
+        />
+
+        {selectedSuite && (
+          <SuiteView
+            isOpen={true}
+            onClose={() => setSelectedSuite(null)}
+            title={selectedSuite.title}
+            description={selectedSuite.description || ''}
+            image={selectedSuite.image}
+            tracks={selectedSuite.tracks}
+            onPlay={handleTrackPlay}
+            onLike={handleLike}
+            onShare={handleShare}
+          />
+        )}
       </main>
     </div>
   );

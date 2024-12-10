@@ -1,12 +1,13 @@
 .
 ├── README.md
+├── codespace_structure.txt
+├── devcontainer.json
 ├── next-env.d.ts
 ├── next.config.mjs
 ├── next.config.ts
 ├── package-lock.json
 ├── package.json
 ├── postcss.config.mjs
-├── project_structure.txt
 ├── public
 │   ├── file.svg
 │   ├── globe.svg
@@ -35,10 +36,11 @@
 │   │   │   ├── FullScreenView.tsx
 │   │   │   ├── PiPView.tsx
 │   │   │   ├── audio
-│   │   │   │   └── HLSAudio.tsx
+│   │   │   │   └── AudioPlayer.tsx
 │   │   │   ├── index.tsx
 │   │   │   ├── shared
 │   │   │   │   ├── Controls
+│   │   │   │   │   ├── icons.tsx
 │   │   │   │   │   ├── index.tsx
 │   │   │   │   │   ├── types.ts
 │   │   │   │   │   └── variants
@@ -69,4 +71,4 @@
 ├── tailwind.config.ts
 └── tsconfig.json
 
-19 directories, 50 files
+19 directories, 52 files
