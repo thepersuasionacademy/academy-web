@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import type { ProgressProps } from '../types';
+import type { ProgressProps } from '@/lib/types/media';
 
 interface EnhancedProgressProps extends ProgressProps {
   onPause?: () => void;

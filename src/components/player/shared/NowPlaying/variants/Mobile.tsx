@@ -1,6 +1,6 @@
 // components/player/shared/NowPlaying/variants/Mobile.tsx
 import React from 'react';
-import type { NowPlayingProps } from '../types';
+import type { NowPlayingProps } from '@/lib/types/media';
 
 export const Mobile = ({ title, artist, coverImage }: NowPlayingProps) => (
   <div className="flex items-center gap-3">

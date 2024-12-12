@@ -2,7 +2,7 @@
 import React from 'react';
 import { Controls as DesktopControls } from './variants/Desktop';
 import { Controls as MobileControls } from './variants/Mobile';
-import type { ControlsProps } from './types';
+import type { ControlsProps } from '@/lib/types/media';
 
 export const Controls = (props: ControlsProps) => {
   return (

@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import NavigationBar from '@/components/media/NavigationBar';
-import { FeaturedContent } from '@/components/media/FeaturedContent';
-import { ContentGrid } from '@/components/media/ContentGrid';
+import NavigationBar from '@/components/dashboard/navigation/NavigationBar';
+import { FeaturedContent } from '@/components/dashboard/FeaturedContent';
+import { ContentGrid } from '@/components/dashboard/ContentGrid';
 import { MediaPlayer } from '@/components/player';
-import { SuiteView } from '@/components/media/SuiteView';
-import { categories, MediaItem } from '@/components/media/types';
-import { PlayerState, PlayerView } from '@/components/player/types';
+import { SuiteView } from '@/components/dashboard/SuiteView';
+import { categories, MediaItem } from '@/lib/types/dashboard';
+import { PlayerState, PlayerView } from '@/lib/types/media';
 
 const AUDIO_SOURCES = {
   audio: "https://mindmasterystack-streamingbucket7fe001bf-0msumefkguly.s3.us-east-2.amazonaws.com/00+-+Pre-float+Preparation.mp3"

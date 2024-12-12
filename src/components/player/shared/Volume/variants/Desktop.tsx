@@ -1,7 +1,7 @@
 // components/player/shared/Volume/Desktop.tsx
 import React from 'react';
 import { Volume2 } from 'lucide-react';
-import { VolumeProps } from '../types';
+import { VolumeProps } from '@/lib/types/media';
 
 export const Desktop = ({ volume, onVolumeChange }: VolumeProps) => (
   <div className="flex items-center space-x-3">

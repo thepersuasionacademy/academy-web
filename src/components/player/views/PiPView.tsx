@@ -1,9 +1,8 @@
 import React, { useEffect } from 'react';
-import { Controls } from './shared/Controls';
-import { Progress } from './shared/Progress';
+import { Controls } from '../shared/Controls';
+import { Progress } from '../shared/Progress';
 import { Maximize2, ChevronDown, Volume2 } from 'lucide-react';
-import { PlayerView } from './types';
-import type { ViewProps } from './types';
+import { PlayerView, ViewProps } from '@/lib/types/media';
 
 export const PiPView: React.FC<ViewProps> = ({ state, onStateChange, onViewChange }) => {
   useEffect(() => {

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Volume2, Heart, Maximize2, PictureInPicture } from 'lucide-react';
-import { Controls } from './shared/Controls';
-import { Progress } from './shared/Progress';
-import { PlayerView, ViewProps } from './types';
+import { Controls } from '../shared/Controls';
+import { Progress } from '../shared/Progress';
+import { PlayerView, ViewProps } from '@/lib/types/media';
 
 export const BarView: React.FC<ViewProps> = ({ state, onStateChange, onViewChange }) => {
   const handleBarClick = (e: React.MouseEvent) => {

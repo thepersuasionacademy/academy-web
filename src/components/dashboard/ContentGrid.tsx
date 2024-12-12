@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BentoCard } from '@/components/BentoCard';
 import { MobileCarousel } from './MobileCarousel';
-import { Category } from './types';
+import { Category } from '@/lib/types/dashboard';
 import { cn } from "@/lib/utils";
 
 interface ContentGridProps {

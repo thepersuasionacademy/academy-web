@@ -2,7 +2,7 @@
 import React from 'react';
 import { Desktop } from './variants/Desktop';
 import { Mobile } from './variants/Mobile';
-import type { NowPlayingProps } from './types';
+import type { NowPlayingProps } from '@/lib/types/media';
 
 export const NowPlaying = (props: NowPlayingProps) => (
   <>

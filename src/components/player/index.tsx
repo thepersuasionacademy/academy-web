@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { AudioPlayer } from './audio/AudioPlayer';  // Updated import
-import { BarView } from './BarView';
-import { FullscreenView } from './FullScreenView';
-import { PiPView } from './PiPView';
-import { PlayerState, PlayerView } from './types';
+import { AudioPlayer } from './audio/AudioPlayer';
+import { BarView } from './views/BarView';
+import { FullscreenView } from './views/FullScreenView';
+import { PiPView } from './views/PiPView';
+import { PlayerState, PlayerView } from '@/lib/types/media';
 
 interface MediaPlayerProps {
   streamUrl: string;

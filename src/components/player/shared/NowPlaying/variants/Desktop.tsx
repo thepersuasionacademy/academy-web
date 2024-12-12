@@ -1,7 +1,7 @@
 // components/player/shared/NowPlaying/variants/Desktop.tsx
 import React from 'react';
 import { Heart } from 'lucide-react';
-import type { NowPlayingProps } from '../types';
+import type { NowPlayingProps } from '@/lib/types/media';
 
 export const Desktop = ({ title, artist, coverImage, isLiked, onLikeToggle }: NowPlayingProps) => (
   <div className="flex items-center space-x-4">

@@ -1,7 +1,7 @@
 import React from 'react';
 import { SkipBack, SkipForward } from 'lucide-react';
 import { CustomPlay, CustomPause } from '../icons';
-import type { ControlsProps } from '../types';
+import type { ControlsProps } from '@/lib/types/media';
 
 export const Controls = ({ isPlaying, onPlayPause, onNext, onPrevious }: ControlsProps) => {
   return (

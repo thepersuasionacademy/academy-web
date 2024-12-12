@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { ChevronDown, Volume2, PictureInPicture, Heart } from 'lucide-react';
-import { Controls } from './shared/Controls';
-import { Progress } from './shared/Progress';
-import { PlayerView, ViewProps } from './types';
+import { Controls } from '../shared/Controls';
+import { Progress } from '../shared/Progress';
+import { PlayerView, ViewProps } from '@/lib/types/media';
 
 export const FullscreenView: React.FC<ViewProps> = ({ state, onStateChange, onViewChange }) => {
   const [showControls, setShowControls] = useState(true);

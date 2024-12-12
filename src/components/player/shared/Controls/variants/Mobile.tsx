@@ -1,7 +1,7 @@
 // src/components/player/shared/Controls/variants/Mobile.tsx
 import React from 'react';
 import { SkipBack, SkipForward, Play, Pause } from 'lucide-react';
-import type { ControlsProps } from '../types';
+import type { ControlsProps } from '@/lib/types/media';
 
 export const Controls = ({ isPlaying, onPlayPause, onNext, onPrevious }: ControlsProps) => {
   return (

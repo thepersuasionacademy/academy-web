@@ -2,7 +2,7 @@
 import React from 'react';
 import { Desktop } from './variants/Desktop';
 import { Mobile } from './variants/Mobile';
-import type { VolumeProps } from './types';
+import type { VolumeProps } from '@/lib/types/media';
 
 export const Volume = (props: VolumeProps) => (
   <>

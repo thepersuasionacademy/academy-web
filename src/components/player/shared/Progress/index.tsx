@@ -2,7 +2,7 @@
 import React from 'react';
 import { Desktop } from './variants/Desktop';
 import { Mobile } from './variants/Mobile';
-import type { ProgressProps } from './types';
+import type { ProgressProps } from '@/lib/types/media';
 
 export const Progress = (props: ProgressProps) => (
   <>

@@ -1,5 +1,5 @@
 import { Play, Heart, Share2 } from 'lucide-react';
-import { MediaItem } from './types';
+import { MediaItem } from '@/lib/types/dashboard';
 
 interface FeaturedContentProps {
   content: MediaItem;

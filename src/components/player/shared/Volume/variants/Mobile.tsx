@@ -1,7 +1,7 @@
 // components/player/shared/Volume/Mobile.tsx
 import React, { useState } from 'react';
 import { Volume2 } from 'lucide-react';
-import { VolumeProps } from '../types';
+import { VolumeProps } from '@/lib/types/media';
 
 export const Mobile = ({ volume, onVolumeChange }: VolumeProps) => {
   const [showVolume, setShowVolume] = useState(false);
