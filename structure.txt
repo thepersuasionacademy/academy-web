@@ -1,0 +1,98 @@
+.
+├── public
+│   ├── file.svg
+│   ├── globe.svg
+│   ├── next.svg
+│   ├── vercel.svg
+│   └── window.svg
+├── src
+│   ├── app
+│   │   ├── (auth)
+│   │   │   ├── login
+│   │   │   │   └── page.tsx
+│   │   │   └── register
+│   │   │       └── page.tsx
+│   │   ├── fonts
+│   │   │   ├── GeistMonoVF.woff
+│   │   │   └── GeistVF.woff
+│   │   ├── favicon.ico
+│   │   ├── globals.css
+│   │   ├── layout.tsx
+│   │   └── page.tsx
+│   ├── components
+│   │   ├── dashboard
+│   │   │   ├── content
+│   │   │   │   ├── ai-tools
+│   │   │   │   ├── mind-mastery
+│   │   │   │   └── training
+│   │   │   ├── navigation
+│   │   │   │   ├── CategoryDropdown.tsx
+│   │   │   │   ├── NavigationBar.tsx
+│   │   │   │   └── SearchOverlay.tsx
+│   │   │   ├── ContentGrid.tsx
+│   │   │   ├── FeaturedContent.tsx
+│   │   │   ├── MobileCarousel.tsx
+│   │   │   ├── SlidePanel.tsx
+│   │   │   └── SuiteView.tsx
+│   │   ├── player
+│   │   │   ├── media
+│   │   │   │   ├── AudioPlayer.tsx
+│   │   │   │   ├── MediaPlayer.tsx
+│   │   │   │   ├── VideoPlayer.tsx
+│   │   │   │   └── types.ts
+│   │   │   ├── shared
+│   │   │   │   ├── Controls
+│   │   │   │   │   ├── variants
+│   │   │   │   │   │   ├── Desktop.tsx
+│   │   │   │   │   │   └── Mobile.tsx
+│   │   │   │   │   ├── icons.tsx
+│   │   │   │   │   ├── index.tsx
+│   │   │   │   │   └── types.ts
+│   │   │   │   ├── NowPlaying
+│   │   │   │   │   ├── variants
+│   │   │   │   │   │   ├── Desktop.tsx
+│   │   │   │   │   │   └── Mobile.tsx
+│   │   │   │   │   ├── index.tsx
+│   │   │   │   │   └── types.ts
+│   │   │   │   ├── Progress
+│   │   │   │   │   ├── variants
+│   │   │   │   │   │   ├── Desktop.tsx
+│   │   │   │   │   │   └── Mobile.tsx
+│   │   │   │   │   ├── index.tsx
+│   │   │   │   │   ├── types.ts
+│   │   │   │   │   └── utils.ts
+│   │   │   │   └── Volume
+│   │   │   │       ├── variants
+│   │   │   │       │   ├── Desktop.tsx
+│   │   │   │       │   └── Mobile.tsx
+│   │   │   │       ├── index.tsx
+│   │   │   │       └── types.ts
+│   │   │   ├── views
+│   │   │   │   ├── BarView.tsx
+│   │   │   │   ├── FullScreenView.tsx
+│   │   │   │   └── PiPView.tsx
+│   │   │   └── index.tsx
+│   │   ├── popup
+│   │   │   ├── PDFPopup.tsx
+│   │   │   └── ToolPopup.tsx
+│   │   ├── BentoCard.tsx
+│   │   └── ScrollProgress.tsx
+│   └── lib
+│       ├── types
+│       │   ├── dashboard.ts
+│       │   ├── media.ts
+│       │   └── tools.ts
+│       └── utils.ts
+├── README.md
+├── devcontainer.json
+├── next-env.d.ts
+├── next.config.mjs
+├── next.config.ts
+├── package-lock.json
+├── package.json
+├── postcss.config.mjs
+├── structure.txt
+├── tailwind.config.ts
+└── tsconfig.json
+
+29 directories, 66 files
