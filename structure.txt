@@ -35,6 +35,8 @@
 │   │   │   ├── SlidePanel.tsx
 │   │   │   └── SuiteView.tsx
 │   │   ├── player
+│   │   │   ├── audio
+│   │   │   │   └── AudioPlayer.tsx
 │   │   │   ├── media
 │   │   │   │   ├── AudioPlayer.tsx
 │   │   │   │   ├── MediaPlayer.tsx
@@ -84,6 +86,7 @@
 │       │   └── tools.ts
 │       └── utils.ts
 ├── README.md
+├── codespace_structure.txt
 ├── devcontainer.json
 ├── next-env.d.ts
 ├── next.config.mjs
@@ -91,8 +94,9 @@
 ├── package-lock.json
 ├── package.json
 ├── postcss.config.mjs
+├── structure.tx
 ├── structure.txt
 ├── tailwind.config.ts
 └── tsconfig.json
 
-29 directories, 66 files
+30 directories, 69 files
