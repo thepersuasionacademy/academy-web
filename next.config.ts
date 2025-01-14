@@ -1,11 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  images: {
-    domains: ['api.placeholder.com'],
-  },
   eslint: {
     ignoreDuringBuilds: true,
+  },
+  images: {
+    domains: ['api.placeholder.com'],
   },
 };
 
