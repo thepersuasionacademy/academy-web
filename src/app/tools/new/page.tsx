@@ -206,12 +206,12 @@ export default function CreateToolPage() {
     setLoading(true)
     setError('')
     setSuccess(null)
-
+  
     try {
       // Create or get category
       let categoryId: string
       const existingCategory = categories.find(c => c.name === categoryInput)
-
+  
       if (existingCategory) {
         categoryId = existingCategory.id
       } else {
@@ -220,18 +220,18 @@ export default function CreateToolPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: categoryInput })
         })
-
+  
         if (!categoryResponse.ok) {
           throw new Error(`Failed to create category: ${await categoryResponse.text()}`)
         }
         const categoryData = await categoryResponse.json()
         categoryId = categoryData.category.id
       }
-
+  
       // Create or get suite
       let suiteId: string
       const existingSuite = suites.find(s => s.name === suiteInput)
-
+  
       if (existingSuite) {
         suiteId = existingSuite.id
       } else {
@@ -240,29 +240,31 @@ export default function CreateToolPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: suiteInput })
         })
-
+  
         if (!suiteResponse.ok) {
           throw new Error(`Failed to create suite: ${await suiteResponse.text()}`)
         }
         const suiteData = await suiteResponse.json()
         suiteId = suiteData.suite.id
       }
-
+  
       const toolData = {
         categoryName: categoryInput,
         suiteName: suiteInput,
         name: formData.get('name'),
         description: formData.get('description'),
         promptTemplate: formData.get('promptTemplate'),
-        creditCost: Number(formData.get('creditCost'))
+        creditCost: Number(formData.get('creditCost')),
+        inputField1: formData.get('inputField1'),
+        inputField1Description: formData.get('inputField1Description') || ''
       }
-
+  
       const toolResponse = await fetch('/api/tools', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(toolData)
       })
-
+  
       if (!toolResponse.ok) {
         const text = await toolResponse.text()
         try {
@@ -272,7 +274,24 @@ export default function CreateToolPage() {
           throw new Error(text)
         }
       }
-
+  
+      // Refresh the tools list
+      const refreshResponse = await fetch('/api/ai/categories/suites/tools', {
+        headers: {
+          'x-selected-category': selectedCategory!,
+          'x-selected-suite': selectedSuite!
+        }
+      })
+      
+      if (!refreshResponse.ok) {
+        throw new Error('Failed to refresh tools list')
+      }
+      
+      const refreshData = await refreshResponse.json()
+      if (Array.isArray(refreshData.tools)) {
+        setTools(refreshData.tools)
+      }
+  
       setSuccess({
         name: toolData.name as string,
         category: categoryInput,
@@ -280,7 +299,7 @@ export default function CreateToolPage() {
         inputField1: formData.get('inputField1') as string,
         inputField1Description: formData.get('inputField1Description') as string
       })
-
+  
       setIsCreatingTool(false)
     } catch (err) {
       const error = err as Error
@@ -291,7 +310,7 @@ export default function CreateToolPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black">
+    <div className="flex min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black">
       <CategorySidebar
         categories={categories}
         selectedCategory={selectedCategory}
@@ -304,7 +323,7 @@ export default function CreateToolPage() {
         setCategoryInput={setCategoryInput}
       />
 
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-screen">
         <SuiteSelector
           suites={suites}
           selectedSuite={selectedSuite}
@@ -312,8 +331,8 @@ export default function CreateToolPage() {
             setSelectedSuite(name)
             setSuiteInput(name)
           }}
-          onCreateNew={() => setIsCreatingTool(true)}
           isLoadingSuites={isLoadingSuites}
+          selectedCategory={selectedCategory!}
         />
 
         {!isCreatingTool && !selectedTool && (
@@ -321,46 +340,49 @@ export default function CreateToolPage() {
             tools={tools}
             isLoading={isLoadingTools}
             onSelectTool={setSelectedTool}
+            onCreateNew={() => setIsCreatingTool(true)}
           />
         )}
 
-{selectedTool && selectedCategory && selectedSuite && (
-  <ToolEditor
-    tool={selectedTool}
-    selectedCategory={selectedCategory}
-    selectedSuite={selectedSuite}
-    onClose={async () => {
-      try {
-        setIsLoadingTools(true)
-        const response = await fetch('/api/ai/categories/suites/tools', {
-          headers: {
-            'x-selected-category': selectedCategory,
-            'x-selected-suite': selectedSuite
-          }
-        })
-        
-        if (!response.ok) {
-          throw new Error('Failed to fetch tools')
-        }
-        
-        const data = await response.json()
-        if (Array.isArray(data.tools)) {
-          setTools(data.tools)
-        }
-      } catch (error) {
-        console.error('Error refreshing tools:', error)
-        setError('Failed to refresh tools list')
-      } finally {
-        setIsLoadingTools(false)
-        setSelectedTool(null)
-      }
-    }}
-    error={error}
-  />
-)}
+        {selectedTool && selectedCategory && selectedSuite && (
+          <div className="flex-1">
+            <ToolEditor
+              tool={selectedTool}
+              selectedCategory={selectedCategory}
+              selectedSuite={selectedSuite}
+              onClose={async () => {
+                try {
+                  setIsLoadingTools(true)
+                  const response = await fetch('/api/ai/categories/suites/tools', {
+                    headers: {
+                      'x-selected-category': selectedCategory,
+                      'x-selected-suite': selectedSuite
+                    }
+                  })
+                  
+                  if (!response.ok) {
+                    throw new Error('Failed to fetch tools')
+                  }
+                  
+                  const data = await response.json()
+                  if (Array.isArray(data.tools)) {
+                    setTools(data.tools)
+                  }
+                } catch (error) {
+                  console.error('Error refreshing tools:', error)
+                  setError('Failed to refresh tools list')
+                } finally {
+                  setIsLoadingTools(false)
+                  setSelectedTool(null)
+                }
+              }}
+              error={error}
+            />
+          </div>
+        )}
 
         {isCreatingTool && (
-          <div className="flex-1 p-6 overflow-auto">
+          <div className="flex-1">
             <ToolCreationForm
               onClose={() => setIsCreatingTool(false)}
               onSubmit={handleSubmit}
