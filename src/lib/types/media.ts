@@ -15,6 +15,7 @@ export enum PlayerView {
   coverImage: string;
   isLiked: boolean;
   view: PlayerView;
+  error?: string;
  }
  
  export interface ViewProps {
@@ -48,3 +49,8 @@ export enum PlayerView {
   isLiked: boolean;
   onLikeToggle: () => void;
  }
+
+ export enum MediaType {
+  AUDIO = 'audio',
+  VIDEO = 'video'
+}
