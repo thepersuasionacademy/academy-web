@@ -5,24 +5,20 @@ import type { NextRequest } from 'next/server';
 
 export async function middleware(req: NextRequest) {
   try {
-    // Don't even try to get a session first, just redirect immediately to Auth0
-    // if there's no session cookie
-    if (!req.cookies.get('appSession')) {
-      return NextResponse.redirect(`https://auth.thepersuasionacademy.com?returnTo=${encodeURIComponent(req.url)}`);
-    }
-
-    // Only check session if we have a cookie
     const res = NextResponse.next();
     const session = await getSession(req, res);
     
+    // Get the Auth0 issuer URL, falling back to a default if not set
+    const auth0Url = process.env.AUTH0_ISSUER_BASE_URL || 'https://your-tenant.us.auth0.com';
+    
     if (!session) {
-      return NextResponse.redirect(`https://auth.thepersuasionacademy.com?returnTo=${encodeURIComponent(req.url)}`);
+      return NextResponse.redirect(new URL(`${auth0Url}/authorize?returnTo=${encodeURIComponent(req.url)}`));
     }
 
     return res;
   } catch (error) {
     console.error('Middleware error:', error);
-    return NextResponse.redirect('https://auth.thepersuasionacademy.com');
+    return NextResponse.next();
   }
 }
 
