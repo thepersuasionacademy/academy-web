@@ -16,6 +16,7 @@
     "@radix-ui/react-slot": "^1.1.1",
     "@types/dotenv": "^6.1.1",
     "@types/hls.js": "^0.13.3",
+    "aws-sdk": "^2.1692.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^16.4.7",
