@@ -15,14 +15,16 @@ export async function middleware(req: NextRequest) {
     const session = await getSession(req, res);
 
     if (!session?.user) {
-      const loginUrl = new URL('/api/auth/login', req.url);
-      return NextResponse.redirect(loginUrl);
+      // Change this to use Auth0's login instead of local route
+      // This will trigger the Auth0 Universal Login page
+      return NextResponse.redirect(new URL('/api/auth/login?returnTo=' + encodeURIComponent(req.url), req.url));
     }
 
     return res;
   } catch (error) {
     console.error('Auth error:', error);
-    return NextResponse.redirect(new URL('/api/auth/login', req.url));
+    // Same here - use Auth0's login
+    return NextResponse.redirect(new URL('/api/auth/login?returnTo=' + encodeURIComponent(req.url), req.url));
   }
 }
 
