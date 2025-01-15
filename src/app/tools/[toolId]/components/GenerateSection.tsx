@@ -1,3 +1,4 @@
+// app/[toolId]/components/GenerateSection.tsx
 'use client';
 
 import React, { useState } from 'react';
@@ -106,7 +107,7 @@ export default function GenerateSection({ tool, isLoading }: GenerateSectionProp
 
   if (!response) {
     return (
-      <div className="max-w-3xl w-full px-4">
+      <div className="max-w-3xl w-full px-4 py-16">
         <div className="mb-8">
           {isLoading ? (
             <>
@@ -207,7 +208,7 @@ export default function GenerateSection({ tool, isLoading }: GenerateSectionProp
   }
 
   return (
-    <div className="max-w-3xl w-full px-4">
+    <div className="max-w-3xl w-full px-4 py-16">
       <div className="prose prose-invert max-w-none">
         <div className="whitespace-pre-wrap text-[#e6e9f0] text-xl mb-16">
           {response}
