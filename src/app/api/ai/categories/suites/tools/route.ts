@@ -21,7 +21,7 @@ function formatToolId(toolId: string): string {
     if (toolId.startsWith('SUITE#')) {
         return toolId;
     }
-    return `SUITE#basics#TOOL#${toolId}`;
+    return `SUITE#basics#TOOL#`;
 }
 
 export async function GET(request: Request) {
@@ -30,33 +30,45 @@ export async function GET(request: Request) {
             throw new Error('DYNAMODB_TABLE_NAME environment variable is not set');
         }
 
-        const toolId = request.headers.get('x-tool-id');
-        if (!toolId) {
+        const selectedCategory = request.headers.get('x-selected-category');
+        const selectedSuite = request.headers.get('x-selected-suite')?.toLowerCase(); // Add toLowerCase()
+
+        if (!selectedCategory || !selectedSuite) {
             return NextResponse.json({ 
-                error: 'Tool ID is required' 
+                error: 'Category and suite are required',
+                details: 'Both category and suite must be specified in headers'
             }, { status: 400 });
         }
 
-        console.log('Searching for tool:', toolId);
-        const formattedSK = formatToolId(toolId);
+        console.log('Headers received:', { selectedCategory, selectedSuite });
 
         const queryParams = {
             TableName: process.env.DYNAMODB_TABLE_NAME,
-            KeyConditionExpression: 'PK = :pk AND SK = :sk',
+            KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
             ExpressionAttributeValues: {
-                ':pk': 'AI#CATEGORY#EMAIL',
-                ':sk': formattedSK
+                ':pk': `AI#CATEGORY#${selectedCategory}`,
+                ':sk': `SUITE#${selectedSuite}#TOOL#`  // selectedSuite is now lowercase
             }
         };
 
-        console.log('Query parameters:', queryParams);
+        console.log('DynamoDB Query:', {
+            TableName: process.env.DYNAMODB_TABLE_NAME,
+            PK: `AI#CATEGORY#${selectedCategory}`,
+            SK_prefix: `SUITE#${selectedSuite}#TOOL#`
+        });
+
         const result = await docClient.send(new QueryCommand(queryParams));
         console.log('DynamoDB result:', JSON.stringify(result, null, 2));
 
         if (!result.Items || result.Items.length === 0) {
             return NextResponse.json({ 
-                error: 'Tool not found' 
-            }, { status: 404 });
+                tools: [],
+                debug: {
+                    category: selectedCategory,
+                    suite: selectedSuite,
+                    query: queryParams
+                }
+            });
         }
 
         const tools = result.Items.map(item => ({
@@ -67,9 +79,9 @@ export async function GET(request: Request) {
             creditCost: item.creditCost,
             promptTemplate: item.promptTemplate,
             inputField1: item.inputField1,
-            inputField1Description: item.inputFieldDescription,
-            inputField2: item.inputField2,
-            inputField2Description: item.inputField2Description,
+            inputField1Description: item.inputField1Description,
+            inputField2: item.inputField2 || undefined,
+            inputField2Description: item.inputField2Description || undefined,
             inputField3: item.inputField3 || undefined,
             inputField3Description: item.inputField3Description || undefined
         }));
@@ -78,7 +90,10 @@ export async function GET(request: Request) {
     } catch (error) {
         console.error('Error fetching tools:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to fetch tools';
-        return NextResponse.json({ error: errorMessage }, { status: 500 });
+        return NextResponse.json({ 
+            error: errorMessage,
+            stack: error instanceof Error ? error.stack : undefined
+        }, { status: 500 });
     }
 }
 
@@ -88,29 +103,31 @@ export async function PUT(request: Request) {
             throw new Error('DYNAMODB_TABLE_NAME environment variable is not set');
         }
 
+        const selectedCategory = request.headers.get('x-selected-category');
+        const selectedSuite = request.headers.get('x-selected-suite');
         const toolId = request.headers.get('x-tool-id');
-        if (!toolId) {
+
+        if (!selectedCategory || !selectedSuite || !toolId) {
             return NextResponse.json({ 
-                error: 'Tool ID is required' 
+                error: 'Missing required headers',
+                details: 'Category, suite, and tool ID are required'
             }, { status: 400 });
         }
 
-        // Format the tool ID
-        const formattedSK = formatToolId(toolId);
-
-        // Get the existing tool using QueryCommand
+        // Get the existing tool
         const existingTool = await docClient.send(new QueryCommand({
             TableName: process.env.DYNAMODB_TABLE_NAME,
-            KeyConditionExpression: 'PK = :pk AND SK = :sk',
+            KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
             ExpressionAttributeValues: {
-                ':pk': 'AI#CATEGORY#EMAIL',
-                ':sk': formattedSK
+                ':pk': `AI#CATEGORY#${selectedCategory}`,
+                ':sk': `SUITE#${selectedSuite}#TOOL#${toolId}`
             }
         }));
 
         if (!existingTool.Items || existingTool.Items.length === 0) {
             return NextResponse.json({ 
-                error: 'Tool not found' 
+                error: 'Tool not found',
+                details: `No tool found with ID ${toolId} in suite ${selectedSuite}`
             }, { status: 404 });
         }
 
@@ -121,7 +138,8 @@ export async function PUT(request: Request) {
             body = await request.json();
         } catch (parseError) {
             return NextResponse.json({ 
-                error: 'Invalid request body' 
+                error: 'Invalid request body',
+                details: 'Request body must be valid JSON'
             }, { status: 400 });
         }
 
@@ -158,6 +176,9 @@ export async function PUT(request: Request) {
     } catch (error) {
         console.error('Error updating tool:', error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to update tool';
-        return NextResponse.json({ error: errorMessage }, { status: 500 });
+        return NextResponse.json({ 
+            error: errorMessage,
+            stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
+        }, { status: 500 });
     }
 }

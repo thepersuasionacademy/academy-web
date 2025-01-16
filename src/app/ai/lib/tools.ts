@@ -1,4 +1,4 @@
-// app/lib/tools.ts
+// src/app/ai/lib/tools.ts
 export interface Tool {
     PK: string;
     SK: string;
@@ -15,13 +15,40 @@ export interface Tool {
 }
   
 export class ToolService {
+    parseToolIdentifier(toolId: string): { category: string; suite: string; toolName: string } {
+        if (toolId.startsWith('SUITE#')) {
+            // Full SK format: "SUITE#basics#TOOL#favorite-color-generator"
+            const parts = toolId.split('#');
+            return {
+                suite: parts[1],
+                toolName: parts[3],
+                category: 'Email' // This should come from context/props
+            };
+        }
+
+        // Simple tool ID format
+        return {
+            suite: 'basics',
+            toolName: toolId,
+            category: 'Email'
+        };
+    }
+
     async getToolById(toolId: string): Promise<Tool | null> {
         try {
-            console.log('Fetching tool with ID:', toolId);
-            
+            const { category, suite, toolName } = this.parseToolIdentifier(toolId);
+
+            console.log('Making request with parsed values:', {
+                category,
+                suite,
+                toolId: toolName
+            });
+
             const response = await fetch('/api/ai/categories/suites/tools', {
                 headers: {
-                    'x-tool-id': toolId
+                    'x-selected-category': category,
+                    'x-selected-suite': suite,
+                    'x-tool-id': toolName
                 }
             });
 

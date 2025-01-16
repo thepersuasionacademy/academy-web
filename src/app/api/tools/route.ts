@@ -37,10 +37,10 @@ interface ToolData {
   creditCost: number
   inputField1: string
   inputField1Description: string
-  inputField2: string
-  inputField2Description: string
-  inputField3: string
-  inputField3Description: string
+  inputField2?: string
+  inputField2Description?: string
+  inputField3?: string
+  inputField3Description?: string
 }
 
 const formatForDynamoDB = (name: string): string => {
@@ -96,12 +96,100 @@ const getSuiteId = async (suiteName: string, categoryId: string): Promise<string
     }))
 
     if (result.Items?.[0]) {
+      // Return the actual suite name as it appears in SK
       return result.Items[0].SK.split('#')[1]
     }
     return null
   } catch (error) {
     console.error('Error in getSuiteId:', error)
     return null
+  }
+}
+
+export async function GET(req: Request) {
+  try {
+    console.log('=== Starting GET request for tools ===');
+    const selectedCategory = req.headers.get('x-selected-category')
+    const selectedSuite = req.headers.get('x-selected-suite')
+
+    console.log('Headers received:', { selectedCategory, selectedSuite });
+
+    if (!selectedCategory || !selectedSuite) {
+      return NextResponse.json({ 
+        error: 'Missing required headers',
+        details: 'Category and suite must be specified'
+      }, { status: 400 })
+    }
+
+    // Get category ID
+    const categoryId = await getCategoryId(selectedCategory)
+    console.log('Category ID lookup:', { selectedCategory, categoryId });
+
+    if (!categoryId) {
+      return NextResponse.json({ 
+        error: 'Category not found',
+        details: `Category not found: ${selectedCategory}`
+      }, { status: 404 })
+    }
+
+    // Get suite name as used in SK
+    const suiteName = await getSuiteId(selectedSuite, categoryId)
+    console.log('Suite name lookup:', { selectedSuite, suiteName });
+
+    if (!suiteName) {
+      return NextResponse.json({ 
+        error: 'Suite not found',
+        details: `Suite not found: ${selectedSuite}`
+      }, { status: 404 })
+    }
+
+    // Query using the exact SK format from your example
+    const queryParams = {
+      TableName: process.env.DYNAMODB_TABLE_NAME!,
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
+      ExpressionAttributeValues: {
+        ':pk': `AI#CATEGORY#${categoryId}`,
+        ':sk': `SUITE#${suiteName}#TOOL#`  // Changed from selectedSuite to suiteName
+      }
+    };
+
+    console.log('DynamoDB Query:', {
+      TableName: process.env.DYNAMODB_TABLE_NAME,
+      PK: `AI#CATEGORY#${categoryId}`,
+      SK_prefix: `SUITE#${suiteName}#TOOL#`
+    });
+
+    const result = await docClient.send(new QueryCommand(queryParams));
+    console.log('DynamoDB Result:', {
+      Count: result.Count,
+      Items: result.Items?.map(item => ({
+        SK: item.SK,
+        name: item.name,
+        description: item.description
+      }))
+    });
+
+    return NextResponse.json({
+      tools: result.Items?.map(item => ({
+        name: item.name,
+        SK: item.SK,
+        description: item.description,
+        creditCost: item.creditCost,
+        promptTemplate: item.promptTemplate,
+        inputField1: item.inputField1,
+        inputField1Description: item.inputField1Description
+      })) || []
+    })
+
+  } catch (error) {
+    console.error('Error in GET handler:', error);
+    return NextResponse.json(
+      { 
+        error: error instanceof Error ? error.message : 'Failed to fetch tools',
+        stack: error instanceof Error ? error.stack : undefined
+      },
+      { status: 500 }
+    )
   }
 }
 

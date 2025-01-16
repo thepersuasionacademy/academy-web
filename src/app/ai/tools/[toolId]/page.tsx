@@ -1,45 +1,17 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { use } from 'react';
-import type { Tool } from '@/app/ai/lib/tools';
-import { ToolService } from '@/app/ai/lib/tools';
-import ToolInterface from '@/app/ai/components/embed/ToolInterface';
+// src/app/ai/tools/[toolId]/page.tsx
+import { Suspense } from 'react';
+import ToolPageClient from './ToolPageClient';
 
 interface PageProps {
-  params: Promise<{ toolId: string }>;
+  params: { toolId: string };
 }
 
-export default function Page({ params }: PageProps) {
-  const resolvedParams = use(params);
-  const [tool, setTool] = useState<Tool | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    if (!resolvedParams.toolId) return;
-
-    const fetchTool = async () => {
-      try {
-        const toolService = new ToolService();
-        const toolData = await toolService.getToolById(resolvedParams.toolId);
-        if (toolData) {
-          setTool(toolData);
-        }
-      } catch (error) {
-        console.error('Error fetching tool:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTool();
-  }, [resolvedParams.toolId]);
-
+export default async function Page({ params }: PageProps) {
+  const toolId = await Promise.resolve(params.toolId);
+  
   return (
-    <main className="min-h-screen bg-[#17171a] relative">
-      <div className="flex flex-col items-center justify-center min-h-screen">
-        <ToolInterface tool={tool} isLoading={isLoading} />
-      </div>
-    </main>
+    <Suspense fallback={<div>Loading...</div>}>
+      <ToolPageClient toolId={toolId} />
+    </Suspense>
   );
 }

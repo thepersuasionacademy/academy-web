@@ -3,13 +3,13 @@
 import { useState } from 'react'
 
 type Tool = {
-  id: string
   name: string
   description: string
   creditCost: number
   promptTemplate: string
   inputField1: string
   inputField1Description: string
+  SK: string  // Added to access the full sort key
 }
 
 interface ToolEditorProps {
@@ -38,8 +38,9 @@ export default function ToolEditor({
     setError('')
 
     const formData = new FormData(e.currentTarget)
+    const toolId = tool.SK.split('TOOL#')[1] // Extract tool ID from SK
+
     const toolData = {
-      id: tool.id,
       name: formData.get('name'),
       description: formData.get('description'),
       creditCost: Number(formData.get('creditCost')),
@@ -52,7 +53,7 @@ export default function ToolEditor({
       console.log('Making update request with:', {
         category: selectedCategory,
         suite: selectedSuite,
-        toolId: tool.id,
+        toolId: toolId,
         data: toolData
       })
 
@@ -62,7 +63,7 @@ export default function ToolEditor({
           'Content-Type': 'application/json',
           'x-selected-category': selectedCategory,
           'x-selected-suite': selectedSuite,
-          'x-tool-id': tool.id
+          'x-tool-id': toolId
         },
         body: JSON.stringify(toolData)
       })
