@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import ScrollProgress from "../components/ScrollProgress";
+import ScrollProgress from "../streaming/components/ScrollProgress";
 import { UserProvider } from '@auth0/nextjs-auth0/client';
 
 const geistSans = localFont({
