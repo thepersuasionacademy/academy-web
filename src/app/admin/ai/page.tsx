@@ -1,14 +1,19 @@
+import { Suspense } from 'react'
 import AdminToolsClient from './AdminToolsClient'
 
-export interface AdminPageParams {
+type PageParams = {
   id: string;
 }
 
-export interface AdminPageProps {
-  params: AdminPageParams;
-  searchParams: { [key: string]: string | string[] | undefined };  // Removed optional marker
+type Props = {
+  params: PageParams;
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
-export default function Page(props: AdminPageProps) {
-  return <AdminToolsClient {...props} />
+export default function Page({ params, searchParams }: Props) {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AdminToolsClient params={params} searchParams={searchParams} />
+    </Suspense>
+  )
 }
