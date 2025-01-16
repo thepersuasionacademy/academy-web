@@ -1,20 +1,19 @@
+import { getSession } from '@auth0/nextjs-auth0'
+import { redirect } from 'next/navigation'
 import AdminToolsClient from './AdminToolsClient'
 
-// Default Next.js page types
-type Params = {
-  id: string;
-}
-
-type SearchParams = { [key: string]: string | string[] | undefined }
-
-// Instead of defining our own types, let Next.js infer them
-export default function Page({
-  params,
-  searchParams,
+export default async function Page({ 
+  params, 
+  searchParams 
 }: {
-  params: Params,
-  searchParams: SearchParams,
+  params: { id: string }
+  searchParams: { [key: string]: string | string[] | undefined }
 }) {
-  // Pass the props directly, letting Next.js handle the Promise resolution
+  const session = await getSession()
+  
+  if (!session) {
+    redirect('/api/auth/login')
+  }
+
   return <AdminToolsClient params={params} searchParams={searchParams} />
 }
