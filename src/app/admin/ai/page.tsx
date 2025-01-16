@@ -1,11 +1,14 @@
 import AdminToolsClient from './AdminToolsClient'
 
-export default async function Page({ 
-  params,
-  searchParams 
-}: {
-  params: { id: string }
-  searchParams: { [key: string]: string | string[] | undefined }
-}) {
-  return <AdminToolsClient params={params} searchParams={searchParams} />
+export interface AdminPageParams {
+  id: string;
+}
+
+export interface AdminPageProps {
+  params: AdminPageParams;
+  searchParams: { [key: string]: string | string[] | undefined };  // Removed optional marker
+}
+
+export default function Page(props: AdminPageProps) {
+  return <AdminToolsClient {...props} />
 }

@@ -1,4 +1,3 @@
-// src/app/admin/ai/AdminToolsClient.tsx
 'use client'
 
 import { useState } from 'react'
@@ -9,13 +8,10 @@ import { ToolContainer } from '@/app/ai/components/dashboard/types/views/ToolCon
 import CategorySidebar from '@/app/ai/components/dashboard/types/views/CategorySidebar'
 import SuiteSelector from '@/app/ai/components/dashboard/SuiteSelector'
 import { type Tool, type SuccessState } from '@/app/ai/components/dashboard/types'
+import type { AdminPageProps } from './page'  // Import types from page.tsx
 
-interface AdminToolsClientProps {
-  params: { id: string }
-  searchParams: { [key: string]: string | string[] | undefined }
-}
-
-export default function AdminToolsClient({ params, searchParams }: AdminToolsClientProps) {
+export default function AdminToolsClient(props: AdminPageProps) {  // Use the same type as page.tsx
+  const { params, searchParams } = props
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<SuccessState | null>(null)
