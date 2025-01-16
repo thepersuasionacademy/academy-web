@@ -1,4 +1,3 @@
-//src/app/admin/ai/page.tsx
 'use client'
 
 import { useState } from 'react'
@@ -10,12 +9,15 @@ import CategorySidebar from '@/app/ai/components/dashboard/types/views/CategoryS
 import SuiteSelector from '@/app/ai/components/dashboard/SuiteSelector'
 import { type Tool, type SuccessState } from '@/app/ai/components/dashboard/types'
 
+type SearchParamValue = string | string[] | undefined
+
 interface PageProps {
   params: { id: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+  searchParams: { [key: string]: SearchParamValue }
 }
 
-export default function CreateToolPage({ params, searchParams }: PageProps) {
+export default function CreateToolPage(props: PageProps) {
+  const { params, searchParams } = props
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<SuccessState | null>(null)
