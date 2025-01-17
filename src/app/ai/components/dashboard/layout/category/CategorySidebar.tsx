@@ -15,6 +15,7 @@ interface CategorySidebarProps {
   isLoadingCategories: boolean
   categoryInput: string
   setCategoryInput: (value: string) => void
+  hideCreationControls?: boolean
 }
 
 export default function CategorySidebar({
@@ -23,7 +24,8 @@ export default function CategorySidebar({
   onSelectCategory,
   isLoadingCategories,
   categoryInput,
-  setCategoryInput
+  setCategoryInput,
+  hideCreationControls = false
 }: CategorySidebarProps) {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false)
   const [newCategoryName, setNewCategoryName] = useState('')
@@ -71,14 +73,11 @@ export default function CategorySidebar({
 
       const data = await response.json()
       
-      // Refresh the categories list
       await refreshCategories()
       
-      // Clear form and close it
       setNewCategoryName('')
       setIsCreatingCategory(false)
       
-      // Select the newly created category
       onSelectCategory(data.category.name)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create category')
@@ -101,46 +100,50 @@ export default function CategorySidebar({
           />
         </div>
 
-        {!isCreatingCategory ? (
-          <button
-            onClick={() => setIsCreatingCategory(true)}
-            className="w-full flex items-center justify-center px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg text-gray-300 transition-colors duration-200 gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            New Category
-          </button>
-        ) : (
-          <form onSubmit={handleCreateCategory} className="space-y-2">
-            <input
-              type="text"
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              placeholder="Category name"
-              className="w-full px-4 py-2 bg-gray-800/50 rounded-lg text-white border border-gray-700 focus:outline-none focus:border-[#9d042b]"
-              disabled={isSubmitting}
-              autoFocus
-            />
-            <div className="flex gap-2">
+        {!hideCreationControls && (
+          <>
+            {!isCreatingCategory ? (
               <button
-                type="submit"
-                disabled={isSubmitting || !newCategoryName.trim()}
-                className="flex-1 px-4 py-2 bg-[#9d042b] hover:bg-[#8a0326] disabled:bg-[#6d021f] rounded-lg text-white transition-colors duration-200 text-sm"
+                onClick={() => setIsCreatingCategory(true)}
+                className="w-full flex items-center justify-center px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg text-gray-300 transition-colors duration-200 gap-2"
               >
-                {isSubmitting ? 'Creating...' : 'Create'}
+                <Plus className="h-4 w-4" />
+                New Category
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setIsCreatingCategory(false)
-                  setNewCategoryName('')
-                  setError('')
-                }}
-                className="flex-1 px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg text-gray-300 transition-colors duration-200 text-sm"
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
+            ) : (
+              <form onSubmit={handleCreateCategory} className="space-y-2">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Category name"
+                  className="w-full px-4 py-2 bg-gray-800/50 rounded-lg text-white border border-gray-700 focus:outline-none focus:border-[#9d042b]"
+                  disabled={isSubmitting}
+                  autoFocus
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !newCategoryName.trim()}
+                    className="flex-1 px-4 py-2 bg-[#9d042b] hover:bg-[#8a0326] disabled:bg-[#6d021f] rounded-lg text-white transition-colors duration-200 text-sm"
+                  >
+                    {isSubmitting ? 'Creating...' : 'Create'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingCategory(false)
+                      setNewCategoryName('')
+                      setError('')
+                    }}
+                    className="flex-1 px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg text-gray-300 transition-colors duration-200 text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            )}
+          </>
         )}
 
         {error && (

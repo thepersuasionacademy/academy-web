@@ -1,5 +1,5 @@
 //src/app/ai/components/dashboard/SuccessNotification.tsx
-import { SuccessState } from './types'
+import { SuccessState } from '../types'
 
 type SuccessNotificationProps = {
   success: SuccessState

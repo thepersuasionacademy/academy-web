@@ -4,9 +4,9 @@ import { useState } from 'react'
 import { useCategories } from '@/app/ai/hooks/useCategories'
 import { useTools } from '@/app/ai/hooks/useTools'
 import { useSuites } from '@/app/ai/hooks/useSuites'
-import { ToolContainer } from '@/app/ai/components/dashboard/types/views/ToolContainer'
-import CategorySidebar from '@/app/ai/components/dashboard/types/views/CategorySidebar'
-import SuiteSelector from '@/app/ai/components/dashboard/SuiteSelector'
+import { ToolContainer } from '@/app/ai/components/dashboard/layout/tool/ToolContainer'
+import CategorySidebar from '@/app/ai/components/dashboard/layout/category/CategorySidebar'
+import SuiteSelector from '@/app/ai/components/dashboard/layout/suite/SuiteSelector'
 import { type Tool, type SuccessState } from '@/app/ai/components/dashboard/types'
 
 type PageParams = {
@@ -16,9 +16,14 @@ type PageParams = {
 interface AdminToolsClientProps {
   params: PageParams;
   searchParams: { [key: string]: string | string[] | undefined };
+  hideCreationControls?: boolean;
 }
 
-export default function AdminToolsClient({ params, searchParams }: AdminToolsClientProps) {
+export default function AdminToolsClient({ 
+  params, 
+  searchParams,
+  hideCreationControls = false 
+}: AdminToolsClientProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState<SuccessState | null>(null)
@@ -127,6 +132,7 @@ export default function AdminToolsClient({ params, searchParams }: AdminToolsCli
         isLoadingCategories={isLoadingCategories}
         categoryInput={categoryInput}
         setCategoryInput={setCategoryInput}
+        hideCreationControls={hideCreationControls}
       />
 
       <div className="flex-1 flex flex-col min-h-screen">
@@ -139,6 +145,7 @@ export default function AdminToolsClient({ params, searchParams }: AdminToolsCli
           }}
           isLoadingSuites={isLoadingSuites}
           selectedCategory={selectedCategory!}
+          hideCreationControls={hideCreationControls}
         />
 
         <ToolContainer
@@ -153,6 +160,7 @@ export default function AdminToolsClient({ params, searchParams }: AdminToolsCli
           success={success}
           tools={tools}
           isLoadingTools={isLoadingTools}
+          hideCreationControls={hideCreationControls}
         />
       </div>
     </div>

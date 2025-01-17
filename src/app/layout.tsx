@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import ScrollProgress from "../streaming/components/ScrollProgress";
 import { UserProvider } from '@auth0/nextjs-auth0/client';
+import Header from '@/app/layout/Header';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -32,8 +33,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <UserProvider>
-          <ScrollProgress />
-          {children}
+          <Header />
+          <main className="pt-0"> {/* Add padding-top for fixed header */}
+            <ScrollProgress />
+            {children}
+          </main>
         </UserProvider>
       </body>
     </html>

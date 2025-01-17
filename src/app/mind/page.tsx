@@ -1,16 +1,15 @@
-'use client';
+'use client'
 
 import { useState, useEffect, useRef } from 'react';
-import NavigationBar from '@/streaming/components/dashboard/navigation/NavigationBar';
 import { FeaturedContent } from '@/streaming/components/dashboard/FeaturedContent';
 import { ContentGrid } from '@/streaming/components/dashboard/ContentGrid';
 import { MediaPlayer } from '@/streaming/components/player';
 import { SuiteView } from '@/streaming/components/dashboard/SuiteView';
-import { categories, MediaItem } from '@/app/mind/lib/types/dashboard';
+import { categories, MediaItem } from '@/app/training/lib/types/dashboard';
 import { PlayerState, PlayerView } from '@/streaming/lib/types/media';
 
 const AUDIO_SOURCES = {
-  audio: "https://mindmasterystack-streamingbucket7fe001bf-0msumefkguly.s3.us-east-2.amazonaws.com/00+-+Pre-float+Preparation.mp3"
+  audio: "/path/to/your/audio/source.mp3"
 };
 
 export default function Home() {
@@ -19,8 +18,8 @@ export default function Home() {
     currentTime: 0,
     duration: 0,
     volume: 0.7,
-    title: 'Focus Flow',
-    artist: 'Daily Mix',
+    title: 'Cold Calling Mastery',
+    artist: 'Sales Training',
     coverImage: '/api/placeholder/60/60',
     isLiked: false,
     view: PlayerView.BAR
@@ -28,15 +27,12 @@ export default function Home() {
 
   const [selectedSuite, setSelectedSuite] = useState<MediaItem | null>(null);
   const scrollPositionRef = useRef(0);
-
   const featuredContent = categories[0].items[0];
 
   useEffect(() => {
     if (selectedSuite) {
-      // Store current scroll position when opening suite
       scrollPositionRef.current = window.scrollY;
     } else {
-      // Restore scroll position when closing suite
       requestAnimationFrame(() => {
         window.scrollTo(0, scrollPositionRef.current);
       });
@@ -48,7 +44,7 @@ export default function Home() {
       ...prev,
       isPlaying: true,
       title: item.title,
-      artist: item.artist || '',
+      artist: item.artist || 'Sales Training',
       coverImage: item.image,
       duration: item.duration || 0
     }));
@@ -58,7 +54,7 @@ export default function Home() {
     if (selectedSuite) {
       handlePlay({
         ...selectedSuite,
-        title: `${selectedSuite.title} - Track ${trackId}`
+        title: `${selectedSuite.title} - Module ${trackId}`
       });
     }
   };
@@ -75,7 +71,7 @@ export default function Home() {
       try {
         await navigator.share({
           title: playerState.title,
-          text: 'Check out this track',
+          text: 'Check out this sales training module',
           url: window.location.href
         });
       } catch (error) {
@@ -86,8 +82,11 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-zinc-900 text-white">
-      <NavigationBar />
       <main className="pb-24">
+        <div className="py-6 px-4 sm:px-6 lg:px-8">
+          <h1 className="text-3xl font-bold mb-8">Sales Persuasion Training</h1>
+        </div>
+        
         <FeaturedContent 
           content={featuredContent}
           onPlay={() => handlePlay(featuredContent)}

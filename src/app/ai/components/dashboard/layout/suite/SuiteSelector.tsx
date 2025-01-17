@@ -14,6 +14,7 @@ interface SuiteSelectorProps {
   onSelectSuite: (suite: string) => void
   isLoadingSuites: boolean
   selectedCategory: string
+  hideCreationControls?: boolean
 }
 
 export default function SuiteSelector({
@@ -21,7 +22,8 @@ export default function SuiteSelector({
   selectedSuite,
   onSelectSuite,
   isLoadingSuites,
-  selectedCategory
+  selectedCategory,
+  hideCreationControls = false
 }: SuiteSelectorProps) {
   const [isCreatingSuite, setIsCreatingSuite] = useState(false)
   const [newSuiteName, setNewSuiteName] = useState('')
@@ -122,44 +124,48 @@ export default function SuiteSelector({
           </button>
         ))}
         
-        {isCreatingSuite ? (
-          <form onSubmit={handleCreateSuite} className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newSuiteName}
-              onChange={(e) => setNewSuiteName(e.target.value)}
-              placeholder="Suite name"
-              className="px-4 py-2 rounded-full bg-gray-800/50 text-white border border-gray-700 focus:outline-none focus:border-[#9d042b]"
-              disabled={isSubmitting}
-              autoFocus
-            />
-            <button
-              type="submit"
-              disabled={isSubmitting || !newSuiteName.trim()}
-              className="px-4 py-2 bg-[#9d042b] hover:bg-[#8a0326] disabled:bg-[#6d021f] rounded-full text-white transition-colors duration-200"
-            >
-              {isSubmitting ? 'Creating...' : 'Create'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsCreatingSuite(false)
-                setNewSuiteName('')
-                setError('')
-              }}
-              className="px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 transition-colors duration-200"
-            >
-              Cancel
-            </button>
-          </form>
-        ) : (
-          <button
-            onClick={() => setIsCreatingSuite(true)}
-            className="flex items-center px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 transition-colors duration-200"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New Suite
-          </button>
+        {!hideCreationControls && (
+          <>
+            {isCreatingSuite ? (
+              <form onSubmit={handleCreateSuite} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newSuiteName}
+                  onChange={(e) => setNewSuiteName(e.target.value)}
+                  placeholder="Suite name"
+                  className="px-4 py-2 rounded-full bg-gray-800/50 text-white border border-gray-700 focus:outline-none focus:border-[#9d042b]"
+                  disabled={isSubmitting}
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !newSuiteName.trim()}
+                  className="px-4 py-2 bg-[#9d042b] hover:bg-[#8a0326] disabled:bg-[#6d021f] rounded-full text-white transition-colors duration-200"
+                >
+                  {isSubmitting ? 'Creating...' : 'Create'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreatingSuite(false)
+                    setNewSuiteName('')
+                    setError('')
+                  }}
+                  className="px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <button
+                onClick={() => setIsCreatingSuite(true)}
+                className="flex items-center px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 transition-colors duration-200"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                New Suite
+              </button>
+            )}
+          </>
         )}
       </div>
       

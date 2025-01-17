@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react';
-import NavigationBar from '@/streaming/components/dashboard/navigation/NavigationBar';
 import { FeaturedContent } from '@/streaming/components/dashboard/FeaturedContent';
 import { ContentGrid } from '@/streaming/components/dashboard/ContentGrid';
 import { MediaPlayer } from '@/streaming/components/player';
@@ -28,7 +27,6 @@ export default function Home() {
 
   const [selectedSuite, setSelectedSuite] = useState<MediaItem | null>(null);
   const scrollPositionRef = useRef(0);
-
   const featuredContent = categories[0].items[0];
 
   useEffect(() => {
@@ -83,13 +81,8 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-900 text-white">
-      <NavigationBar />
-      <main className="pb-24">
-        <div className="py-6 px-4 sm:px-6 lg:px-8">
-          <h1 className="text-3xl font-bold mb-8">Sales Persuasion Training</h1>
-        </div>
-        
+    <div className="min-h-screen bg-[#131826] text-white">
+      <main>
         <FeaturedContent 
           content={featuredContent}
           onPlay={() => handlePlay(featuredContent)}

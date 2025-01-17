@@ -1,7 +1,7 @@
 //src/app/ai/components/dashboard/ToolForm.tsx
 import { ChevronDown } from 'lucide-react'
 import { useState } from 'react'
-import { type Tool } from './types'
+import { type Tool } from '../types'
 
 type InputField = {
   id: string
