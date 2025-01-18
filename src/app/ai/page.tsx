@@ -1,5 +1,4 @@
 // page.tsx
-import { getSession } from '@auth0/nextjs-auth0'
 import { redirect } from 'next/navigation'
 import AdminToolsClient from '../admin/ai/AdminToolsClient'
 import type { Metadata } from 'next'
@@ -14,10 +13,7 @@ interface PageContext {
 }
 
 export default async function Page(context: PageContext) {
-  const session = await getSession()
-  if (!session) {
-    redirect('/api/auth/login')
-  }
+
 
   const params = await context.params
   return (

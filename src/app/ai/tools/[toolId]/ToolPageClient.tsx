@@ -1,4 +1,3 @@
-// src/app/ai/tools/[toolId]/ToolPageClient.tsx
 'use client';
 
 import { useTool } from '@/app/ai/hooks/useTool';
@@ -44,7 +43,7 @@ export default function ToolPageClient({ toolId }: ToolPageClientProps) {
   }
 
   return (
-    <main className="min-h-screen bg-[#17171a] relative">
+    <main className="min-h-screen bg-[#121826] relative">
       <div className="flex flex-col items-center justify-center min-h-screen">
         <ToolInterface tool={adaptedTool} isLoading={isLoading} />
       </div>
