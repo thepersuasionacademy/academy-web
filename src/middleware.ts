@@ -4,8 +4,19 @@ import { getSession } from '@auth0/nextjs-auth0/edge';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(req: NextRequest) {
-  // Bypass auth in development
-  if (process.env.NODE_ENV === 'development') {
+  // Debug logging
+  console.log('Current host:', req.headers.get('host'));
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('VERCEL:', process.env.VERCEL);
+
+  // Bypass auth for specific GitHub Codespace URL or local development
+  const isGitHubDev = req.headers.get('host') === 'cautious-space-barnacle-69grq676rx4gf5vjv-3000.app.github.dev';
+  const isLocalDev = !process.env.VERCEL && process.env.NODE_ENV === 'development';
+  
+  console.log('isGitHubDev:', isGitHubDev);
+  console.log('isLocalDev:', isLocalDev);
+
+  if (isGitHubDev || isLocalDev) {
     return NextResponse.next();
   }
 
@@ -14,7 +25,6 @@ export async function middleware(req: NextRequest) {
   const session = await getSession(req, res);
 
   if (!session) {
-    // Simply redirect to login, Auth0 SDK will handle the rest
     return NextResponse.redirect(new URL('/api/auth/login', req.url));
   }
 
@@ -23,7 +33,6 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Protect everything except auth endpoints and static files
     '/((?!api/auth|_next|favicon.ico).*)'
   ]
 }

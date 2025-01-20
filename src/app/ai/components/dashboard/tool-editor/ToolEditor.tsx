@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useTheme } from '@/app/context/ThemeContext'
+import { Trash2 } from 'lucide-react'
 
 type Tool = {
   name: string
@@ -29,6 +30,7 @@ export default function ToolEditor({
   selectedSuite 
 }: ToolEditorProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [error, setError] = useState('')
   const { theme } = useTheme()
 
@@ -87,6 +89,40 @@ export default function ToolEditor({
       setError(err instanceof Error ? err.message : 'An unexpected error occurred')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!window.confirm('Are you sure you want to delete this tool? This action cannot be undone.')) {
+      return
+    }
+
+    setIsDeleting(true)
+    setError('')
+
+    const toolId = tool.SK.split('TOOL#')[1]
+
+    try {
+      const response = await fetch('/api/ai/categories/suites/tools', {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-selected-category': selectedCategory,
+          'x-selected-suite': selectedSuite,
+          'x-tool-id': toolId
+        }
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete tool')
+      }
+
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete tool')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -197,6 +233,20 @@ export default function ToolEditor({
               </button>
             </div>
           </form>
+
+          {/* Delete Button */}
+          <div className="mt-12 pt-8 border-t border-[var(--border-color)] flex flex-col items-center">
+            <button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="group flex flex-col items-center px-4 py-2 text-red-500 hover:text-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+            >
+              <Trash2 className="w-5 h-5 mb-1" />
+              <span className="text-sm">
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@auth0/nextjs-auth0'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { DynamoDBDocumentClient, GetCommand, QueryCommand, PutCommand } from '@aws-sdk/lib-dynamodb'
+import { 
+  DynamoDBDocumentClient, 
+  GetCommand, 
+  QueryCommand, 
+  PutCommand,
+  DeleteCommand 
+} from '@aws-sdk/lib-dynamodb'
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION,
@@ -96,7 +102,6 @@ const getSuiteId = async (suiteName: string, categoryId: string): Promise<string
     }))
 
     if (result.Items?.[0]) {
-      // Return the actual suite name as it appears in SK
       return result.Items[0].SK.split('#')[1]
     }
     return null
@@ -108,11 +113,11 @@ const getSuiteId = async (suiteName: string, categoryId: string): Promise<string
 
 export async function GET(req: Request) {
   try {
-    console.log('=== Starting GET request for tools ===');
+    console.log('=== Starting GET request for tools ===')
     const selectedCategory = req.headers.get('x-selected-category')
     const selectedSuite = req.headers.get('x-selected-suite')
 
-    console.log('Headers received:', { selectedCategory, selectedSuite });
+    console.log('Headers received:', { selectedCategory, selectedSuite })
 
     if (!selectedCategory || !selectedSuite) {
       return NextResponse.json({ 
@@ -121,9 +126,8 @@ export async function GET(req: Request) {
       }, { status: 400 })
     }
 
-    // Get category ID
     const categoryId = await getCategoryId(selectedCategory)
-    console.log('Category ID lookup:', { selectedCategory, categoryId });
+    console.log('Category ID lookup:', { selectedCategory, categoryId })
 
     if (!categoryId) {
       return NextResponse.json({ 
@@ -132,9 +136,8 @@ export async function GET(req: Request) {
       }, { status: 404 })
     }
 
-    // Get suite name as used in SK
     const suiteName = await getSuiteId(selectedSuite, categoryId)
-    console.log('Suite name lookup:', { selectedSuite, suiteName });
+    console.log('Suite name lookup:', { selectedSuite, suiteName })
 
     if (!suiteName) {
       return NextResponse.json({ 
@@ -143,31 +146,23 @@ export async function GET(req: Request) {
       }, { status: 404 })
     }
 
-    // Query using the exact SK format from your example
     const queryParams = {
       TableName: process.env.DYNAMODB_TABLE_NAME!,
       KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
       ExpressionAttributeValues: {
         ':pk': `AI#CATEGORY#${categoryId}`,
-        ':sk': `SUITE#${suiteName}#TOOL#`  // Changed from selectedSuite to suiteName
+        ':sk': `SUITE#${suiteName}#TOOL#`
       }
-    };
+    }
 
     console.log('DynamoDB Query:', {
       TableName: process.env.DYNAMODB_TABLE_NAME,
       PK: `AI#CATEGORY#${categoryId}`,
       SK_prefix: `SUITE#${suiteName}#TOOL#`
-    });
+    })
 
-    const result = await docClient.send(new QueryCommand(queryParams));
-    console.log('DynamoDB Result:', {
-      Count: result.Count,
-      Items: result.Items?.map(item => ({
-        SK: item.SK,
-        name: item.name,
-        description: item.description
-      }))
-    });
+    const result = await docClient.send(new QueryCommand(queryParams))
+    console.log('DynamoDB result:', result)
 
     return NextResponse.json({
       tools: result.Items?.map(item => ({
@@ -182,7 +177,7 @@ export async function GET(req: Request) {
     })
 
   } catch (error) {
-    console.error('Error in GET handler:', error);
+    console.error('Error in GET handler:', error)
     return NextResponse.json(
       { 
         error: error instanceof Error ? error.message : 'Failed to fetch tools',
@@ -210,9 +205,12 @@ export async function POST(req: Request) {
       inputField3Description
     }: ToolCreationRequest = await req.json()
 
-    const session = await getSession()
-    if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    // Skip authentication in development
+    if (process.env.NODE_ENV === 'production') {
+      const session = await getSession()
+      if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
     }
 
     if (!name || !categoryName || !suiteName || !description || !promptTemplate || creditCost === undefined || !inputField1) {
@@ -268,7 +266,7 @@ export async function POST(req: Request) {
       )
     }
 
-    // Create tool with fixed input fields
+    // Create tool
     await docClient.send(new PutCommand({
       TableName: process.env.DYNAMODB_TABLE_NAME!,
       Item: {
@@ -319,6 +317,78 @@ export async function POST(req: Request) {
           hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
           hasTableName: !!process.env.DYNAMODB_TABLE_NAME
         }
+      },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const url = new URL(req.url)
+    const toolName = url.pathname.split('/').pop()
+
+    if (!toolName) {
+      return NextResponse.json({ 
+        error: 'Missing tool name',
+        details: 'Tool name must be specified in the URL'
+      }, { status: 400 })
+    }
+
+    const selectedCategory = req.headers.get('x-selected-category')
+    const selectedSuite = req.headers.get('x-selected-suite')
+
+    if (!selectedCategory || !selectedSuite) {
+      return NextResponse.json({ 
+        error: 'Missing required headers',
+        details: 'Category and suite must be specified'
+      }, { status: 400 })
+    }
+
+    // Skip authentication in development
+    if (process.env.NODE_ENV === 'production') {
+      const session = await getSession()
+      if (!session?.user) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
+
+    const categoryId = await getCategoryId(selectedCategory)
+    if (!categoryId) {
+      return NextResponse.json({ 
+        error: 'Category not found',
+        details: `Category not found: ${selectedCategory}`
+      }, { status: 404 })
+    }
+
+    const suiteId = await getSuiteId(selectedSuite, categoryId)
+    if (!suiteId) {
+      return NextResponse.json({ 
+        error: 'Suite not found',
+        details: `Suite not found: ${selectedSuite}`
+      }, { status: 404 })
+    }
+
+    const formattedToolName = formatForDynamoDB(toolName)
+    await docClient.send(new DeleteCommand({
+      TableName: process.env.DYNAMODB_TABLE_NAME!,
+      Key: {
+        PK: `AI#CATEGORY#${categoryId}`,
+        SK: `SUITE#${suiteId}#TOOL#${formattedToolName}`
+      }
+    }))
+
+    return NextResponse.json({ 
+      message: 'Tool deleted successfully',
+      toolName: toolName
+    })
+
+  } catch (error) {
+    console.error('Error deleting tool:', error)
+    return NextResponse.json(
+      { 
+        error: error instanceof Error ? `Failed to delete tool: ${error.message}` : 'Failed to delete tool',
+        details: process.env.NODE_ENV === 'development' ? error : undefined
       },
       { status: 500 }
     )

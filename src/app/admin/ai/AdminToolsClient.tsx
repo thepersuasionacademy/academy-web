@@ -120,6 +120,102 @@ export default function AdminToolsClient({
     }
   }
 
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+
+  const handleDelete = async () => {
+    if (!selectedTool || !selectedCategory || !selectedSuite) return;
+    
+    setLoading(true);
+    setError('');
+  
+    try {
+      // Format the tool name to match DynamoDB format
+      const formattedToolName = selectedTool.name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9-\s]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+      
+      console.log('Deleting tool:', { 
+        rawName: selectedTool.name, 
+        formattedName: formattedToolName 
+      });
+  
+      const response = await fetch('/api/ai/categories/suites/tools', {
+        method: 'DELETE',
+        headers: { 
+          'Content-Type': 'application/json',
+          'x-selected-category': selectedCategory,
+          'x-selected-suite': selectedSuite,
+          'x-tool-id': formattedToolName
+        }
+      });
+  
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete tool');
+      }
+  
+      await refreshTools();
+      setSelectedTool(null);
+      setIsDeleteModalOpen(false);
+    } catch (err) {
+      const error = err as Error;
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDuplicate = async (tool: Tool) => {
+    if (!selectedCategory || !selectedSuite) {
+      setError('Category and Suite must be selected to duplicate a tool');
+      return;
+    }
+
+    console.log('Starting duplication for tool:', tool.name);
+    
+    try {
+      const toolData = {
+        categoryName: selectedCategory,
+        suiteName: selectedSuite,
+        name: `${tool.name} - Copy`,
+        description: tool.description,
+        promptTemplate: tool.promptTemplate,
+        creditCost: tool.creditCost,
+        inputField1: tool.inputField1,
+        inputField1Description: tool.inputField1Description || ''
+      }
+
+      console.log('Sending duplicate request with data:', toolData);
+
+      const toolResponse = await fetch('/api/tools', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(toolData)
+      })
+  
+      if (!toolResponse.ok) {
+        const text = await toolResponse.text()
+        console.error('Duplicate response error:', text);
+        try {
+          const json = JSON.parse(text)
+          throw new Error(json.details || json.error || text)
+        } catch {
+          throw new Error(text)
+        }
+      }
+  
+      await refreshTools()
+      console.log('Tool duplicated successfully');
+    } catch (err) {
+      const error = err as Error
+      console.error('Duplication error:', error);
+      setError(error.message)
+    }
+  }
+
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
       <CategorySidebar
@@ -152,6 +248,8 @@ export default function AdminToolsClient({
           selectedTool={selectedTool}
           onToolUpdate={handleToolUpdate}
           onSubmit={handleSubmit}
+          onDelete={handleDelete}
+          onDuplicate={handleDuplicate}
           setSelectedTool={setSelectedTool}
           selectedCategory={selectedCategory!}
           selectedSuite={selectedSuite!}
