@@ -23,7 +23,7 @@ export function ResponseDisplay({
   const { theme } = useTheme();
 
   return (
-    <div className="max-w-3xl w-full px-4 py-16">
+    <div className="max-w-3xl w-full px-4 py-4">
       <div className={`prose max-w-none ${
         theme === 'dark' ? 'prose-invert' : 'prose-gray'
       }`}>

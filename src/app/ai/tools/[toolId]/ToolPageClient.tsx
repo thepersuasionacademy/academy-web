@@ -90,25 +90,34 @@ export default function ToolPageClient({ toolId }: ToolPageClientProps) {
 
   return (
     <main className="min-h-screen bg-[var(--background)]">
-      {/* Theme Toggle Bar */}
+      {/* Sliding Theme Toggle */}
       <div className="w-full py-4 flex justify-center">
         {mounted && (
           <button 
             onClick={toggleTheme}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--card-bg)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-all duration-200 hover:shadow-md"
+            className="relative flex items-center p-1 rounded-full bg-[var(--card-bg)] border border-[var(--border-color)]"
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {theme === 'dark' ? (
-              <>
-                <Sun className="h-4 w-4" />
-                <span className="text-sm font-medium">Light Mode</span>
-              </>
-            ) : (
-              <>
-                <Moon className="h-4 w-4" />
-                <span className="text-sm font-medium">Dark Mode</span>
-              </>
-            )}
+            {/* Background Icons */}
+            <div className="flex items-center space-x-1">
+              <div className="w-6 h-6 flex items-center justify-center">
+                <Moon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+              </div>
+              <div className="w-6 h-6 flex items-center justify-center">
+                <Sun className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
+              </div>
+            </div>
+            
+            {/* Sliding Indicator */}
+            <div className={`absolute top-1 h-6 w-6 rounded-full bg-[var(--hover-bg)] transition-all duration-200 ${
+              theme === 'dark' ? 'left-1' : 'left-[calc(100%-28px)]'
+            }`}>
+              {theme === 'dark' ? (
+                <Moon className="h-3.5 w-3.5 text-[var(--foreground)] m-auto mt-1.5" />
+              ) : (
+                <Sun className="h-3.5 w-3.5 text-[var(--foreground)] m-auto mt-1.5" />
+              )}
+            </div>
           </button>
         )}
       </div>

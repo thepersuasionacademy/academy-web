@@ -118,7 +118,7 @@ export default function GenerateSection({ tool, isLoading }: GenerateSectionProp
     }
 
     return (
-      <div className="max-w-3xl w-full px-4 py-16">
+      <div className="max-w-3xl w-full px-4 py-18">
         <ToolHeader tool={tool} isLoading={isLoading} />
         <InputFields
           tool={tool}

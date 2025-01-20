@@ -1,9 +1,9 @@
-// src/app/ai/components/InputFields.tsx
 'use client';
 
 import React from 'react';
-import { useTheme } from '@/app/context/ThemeContext';
 import type { Tool } from '@/app/ai/lib/tools';
+import { useTheme } from '@/app/context/ThemeContext';
+import { ArrowRight } from 'lucide-react';
 
 interface InputFieldsProps {
   tool: Tool | null;
@@ -20,21 +20,23 @@ export function InputFields({
   onInputChange, 
   onKeyPress 
 }: InputFieldsProps) {
-  const { theme } = useTheme();
-
-  const inputStyles = `w-full bg-transparent text-2xl py-4 px-2 
-    border-b border-[var(--border-color)] focus:border-[var(--accent)]
-    text-[var(--foreground)] placeholder-[var(--text-secondary)]
-    focus:outline-none transition-colors duration-200`;
-
   return (
-    <div className="space-y-8 mb-16">
+    <div className="space-y-12 mb-16">
       <div>
+        <label className="block text-[var(--foreground)] text-2xl font-semibold mb-3 flex items-center gap-2">
+          <ArrowRight className="h-6 w-6 text-[var(--text-secondary)]" />
+          {tool?.inputField1 || 'Loading...'}
+        </label>
+        <div className="text-base text-[var(--text-secondary)] mb-4 ml-8">
+          {tool?.inputField1Description || 'Loading...'}
+        </div>
         <input 
           type="text"
           name="field1"
-          className={inputStyles}
-          placeholder={tool?.inputField1Description || 'Loading...'}
+          className="w-full bg-transparent text-xl py-4 px-2 
+            border-b border-[var(--border-color)] focus:border-[var(--accent)]
+            text-[var(--foreground)]
+            focus:outline-none transition-colors duration-200"
           value={inputs.field1}
           onChange={(e) => onInputChange('field1', e.target.value)}
           onKeyPress={(e) => onKeyPress(e, 'field1')}
@@ -45,11 +47,20 @@ export function InputFields({
 
       {(isLoading || tool?.inputField2) && (
         <div>
+          <label className="block text-[var(--foreground)] text-2xl font-semibold mb-3 flex items-center gap-2">
+            <ArrowRight className="h-6 w-6 text-[var(--text-secondary)]" />
+            {tool?.inputField2 || 'Loading...'}
+          </label>
+          <div className="text-base text-[var(--text-secondary)] mb-4 ml-8">
+            {tool?.inputField2Description || 'Loading...'}
+          </div>
           <input 
             type="text"
             name="field2"
-            className={inputStyles}
-            placeholder={tool?.inputField2Description || 'Loading...'}
+            className="w-full bg-transparent text-xl py-4 px-2 
+              border-b border-[var(--border-color)] focus:border-[var(--accent)]
+              text-[var(--foreground)]
+              focus:outline-none transition-colors duration-200"
             value={inputs.field2 || ''}
             onChange={(e) => onInputChange('field2', e.target.value)}
             onKeyPress={(e) => onKeyPress(e, 'field2')}
@@ -60,11 +71,20 @@ export function InputFields({
 
       {(isLoading || tool?.inputField3) && (
         <div>
+          <label className="block text-[var(--foreground)] text-2xl font-semibold mb-3 flex items-center gap-2">
+            <ArrowRight className="h-6 w-6 text-[var(--text-secondary)]" />
+            {tool?.inputField3 || 'Loading...'}
+          </label>
+          <div className="text-base text-[var(--text-secondary)] mb-4 ml-8">
+            {tool?.inputField3Description || 'Loading...'}
+          </div>
           <input 
             type="text"
             name="field3"
-            className={inputStyles}
-            placeholder={tool?.inputField3Description || 'Loading...'}
+            className="w-full bg-transparent text-xl py-4 px-2 
+              border-b border-[var(--border-color)] focus:border-[var(--accent)]
+              text-[var(--foreground)]
+              focus:outline-none transition-colors duration-200"
             value={inputs.field3 || ''}
             onChange={(e) => onInputChange('field3', e.target.value)}
             onKeyPress={(e) => onKeyPress(e, 'field3')}
