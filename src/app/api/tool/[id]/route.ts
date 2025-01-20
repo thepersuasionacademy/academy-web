@@ -1,7 +1,7 @@
 // src/app/api/tool/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
 
 const client = new DynamoDBClient({
   region: process.env.AWS_REGION,
@@ -18,27 +18,21 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Properly await the params
     const id = await Promise.resolve(params.id);
-    const toolSK = decodeURIComponent(id);
-
-    console.log('Fetching tool with SK:', toolSK);
-
-    const result = await docClient.send(new QueryCommand({
+    
+    // Use scan to find the tool by looking for its ID in the SK
+    const result = await docClient.send(new ScanCommand({
       TableName: process.env.DYNAMODB_TABLE_NAME!,
-      KeyConditionExpression: 'PK = :pk AND SK = :sk',
+      FilterExpression: 'contains(SK, :toolId)',
       ExpressionAttributeValues: {
-        ':pk': 'AI#CATEGORY#Email',
-        ':sk': toolSK
+        ':toolId': id
       }
     }));
-
-    console.log('DynamoDB result:', JSON.stringify(result, null, 2));
 
     if (!result.Items || result.Items.length === 0) {
       return NextResponse.json({ 
         error: 'Tool not found',
-        queriedSK: toolSK
+        queriedId: id
       }, { status: 404 });
     }
 
@@ -47,11 +41,16 @@ export async function GET(
       tools: [{
         name: tool.name,
         SK: tool.SK,
+        PK: tool.PK,
         description: tool.description,
         creditCost: tool.creditCost,
         promptTemplate: tool.promptTemplate,
         inputField1: tool.inputField1,
-        inputField1Description: tool.inputField1Description
+        inputField1Description: tool.inputField1Description,
+        inputField2: tool.inputField2,
+        inputField2Description: tool.inputField2Description,
+        inputField3: tool.inputField3,
+        inputField3Description: tool.inputField3Description
       }]
     });
   } catch (error) {

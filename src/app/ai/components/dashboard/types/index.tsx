@@ -17,6 +17,10 @@ export type Tool = {
   promptTemplate: string
   inputField1: string
   inputField1Description: string
+  inputField2?: string;
+  inputField2Description?: string;
+  inputField3?: string;
+  inputField3Description?: string;
 }
 
 export type SuccessState = {

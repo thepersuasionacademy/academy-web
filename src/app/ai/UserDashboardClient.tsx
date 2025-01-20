@@ -34,7 +34,7 @@ export default function UserDashboardClient({
   const { tools, isLoadingTools } = useTools(selectedCategory, selectedSuite)
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-[var(--background)] text-[var(--foreground)]">
       <div className="relative w-full flex">
         <CategorySidebar
           categories={categories}
@@ -48,7 +48,7 @@ export default function UserDashboardClient({
           hideCreationControls={hideCreationControls}
         />
 
-        <div className="flex-1 flex flex-col min-h-screen relative">
+        <div className="flex-1 flex flex-col min-h-screen relative border-l border-[var(--border-color)]">
           <SuiteSelector
             suites={suites}
             selectedSuite={selectedSuite}

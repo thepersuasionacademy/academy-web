@@ -13,14 +13,14 @@ interface PageContext {
 }
 
 export default async function Page(context: PageContext) {
-
-
   const params = await context.params
   return (
-    <AdminToolsClient 
-      params={params} 
-      searchParams={context.searchParams} 
-      hideCreationControls={true} 
-    />
+    <div className="bg-[var(--background)]">
+      <AdminToolsClient 
+        params={params} 
+        searchParams={context.searchParams} 
+        hideCreationControls={true} 
+      />
+    </div>
   )
 }

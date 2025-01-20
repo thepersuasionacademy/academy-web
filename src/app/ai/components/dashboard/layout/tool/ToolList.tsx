@@ -23,11 +23,11 @@ interface ToolListProps {
 
 const cardBaseClasses = cn(
   "relative rounded-2xl p-6",
-  "border border-white/[0.15] hover:border-red-600",
+  "border border-[var(--border-color)] hover:border-[var(--accent)]",
   "transition-all duration-200",
-  "bg-[#131826]",
-  "shadow-[0_4px_12px_rgba(0,0,0,0.5)]",
-  "hover:shadow-[0_0_10px_rgba(171,2,43,0.6)]"
+  "bg-[var(--card-bg)]",
+  "shadow-lg",
+  "hover:shadow-[0_0_10px_rgba(var(--accent),0.3)]"
 );
 
 export default function ToolList({ 
@@ -43,13 +43,13 @@ export default function ToolList({
         {[1, 2, 3].map(i => (
           <div key={i} className={cn(
             "relative rounded-2xl p-4 animate-pulse",
-            "bg-[#131826]",
-            "border border-white/[0.15]",
-            "shadow-[0_4px_12px_rgba(0,0,0,0.5)]"
+            "bg-[var(--card-bg)]",
+            "border border-[var(--border-color)]",
+            "shadow-lg"
           )}>
-            <div className="h-6 w-3/4 bg-zinc-800/50 rounded mb-2" />
-            <div className="h-4 w-full bg-zinc-800/50 rounded mb-2" />
-            <div className="h-4 w-1/2 bg-zinc-800/50 rounded" />
+            <div className="h-6 w-3/4 bg-[var(--hover-bg)] rounded mb-2" />
+            <div className="h-4 w-full bg-[var(--hover-bg)] rounded mb-2" />
+            <div className="h-4 w-1/2 bg-[var(--hover-bg)] rounded" />
           </div>
         ))}
       </div>
@@ -67,11 +67,11 @@ export default function ToolList({
             "flex flex-col items-center justify-center text-center group"
           )}
         >
-          <div className="bg-red-900/10 p-3 rounded-full mb-3 group-hover:bg-red-900/20 transition-colors duration-200">
-            <Plus className="h-6 w-6 text-red-500" />
+          <div className="bg-[var(--accent)]/10 p-3 rounded-full mb-3 group-hover:bg-[var(--accent)]/20 transition-colors duration-200">
+            <Plus className="h-6 w-6 text-[var(--accent)]" />
           </div>
-          <h3 className="text-lg font-bold text-white mb-1">Create New Tool</h3>
-          <p className="text-zinc-400 text-sm">Add a new tool to this suite</p>
+          <h3 className="text-lg font-bold text-[var(--foreground)] mb-1">Create New Tool</h3>
+          <p className="text-[var(--text-secondary)] text-sm">Add a new tool to this suite</p>
         </button>
       )}
 
@@ -82,9 +82,9 @@ export default function ToolList({
           onClick={() => onSelectTool(tool)}
           className={cardBaseClasses}
         >
-          <h3 className="text-xl font-bold text-white mb-2">{tool.name}</h3>
-          <p className="text-zinc-300 text-sm mb-3 line-clamp-2">{tool.description}</p>
-          <div className="text-zinc-400 text-sm">Credits: {tool.creditCost}</div>
+          <h3 className="text-xl font-bold text-[var(--foreground)] mb-2">{tool.name}</h3>
+          <p className="text-[var(--text-secondary)] text-sm mb-3 line-clamp-2">{tool.description}</p>
+          <div className="text-[var(--text-secondary)] text-sm">Credits: {tool.creditCost}</div>
         </button>
       ))}
     </div>

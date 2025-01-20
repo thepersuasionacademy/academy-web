@@ -1,6 +1,6 @@
 'use client'
 
-import { Plus, Search } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 
 type Category = {
@@ -87,25 +87,16 @@ export default function CategorySidebar({
   }
 
   return (
-    <div className="w-64 border-r border-gray-700 p-4">
+    <div className="w-64 border-r border-[var(--border-color)] p-4">
+      <h2 className="text-[var(--foreground)] font-bold text-lg mb-4">Categories</h2>
+      
       <div className="mb-4 space-y-2">
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-          <input
-            type="text"
-            value={categoryInput}
-            onChange={(e) => setCategoryInput(e.target.value)}
-            placeholder="Search categories..."
-            className="w-full pl-8 pr-4 py-2 bg-gray-800/50 rounded-lg text-white placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#9d042b]"
-          />
-        </div>
-
         {!hideCreationControls && (
           <>
             {!isCreatingCategory ? (
               <button
                 onClick={() => setIsCreatingCategory(true)}
-                className="w-full flex items-center justify-center px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg text-gray-300 transition-colors duration-200 gap-2"
+                className="w-full flex items-center justify-center px-4 py-2 bg-[var(--hover-bg)] hover:bg-[var(--hover-bg)] rounded-lg text-[var(--text-secondary)] transition-colors duration-200 gap-2"
               >
                 <Plus className="h-4 w-4" />
                 New Category
@@ -117,7 +108,7 @@ export default function CategorySidebar({
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   placeholder="Category name"
-                  className="w-full px-4 py-2 bg-gray-800/50 rounded-lg text-white border border-gray-700 focus:outline-none focus:border-[#9d042b]"
+                  className="w-full px-4 py-2 bg-[var(--hover-bg)] rounded-lg text-[var(--foreground)] border border-[var(--border-color)] focus:outline-none focus:border-[var(--accent)]"
                   disabled={isSubmitting}
                   autoFocus
                 />
@@ -125,7 +116,7 @@ export default function CategorySidebar({
                   <button
                     type="submit"
                     disabled={isSubmitting || !newCategoryName.trim()}
-                    className="flex-1 px-4 py-2 bg-[#9d042b] hover:bg-[#8a0326] disabled:bg-[#6d021f] rounded-lg text-white transition-colors duration-200 text-sm"
+                    className="flex-1 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent)] disabled:opacity-50 rounded-lg text-white transition-colors duration-200 text-sm"
                   >
                     {isSubmitting ? 'Creating...' : 'Create'}
                   </button>
@@ -136,7 +127,7 @@ export default function CategorySidebar({
                       setNewCategoryName('')
                       setError('')
                     }}
-                    className="flex-1 px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-lg text-gray-300 transition-colors duration-200 text-sm"
+                    className="flex-1 px-4 py-2 bg-[var(--hover-bg)] hover:bg-[var(--hover-bg)] rounded-lg text-[var(--text-secondary)] transition-colors duration-200 text-sm"
                   >
                     Cancel
                   </button>
@@ -154,15 +145,15 @@ export default function CategorySidebar({
       </div>
       
       {isLoadingCategories ? (
-        <div className="text-gray-400 p-2">Loading categories...</div>
+        <div className="text-[var(--text-secondary)] p-2">Loading categories...</div>
       ) : (
         localCategories.map((category) => (
           <div
             key={category.id}
             className={`mb-2 p-2 rounded-lg cursor-pointer transition-colors duration-200 ${
               selectedCategory === category.name 
-                ? 'bg-[#9d042b] text-white' 
-                : 'text-gray-300 hover:bg-gray-800/50'
+                ? 'bg-[var(--accent)] text-white' 
+                : 'text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
             }`}
             onClick={() => onSelectCategory(category.name)}
           >

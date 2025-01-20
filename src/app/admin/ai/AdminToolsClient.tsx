@@ -121,7 +121,7 @@ export default function AdminToolsClient({
   }
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-b from-gray-900 via-gray-900 to-black">
+    <div className="flex min-h-screen bg-[var(--background)]">
       <CategorySidebar
         categories={categories}
         selectedCategory={selectedCategory}

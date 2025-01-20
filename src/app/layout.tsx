@@ -1,12 +1,10 @@
-'use client';
-
+// src/app/layout.tsx
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import ScrollProgress from "../streaming/components/ScrollProgress";
 import { UserProvider } from '@auth0/nextjs-auth0/client';
-import Header from '@/app/layout/Header';
-import { usePathname } from 'next/navigation';
+import { ThemeProvider } from './context/ThemeContext';
+import ClientLayout from './ClientLayout';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -22,24 +20,22 @@ const geistMono = localFont({
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
-  const pathname = usePathname();
-  const hideHeader = pathname?.startsWith('/ai/tools/');
-
+}) {
   return (
-    <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+    <html lang="en" suppressHydrationWarning>
+      <body 
+        className={`${geistSans.variable} ${geistMono.variable} antialiased
+          transition-colors duration-200`}
       >
-        <UserProvider>
-          {!hideHeader && <Header />}
-          <main className="pt-0">
-            <ScrollProgress />
-            {children}
-          </main>
-        </UserProvider>
+        <ThemeProvider>
+          <UserProvider>
+            <ClientLayout>
+              {children}
+            </ClientLayout>
+          </UserProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

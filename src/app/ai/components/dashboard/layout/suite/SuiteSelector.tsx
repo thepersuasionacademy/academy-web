@@ -36,7 +36,6 @@ export default function SuiteSelector({
   }, [suites])
 
   const refreshSuites = async () => {
-    console.log('Refreshing suites for category:', selectedCategory)
     try {
       const response = await fetch('/api/ai/categories/suites', {
         headers: {
@@ -49,7 +48,6 @@ export default function SuiteSelector({
       }
       
       const data = await response.json()
-      console.log('Fetched suites:', data.suites)
       setLocalSuites(data.suites)
       return data.suites
     } catch (err) {
@@ -66,7 +64,6 @@ export default function SuiteSelector({
     setError('')
 
     try {
-      console.log('Creating suite:', newSuiteName)
       const response = await fetch('/api/ai/categories/suites', {
         method: 'POST',
         headers: {
@@ -82,10 +79,8 @@ export default function SuiteSelector({
       }
 
       const data = await response.json()
-      console.log('Suite created:', data)
       
       const updatedSuites = await refreshSuites()
-      console.log('Updated suites:', updatedSuites)
       
       setNewSuiteName('')
       setIsCreatingSuite(false)
@@ -101,22 +96,24 @@ export default function SuiteSelector({
 
   if (isLoadingSuites) {
     return (
-      <div className="p-4 border-b border-gray-700">
-        <div className="text-gray-400">Loading suites...</div>
+      <div className="p-4 border-b border-[var(--border-color)]">
+        <div className="text-[var(--text-secondary)]">Loading suites...</div>
       </div>
     )
   }
 
   return (
-    <div className="p-4 border-b border-gray-700">
+    <div className="p-4 border-b border-[var(--border-color)]">
       <div className="flex gap-2 flex-wrap items-center">
+        <h2 className="text-[var(--foreground)] font-bold text-lg">Suites</h2>
+        
         {localSuites.map((suite) => (
           <button
             key={suite.id}
             className={`px-4 py-2 rounded-full transition-colors duration-200 ${
               selectedSuite === suite.name
-                ? 'bg-[#9d042b] text-white'
-                : 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/50'
+                ? 'bg-[var(--accent)] text-white'
+                : 'text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
             }`}
             onClick={() => onSelectSuite(suite.name)}
           >
@@ -133,14 +130,14 @@ export default function SuiteSelector({
                   value={newSuiteName}
                   onChange={(e) => setNewSuiteName(e.target.value)}
                   placeholder="Suite name"
-                  className="px-4 py-2 rounded-full bg-gray-800/50 text-white border border-gray-700 focus:outline-none focus:border-[#9d042b]"
+                  className="px-4 py-2 rounded-full bg-[var(--hover-bg)] text-[var(--foreground)] border border-[var(--border-color)] focus:outline-none focus:border-[var(--accent)]"
                   disabled={isSubmitting}
                   autoFocus
                 />
                 <button
                   type="submit"
                   disabled={isSubmitting || !newSuiteName.trim()}
-                  className="px-4 py-2 bg-[#9d042b] hover:bg-[#8a0326] disabled:bg-[#6d021f] rounded-full text-white transition-colors duration-200"
+                  className="px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent)] disabled:opacity-50 rounded-full text-white transition-colors duration-200"
                 >
                   {isSubmitting ? 'Creating...' : 'Create'}
                 </button>
@@ -151,7 +148,7 @@ export default function SuiteSelector({
                     setNewSuiteName('')
                     setError('')
                   }}
-                  className="px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 transition-colors duration-200"
+                  className="px-4 py-2 hover:bg-[var(--hover-bg)] rounded-full text-[var(--text-secondary)] transition-colors duration-200"
                 >
                   Cancel
                 </button>
@@ -159,7 +156,7 @@ export default function SuiteSelector({
             ) : (
               <button
                 onClick={() => setIsCreatingSuite(true)}
-                className="flex items-center px-4 py-2 bg-gray-800/50 hover:bg-gray-700/50 rounded-full text-gray-300 transition-colors duration-200"
+                className="flex items-center px-4 py-2 hover:bg-[var(--hover-bg)] rounded-full text-[var(--text-secondary)] transition-colors duration-200"
               >
                 <Plus className="h-4 w-4 mr-2" />
                 New Suite
