@@ -2,7 +2,7 @@
 'use client';
 
 import React from 'react';
-import type { Tool } from '@/app/ai/lib/tools';
+import type { Tool } from '@/app/api/ai/types/tools';
 import { useTheme } from '@/app/context/ThemeContext';
 
 interface ToolHeaderProps {

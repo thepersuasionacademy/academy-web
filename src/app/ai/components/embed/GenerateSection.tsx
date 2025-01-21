@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import type { Tool } from '@/app/ai/lib/tools';
+import type { Tool } from '@/app/api/ai/types/tools';
 import { InputFields } from './output/InputFields';
 import { ResponseDisplay } from './output/ResponseDisplay';
 import { ToolHeader } from './output/ToolHeader';

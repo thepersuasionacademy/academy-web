@@ -1,6 +1,6 @@
 'use client';
 
-import type { Tool } from '@/app/ai/lib/tools';
+import type { Tool } from '@/app/api/ai/types/tools';
 import GenerateSection from './GenerateSection';
 
 interface ToolInterfaceProps {
