@@ -5,4 +5,5 @@ export interface User {
     email: string;
     credits: number;
     status: string;
+    phone?: string;
   }
