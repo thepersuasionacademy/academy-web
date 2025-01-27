@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface MediaPlayerProps {
@@ -9,9 +9,18 @@ interface MediaPlayerProps {
   description: string;
   isOpen: boolean;
   trackNumber: number;
+  category?: string;
+  suite?: string;
 }
 
-export const MediaPlayer = ({ title, description, isOpen, trackNumber }: MediaPlayerProps) => {
+export const MediaPlayer = ({ 
+  title, 
+  description, 
+  isOpen, 
+  trackNumber,
+  category,
+  suite 
+}: MediaPlayerProps) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
 
   const libraryId = '369599';
@@ -21,17 +30,36 @@ export const MediaPlayer = ({ title, description, isOpen, trackNumber }: MediaPl
 
   return (
     <div className={cn(
-      "h-full flex flex-col z-50 flex-1 px-16 pt-6 pb-12",
+      "h-full flex flex-col z-50 flex-1 px-16",
       "bg-[var(--card-bg)]",
       "transform transition-transform duration-300 ease-out",
       isOpen ? "translate-x-0" : "-translate-x-full"
     )}>
+      {/* Breadcrumb Navigation */}
+      <div className="pt-6 pb-4 text-sm text-[var(--text-secondary)]">
+        <div className="flex items-center gap-2">
+          {category && (
+            <>
+              <span className="hover:text-[var(--foreground)] cursor-pointer">{category}</span>
+              <ChevronRight className="w-4 h-4" />
+            </>
+          )}
+          {suite && (
+            <>
+              <span className="hover:text-[var(--foreground)] cursor-pointer">{suite}</span>
+              <ChevronRight className="w-4 h-4" />
+            </>
+          )}
+          <span className="text-[var(--foreground)]">{`Track ${trackNumber}`}</span>
+        </div>
+      </div>
+
       {/* Video Player */}
-      <div className="w-full flex-1 relative bg-black/40 backdrop-blur-sm">
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 to-transparent pointer-events-none" />
-        <div className="max-w-[1280px] h-full mx-auto">
-          <div className="relative w-full h-full shadow-[0_0_50px_-12px_rgba(0,0,0,0.8)] rounded-lg overflow-hidden">
+      <div className="flex-1 relative bg-[var(--card-bg)]">
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--card-bg)]/20 to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--card-bg)]/20 to-transparent pointer-events-none" />
+        <div className="h-full w-full flex items-center">
+          <div className="aspect-video w-full relative shadow-[0_0_50px_-12px_rgba(0,0,0,0.8)] rounded-lg overflow-hidden">
             <iframe 
               src={playerUrl}
               loading="lazy"
@@ -42,20 +70,20 @@ export const MediaPlayer = ({ title, description, isOpen, trackNumber }: MediaPl
             />
           </div>
         </div>
-        <div className="absolute inset-0 bg-gradient-to-r from-black/20 via-transparent to-black/20 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--card-bg)]/20 via-transparent to-[var(--card-bg)]/20 pointer-events-none" />
       </div>
 
       {/* Content Section */}
       <div className="shrink-0 relative">
         {/* Glassmorphic background effect */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-transparent dark:from-white/5" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--card-bg)]/5 to-transparent" />
         <div className="absolute inset-0 backdrop-blur-[2px]" />
         
         {/* Content with glass effect */}
         <div className="relative border-t border-[var(--border-color)]">
-          <div className="max-w-[1280px] mx-auto">
+          <div className="max-w-[1280px]">
             {/* Title Section */}
-            <div className="pt-8 pb-4 px-8">
+            <div className="pt-8 pb-4">
               <div className="relative">
                 {/* Subtle text shadow for depth */}
                 <div className="absolute -inset-x-1 inset-y-0 bg-gradient-to-r from-[var(--card-bg)]/50 via-transparent to-[var(--card-bg)]/50 blur-sm" />
@@ -64,7 +92,7 @@ export const MediaPlayer = ({ title, description, isOpen, trackNumber }: MediaPl
             </div>
             
             {/* Description Section */}
-            <div className="pb-8 px-8">
+            <div className="pb-8">
               <div 
                 className={cn(
                   "text-xl whitespace-pre-wrap relative",
@@ -102,8 +130,8 @@ export const MediaPlayer = ({ title, description, isOpen, trackNumber }: MediaPl
               )}
             </div>
 
-            {/* Interactive Pills - Centered below description */}
-            <div className="flex justify-center gap-4 px-8 pt-2 pb-6">
+            {/* Interactive Pills */}
+            <div className="flex justify-start gap-4 pt-2 pb-6">
               <button className="px-6 py-2 rounded-full bg-[var(--hover-bg)] text-base font-medium text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--hover-bg)]/80 transition-all hover:scale-105">
                 AI Tool
               </button>

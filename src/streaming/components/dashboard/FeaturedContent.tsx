@@ -1,5 +1,5 @@
 import { Play, Heart, Share2 } from 'lucide-react';
-import { MediaItem } from '@/app/mind/lib/types/dashboard';
+import { MediaItem } from '@/streaming/types';
 
 interface FeaturedContentProps {
   content: MediaItem;
@@ -7,6 +7,8 @@ interface FeaturedContentProps {
   onLike: () => void;
   onShare: () => void;
 }
+
+const buttonClassName = "px-8 py-3 bg-[var(--accent)] rounded-full hover:opacity-90 transition-all flex items-center space-x-2 hover:scale-105 active:scale-100";
 
 export const FeaturedContent = ({ content, onPlay, onLike, onShare }: FeaturedContentProps) => {
   return (
@@ -42,7 +44,7 @@ export const FeaturedContent = ({ content, onPlay, onLike, onShare }: FeaturedCo
             <div className="flex items-center space-x-4 pt-2">
               <button 
                 onClick={onPlay}
-                className="px-8 py-3 bg-red-600 rounded-full hover:bg-red-700 transition-all flex items-center space-x-2 hover:scale-105 active:scale-100"
+                className={buttonClassName}
               >
                 <Play className="w-5 h-5" />
                 <span className="font-medium">Play Now</span>

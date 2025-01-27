@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { ContentGrid } from '@/app/content/components/dashboard/ContentGrid';
-import { SuiteView } from '@/app/content/components/dashboard/SuiteView';
+import { SuiteView } from '@/streaming/components/dashboard/SuiteView';
 import { MediaPlayer } from '@/app/content/components/dashboard/MediaPlayer';
 import ScrollProgress from '@/app/content/components/ScrollProgress';
 import { CategoryPills } from '@/app/content/components/CategoryPills';
@@ -27,7 +27,6 @@ export default function Page(): React.JSX.Element {
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const [activeCategory, setActiveCategory] = useState<'mind' | 'training'>('mind');
   const [selectedTrackNumber, setSelectedTrackNumber] = useState<number | undefined>();
-  const [isSuiteCollapsed, setIsSuiteCollapsed] = useState(false);
 
   // Filter categories based on active category
   const filteredCategories = categories.filter(cat => {
@@ -55,19 +54,11 @@ export default function Page(): React.JSX.Element {
     }
   };
 
-  const handleSuiteAction = (action: 'play' | 'like' | 'share') => {
+  const handleSuiteAction = (action: 'play') => {
     if (!selectedItem) return;
     
-    switch (action) {
-      case 'play':
-        handleTrackSelect(0); // Play first track
-        break;
-      case 'like':
-        console.log('Liked:', selectedItem.title);
-        break;
-      case 'share':
-        console.log('Sharing:', selectedItem.title);
-        break;
+    if (action === 'play') {
+      handleTrackSelect(0); // Play first track
     }
   };
 
@@ -86,8 +77,6 @@ export default function Page(): React.JSX.Element {
           <FeaturedContent 
             content={featuredItem}
             onPlay={() => console.log('Play featured')}
-            onLike={() => console.log('Like featured')}
-            onShare={() => console.log('Share featured')}
           />
           <div className="mt-8">
             <ContentGrid
@@ -100,37 +89,36 @@ export default function Page(): React.JSX.Element {
         {/* Overlay layer for MediaPlayer and SuiteView */}
         {selectedItem && (
           <div className="fixed inset-0 z-50 flex overflow-hidden">
-            {/* Main Content Area - MediaPlayer */}
+            {/* Main Content Area - MediaPlayer Container */}
             {selectedTrackNumber !== undefined && (
-              <div className="flex-1 flex bg-black">
-                <MediaPlayer
-                  title={selectedItem.title}
-                  trackNumber={selectedTrackNumber + 1}
-                  description={MOCK_DESCRIPTION}
-                  isOpen={true}
-                />
+              <div className="flex-1 flex bg-[var(--card-bg)] relative">
+                <div className="absolute inset-0 pr-[400px]">
+                  <div className="w-full h-full pr-16">
+                    <MediaPlayer
+                      title={selectedItem.title}
+                      trackNumber={selectedTrackNumber + 1}
+                      description={MOCK_DESCRIPTION}
+                      isOpen={true}
+                      category={filteredCategories.find(cat => 
+                        cat.items.some(item => item.id === selectedItem?.id)
+                      )?.name}
+                      suite={selectedItem.title}
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Suite View */}
-            <div className={cn(
-              isSuiteCollapsed ? "w-[100px]" : "w-[450px]",
-              "transition-all duration-300 border-l border-white/10"
-            )}>
+            {/* Suite View - Absolute positioned */}
+            <div className="absolute right-0 top-0 bottom-0 w-[400px] bg-[var(--card-bg)]">
               <SuiteView
                 isOpen={true}
                 onClose={handleSuiteClose}
-                isCollapsed={isSuiteCollapsed}
-                onToggleCollapse={() => setIsSuiteCollapsed(!isSuiteCollapsed)}
                 title={selectedItem.title}
                 description={selectedItem.description}
                 image={selectedItem.image}
                 tracks={selectedItem.tracks || 0}
-                onPlay={() => handleSuiteAction('play')}
-                onLike={() => handleSuiteAction('like')}
-                onShare={() => handleSuiteAction('share')}
-                onTrackSelect={handleTrackSelect}
-                selectedTrackNumber={selectedTrackNumber}
+                onPlay={handleTrackSelect}
               />
             </div>
           </div>

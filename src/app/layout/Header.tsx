@@ -30,26 +30,25 @@ export default function Header({ credits = 0 }: HeaderProps) {
 
   const headerClassName = cn(
     "border-b border-b-2",
-    theme === 'dark' 
-      ? "bg-gradient-to-b from-[#121826] to-[#161c2d] border-[#1e2538]" 
-      : "bg-gradient-to-b from-gray-50 to-white border-gray-200"
+    "border-[var(--border-color)]",
+    "bg-[var(--card-bg)]"
   );
 
   const logoClassName = cn(
     "text-lg font-semibold transition-colors",
-    theme === 'dark' ? "text-gray-100 hover:text-white" : "text-gray-800 hover:text-gray-900"
+    "text-[var(--foreground)] hover:text-[var(--foreground)]"
   );
 
   const navLinkClassName = (isActive: boolean) => cn(
     "px-3 py-2 text-sm font-medium transition-colors",
     isActive
-      ? theme === 'dark' ? "text-white" : "text-gray-900"
-      : theme === 'dark' ? "text-gray-400 hover:text-gray-200" : "text-gray-600 hover:text-gray-800"
+      ? "text-[var(--foreground)]"
+      : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"
   );
 
   const iconClassName = cn(
     "transition-colors",
-    theme === 'dark' ? "text-gray-400 hover:text-gray-200" : "text-gray-600 hover:text-gray-800"
+    "text-[var(--text-secondary)] hover:text-[var(--foreground)]"
   );
 
   return (

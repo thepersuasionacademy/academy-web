@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --background: linear-gradient(to bottom, #f8f9fc, #ffffff, #f8fafc);
-  --foreground: #18181b;
-  --card-bg: #f4f4f5;
-  --border-color: #e4e4e7;
-  --hover-bg: #e4e4e7;
-  --text-secondary: #3f3f46;
-  --accent: #bf2828;
+  --background: linear-gradient(to bottom, #f8f9fa, #f6f6f6, #f4f4f4);
+  --foreground: #2c2c2c;
+  --card-bg: #f8f8f8;
+  --border-color: #e8e8e8;
+  --hover-bg: #f0f0f0;
+  --text-secondary: #4a4a4a;
+  --accent: #d42121;
 }
 
 .dark {
-  --background: linear-gradient(to bottom, #121826, #161c2d, #1a1f2e);
-  --foreground: #ededed;
-  --card-bg: #131826;
-  --border-color: rgb(63, 63, 70);
-  --hover-bg: rgba(255, 255, 255, 0.1);
-  --text-secondary: #a1a1aa;
-  --accent: #9d042b;
+  --background: linear-gradient(to bottom, #161618, #1d1d20, #242428);
+  --foreground: #e8e8e3;
+  --card-bg: #1d1d20;
+  --border-color: #2d2d32;
+  --hover-bg: rgba(255, 255, 255, 0.06);
+  --text-secondary: #a8a8a8;
+  --accent: #d42121;
 }
 
 @media (max-width: 1280px) {

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { Play, Heart, Share2, X } from 'lucide-react';
+import { Play, X } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface Track {
@@ -16,8 +16,6 @@ interface SuiteViewProps {
   image: string;
   tracks: number;
   onPlay: (trackId: string) => void;
-  onLike: () => void;
-  onShare: () => void;
 }
 
 export const SuiteView = ({
@@ -28,13 +26,11 @@ export const SuiteView = ({
   image,
   tracks: trackCount,
   onPlay,
-  onLike,
-  onShare
 }: SuiteViewProps) => {
   const generatedTracks = useMemo(() => 
     Array.from({ length: trackCount }, (_, i) => ({
       id: `${i + 1}`,
-      title: `${title} - Track ${i + 1}`,
+      title: `Track ${i + 1}`,
       duration: "20:00"
     })),
     [trackCount, title]
@@ -59,90 +55,66 @@ export const SuiteView = ({
   if (!isOpen) return null;
 
   return (
-    <>
-      <div 
-        className={cn(
-          "fixed inset-0 bg-black/50 z-40 transition-opacity duration-300",
-          isOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        )}
-        onClick={onClose}
-      />
-
-      <div 
-        className={cn(
-          "fixed inset-0 z-50 bg-zinc-900",
-          "w-full md:w-[400px] right-0 left-auto",
-          "transform transition-transform duration-300 ease-out",
-          isOpen ? "translate-x-0" : "translate-x-full"
-        )}
-      >
-        <div className="relative h-full overflow-auto">
-          <div className="relative pb-[56.25%]">
+    <div 
+      className={cn(
+        "fixed inset-y-0 right-0 z-50",
+        "w-[450px]",
+        "transform transition-transform duration-300 ease-out",
+        "bg-[var(--card-bg)] text-[var(--foreground)] flex-shrink-0",
+        "border-l border-[var(--border-color)]",
+        isOpen ? "translate-x-0" : "translate-x-full"
+      )}
+    >
+      <div className="relative h-full overflow-auto">
+        <div className="relative pb-[56.25%]">
+          <div className="absolute inset-0">
+            <img 
+              src={image} 
+              alt={title}
+              className="w-full h-full object-cover"
+            />
             <div className="absolute inset-0">
-              <img 
-                src={image} 
-                alt={title}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-zinc-900/50 to-zinc-900" />
-            </div>
-            
-            <div className="absolute top-safe right-4 top-4">
-              <button 
-                onClick={onClose}
-                className="p-2 rounded-full bg-black/50 backdrop-blur-sm"
-              >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="absolute bottom-0 p-6 w-full">
-              <h1 className="text-3xl md:text-2xl font-bold mb-1">{title}</h1>
-              <p className="text-base md:text-sm text-zinc-400">{description}</p>
+              {/* Subtle vertical gradient */}
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[var(--card-bg)]/30 to-[var(--card-bg)]" />
+              {/* Very subtle vignette effect */}
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--card-bg)]/10 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[var(--card-bg)]/10 via-transparent to-[var(--card-bg)]/10" />
             </div>
           </div>
-
-          <div className="flex gap-4 p-6 sticky top-0 bg-zinc-900/80 backdrop-blur-sm">
+          
+          <div className="absolute top-safe right-4 top-4">
             <button 
-              className="flex-1 flex items-center justify-center gap-2 bg-red-600 text-white px-8 py-3 rounded-full font-semibold text-lg"
-              onClick={() => onPlay(generatedTracks[0].id)}
+              onClick={onClose}
+              className="p-2 rounded-full bg-[var(--card-bg)]/80 backdrop-blur-sm hover:bg-[var(--hover-bg)] transition-colors"
             >
-              <Play className="w-5 h-5" />
-              Play Now
+              <X className="w-6 h-6" />
             </button>
-            <button 
-              className="p-3 rounded-full bg-zinc-800/80"
-              onClick={onLike}
-            >
-              <Heart className="w-6 h-6" />
-            </button>
-            <button 
-              className="p-3 rounded-full bg-zinc-800/80"
-              onClick={onShare}
-            >
-              <Share2 className="w-6 h-6" />
-            </button>
-          </div>
-
-          <div className="px-6 pb-safe">
-            {generatedTracks.map((track, index) => (
-              <div key={track.id}>
-                <button
-                  onClick={() => onPlay(track.id)}
-                  className="w-full flex items-center justify-between py-4 transition-colors duration-200 hover:bg-white/10 rounded-lg px-3"
-                >
-                  <span className="font-medium text-lg">{track.title}</span>
-                  <span className="text-zinc-400 text-base">{track.duration}</span>
-                </button>
-                {index < generatedTracks.length - 1 && (
-                  <div className="h-px bg-white/[0.08]" />
-                )}
-              </div>
-            ))}
           </div>
         </div>
+
+        <div className="p-6 sticky top-0 bg-[var(--card-bg)]/80 backdrop-blur-sm">
+          <h1 className="text-3xl md:text-2xl font-bold mb-2">{title}</h1>
+          <p className="text-base md:text-sm text-[var(--text-secondary)]">{description}</p>
+        </div>
+
+        <div className="px-6 pb-safe">
+          {generatedTracks.map((track, index) => (
+            <div key={track.id}>
+              <button
+                onClick={() => onPlay(track.id)}
+                className="w-full flex items-center justify-between py-4 transition-colors duration-200 hover:bg-[var(--hover-bg)] rounded-lg px-3"
+              >
+                <span className="font-medium text-lg">{`Track ${index + 1}`}</span>
+                <span className="text-[var(--text-secondary)] text-base">{track.duration}</span>
+              </button>
+              {index < generatedTracks.length - 1 && (
+                <div className="h-px bg-[var(--border-color)]" />
+              )}
+            </div>
+          ))}
+        </div>
       </div>
-    </>
+    </div>
   );
 };
 

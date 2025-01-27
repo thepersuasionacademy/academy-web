@@ -1,8 +1,17 @@
 import { useState } from 'react';
 import { BentoCard } from '@/streaming/components/BentoCard';
-import { MobileCarousel } from './MobileCarousel';
-import { Category } from '@/app/mind/lib/types/dashboard';
 import { cn } from "@/lib/utils";
+
+interface Category {
+  name: string;
+  items: {
+    id: string;
+    title: string;
+    description: string;
+    image: string;
+    tracks: number;
+  }[];
+}
 
 interface ContentGridProps {
   categories: Category[];
@@ -45,21 +54,23 @@ export const ContentGrid = ({ categories, onItemClick }: ContentGridProps) => {
           </div>
 
           <div className="block md:hidden">
-            <MobileCarousel
-              title={category.name}
-              items={category.items.map((item) => (
-                <div key={item.id} onClick={() => onItemClick(item.id)}>
-                  <BentoCard
-                    title={item.title}
-                    description={item.description}
-                    image={item.image}
-                    tracks={item.tracks}
-                    href="#"
-                    onClick={(e) => handleCardClick(item.id, e)}
-                  />
-                </div>
-              ))}
-            />
+            <div className="px-4">
+              <h2 className="text-2xl font-semibold mb-4">{category.name}</h2>
+              <div className="flex flex-col gap-4">
+                {category.items.map((item) => (
+                  <div key={item.id}>
+                    <BentoCard
+                      title={item.title}
+                      description={item.description}
+                      image={item.image}
+                      tracks={item.tracks}
+                      href="#"
+                      onClick={(e) => handleCardClick(item.id, e)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       ))}
