@@ -5,39 +5,6 @@ import { Mail, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UserGrid } from './components/user-grid';
 import { cn } from "@/lib/utils";
 import type { User as UserType } from './components/types';
-import { AICreditsDetail } from './components/AICreditsDetail';
-import { PaymentDetail } from './components/PaymentDetail';
-
-// Add these interfaces at the top of the file
-interface AIItem {
-  id: number;
-  name: string;
-  category: string;
-  suite: string;
-  timestamp: string;
-  cost: number;
-  description: string;
-  aiResponse: string;
-}
-
-interface PaymentItem {
-  id: number;
-  name: string;
-  category: string;
-  suite: string;
-  timestamp: string;
-  amount: number;
-  status: 'paid' | 'pending' | 'failed';
-  receipt: string;
-  paymentType: 'one-time' | 'subscription' | 'payment-plan';
-  nextBillingDate?: string;
-  billingCycle?: 'monthly' | 'yearly';
-  installments?: {
-    completed: number;
-    total: number;
-    nextPaymentDate: string;
-  };
-}
 
 export default function AdminUsersPage() {
   // Search states
@@ -46,24 +13,12 @@ export default function AdminUsersPage() {
   const [nameQuery, setNameQuery] = useState('');
   const [users, setUsers] = useState<UserType[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
-
-  // Dashboard states (moved from dashboard page)
-  const [activeTab, setActiveTab] = useState<'credits' | 'payments'>('credits');
-  const [selectedItem, setSelectedItem] = useState<AIItem | PaymentItem | null>(null);
-  const [showCopied, setShowCopied] = useState(false);
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [isEditingEmail, setIsEditingEmail] = useState(false);
-  const [tempFirstName, setTempFirstName] = useState('');
-  const [tempLastName, setTempLastName] = useState('');
-  const [tempEmail, setTempEmail] = useState('');
 
   const searchUsers = async (type: 'email' | 'name', value: string) => {
     if (value.length < 3) return;
 
     setIsLoading(true);
-    setError(null);
     
     try {
       const queryParams = new URLSearchParams();
@@ -81,12 +36,10 @@ export default function AdminUsersPage() {
         throw new Error('Unexpected API response format');
       }
 
-      setUsers(data); // Use the data directly from DynamoDB
-      setError(null);
+      setUsers(data);
     } catch (error) {
       console.error('Error searching users:', error);
       setUsers([]);
-      setError(error instanceof Error ? error.message : 'Failed to search users');
     } finally {
       setIsLoading(false);
     }
@@ -102,7 +55,6 @@ export default function AdminUsersPage() {
     // Clear results if both fields are empty
     if (!value && (type === 'email' ? !nameQuery : !emailQuery)) {
       setUsers([]);
-      setError(null);
       return;
     }
     
@@ -115,10 +67,6 @@ export default function AdminUsersPage() {
 
   const handleUserSelect = (user: UserType) => {
     setSelectedUser(user);
-    // Initialize user editing states
-    setTempFirstName(user.firstName);
-    setTempLastName(user.lastName);
-    setTempEmail(user.email);
     // Close sidebar on mobile
     if (window.innerWidth < 1024) {
       setIsSidebarOpen(false);

@@ -3,7 +3,7 @@
 
 import { usePathname } from 'next/navigation';
 import Header from '@/app/layout/Header';
-import ScrollProgress from "../streaming/components/ScrollProgress";
+import ScrollProgress from '@/app/content/components/ScrollProgress';
 
 export default function ClientLayout({
   children,

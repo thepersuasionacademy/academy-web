@@ -4,10 +4,6 @@ import React, { useState } from 'react';
 import { 
   User,
   ChevronRight,
-  FileText,
-  Copy,
-  CheckCircle,
-  XCircle,
   Clock,
   Pencil,
   Check,

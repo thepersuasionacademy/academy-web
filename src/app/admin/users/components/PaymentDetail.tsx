@@ -65,18 +65,19 @@ export function PaymentDetail({ item, formatTimestamp }: PaymentDetailProps) {
       </div>
 
       {/* Subscription Details */}
-      {item.paymentType === 'subscription' && (
+      {item.paymentType === 'subscription' && item.nextBillingDate && (
         <div>
           <p className="text-lg text-[var(--text-secondary)]">Next Billing</p>
           <div className="flex items-center gap-2">
             <Clock className="w-5 h-5 text-[var(--text-secondary)]" />
             <p className="text-xl text-[var(--foreground)]">
-              {formatTimestamp(item.nextBillingDate!).date}
+              {formatTimestamp(item.nextBillingDate).date}
             </p>
           </div>
           <p className="text-sm text-[var(--text-secondary)] mt-1">
-            {item.billingCycle?.charAt(0).toUpperCase() + 
-             item.billingCycle?.slice(1)} billing cycle
+            {item.billingCycle && 
+              `${item.billingCycle.charAt(0).toUpperCase() + item.billingCycle.slice(1)} billing cycle`
+            }
           </p>
         </div>
       )}
