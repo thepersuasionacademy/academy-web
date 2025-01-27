@@ -20,12 +20,12 @@ export async function GET(
   try {
     const id = await Promise.resolve(params.id);
     
-    // Use scan to find the tool by looking for its ID in the SK
+    // Look for exact match on the tool portion of SK
     const result = await docClient.send(new ScanCommand({
       TableName: process.env.DYNAMODB_TABLE_NAME!,
-      FilterExpression: 'contains(SK, :toolId)',
+      FilterExpression: 'contains(SK, :toolPattern)',
       ExpressionAttributeValues: {
-        ':toolId': id
+        ':toolPattern': `TOOL#${id}`  // Look for exact tool ID after TOOL#
       }
     }));
 

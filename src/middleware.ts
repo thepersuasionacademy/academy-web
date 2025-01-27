@@ -12,11 +12,14 @@ export async function middleware(req: NextRequest) {
   // Bypass auth for specific GitHub Codespace URL or local development
   const isGitHubDev = req.headers.get('host') === 'cautious-space-barnacle-69grq676rx4gf5vjv-3000.app.github.dev';
   const isLocalDev = !process.env.VERCEL && process.env.NODE_ENV === 'development';
+  const isToolRoute = req.nextUrl.pathname.startsWith('/ai/tools/');
   
   console.log('isGitHubDev:', isGitHubDev);
   console.log('isLocalDev:', isLocalDev);
+  console.log('isToolRoute:', isToolRoute);
 
-  if (isGitHubDev || isLocalDev) {
+  // Bypass auth for development environments or tool routes in development
+  if (isGitHubDev || isLocalDev || (process.env.NODE_ENV === 'development' && isToolRoute)) {
     return NextResponse.next();
   }
 

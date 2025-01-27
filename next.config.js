@@ -1,10 +1,16 @@
+const imageDomains = [
+  'api.placeholder.com',
+  'thepersuasionacademy-com.b-cdn.net',
+  // Add more domains as needed
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
   images: {
-    domains: ['api.placeholder.com'],
+    domains: imageDomains,
   },
   experimental: {
     serverActions: true,

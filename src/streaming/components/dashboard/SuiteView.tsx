@@ -13,7 +13,6 @@ interface SuiteViewProps {
   onClose: () => void;
   title: string;
   description: string;
-  image: string;
   tracks: number;
   onPlay: (trackId: string) => void;
 }
@@ -23,7 +22,6 @@ export const SuiteView = ({
   onClose,
   title,
   description,
-  image,
   tracks: trackCount,
   onPlay,
 }: SuiteViewProps) => {
@@ -66,34 +64,16 @@ export const SuiteView = ({
       )}
     >
       <div className="relative h-full overflow-auto">
-        <div className="relative pb-[56.25%]">
-          <div className="absolute inset-0">
-            <img 
-              src={image} 
-              alt={title}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0">
-              {/* Subtle vertical gradient */}
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[var(--card-bg)]/30 to-[var(--card-bg)]" />
-              {/* Very subtle vignette effect */}
-              <div className="absolute inset-0 bg-gradient-to-t from-[var(--card-bg)]/10 to-transparent" />
-              <div className="absolute inset-0 bg-gradient-to-r from-[var(--card-bg)]/10 via-transparent to-[var(--card-bg)]/10" />
-            </div>
-          </div>
-          
-          <div className="absolute top-safe right-4 top-4">
+        <div className="p-6 sticky top-0 bg-[var(--card-bg)]/80 backdrop-blur-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-3xl md:text-2xl font-bold">{title}</h1>
             <button 
               onClick={onClose}
-              className="p-2 rounded-full bg-[var(--card-bg)]/80 backdrop-blur-sm hover:bg-[var(--hover-bg)] transition-colors"
+              className="p-2 rounded-full hover:bg-[var(--hover-bg)] transition-colors"
             >
               <X className="w-6 h-6" />
             </button>
           </div>
-        </div>
-
-        <div className="p-6 sticky top-0 bg-[var(--card-bg)]/80 backdrop-blur-sm">
-          <h1 className="text-3xl md:text-2xl font-bold mb-2">{title}</h1>
           <p className="text-base md:text-sm text-[var(--text-secondary)]">{description}</p>
         </div>
 

@@ -6,40 +6,6 @@ import ToolInterface from '@/app/ai/components/embed/ToolInterface';
 import { Moon, Sun } from 'lucide-react';
 import type { Tool } from '@/app/ai/components/dashboard/types';
 
-interface ToolInterfaceAdapter {
-  PK: string;
-  SK: string;
-  name: string;
-  description: string;
-  creditCost: number;
-  promptTemplate: string;
-  inputField1: string;
-  inputField1Description: string;
-  inputField2?: string;
-  inputField2Description?: string;
-  inputField3?: string;
-  inputField3Description?: string;
-}
-
-function adaptTool(tool: Tool | null): ToolInterfaceAdapter | null {
-  if (!tool) return null;
-  
-  return {
-    PK: tool.SK,
-    SK: tool.SK,
-    name: tool.name,
-    description: tool.description,
-    creditCost: tool.creditCost,
-    promptTemplate: tool.promptTemplate,
-    inputField1: tool.inputField1,
-    inputField1Description: tool.inputField1Description,
-    inputField2: tool.inputField2,
-    inputField2Description: tool.inputField2Description,
-    inputField3: tool.inputField3,
-    inputField3Description: tool.inputField3Description
-  };
-}
-
 interface ToolPageClientProps {
   toolId: string;
 }
@@ -59,16 +25,22 @@ export default function ToolPageClient({ toolId }: ToolPageClientProps) {
     async function fetchTool() {
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/tool/${toolId}`);
+        console.log('Fetching tool with ID:', toolId);
+        
+        const response = await fetch(`/api/ai/tool/buyer-psychology-modeling`);
+        console.log('Response status:', response.status);
         
         if (!response.ok) {
-          throw new Error('Failed to fetch tool');
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
+          throw new Error(`Failed to fetch tool: ${response.status} ${errorText}`);
         }
 
         const data = await response.json();
+        console.log('Tool data:', data);
         setTool(data.tools?.[0] || null);
       } catch (err) {
-        console.error('Error fetching tool:', err);
+        console.error('Error details:', err);
         setError(err instanceof Error ? err.message : 'An error occurred');
       } finally {
         setIsLoading(false);
@@ -80,17 +52,9 @@ export default function ToolPageClient({ toolId }: ToolPageClientProps) {
     }
   }, [toolId]);
 
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <div className="text-red-500">Error loading tool: {error}</div>
-      </div>
-    );
-  }
-
   return (
     <main className="min-h-screen bg-[var(--background)]">
-      {/* Sliding Theme Toggle */}
+      {/* Theme Toggle */}
       <div className="w-full py-4 flex justify-center">
         {mounted && (
           <button 
@@ -98,7 +62,7 @@ export default function ToolPageClient({ toolId }: ToolPageClientProps) {
             className="relative flex items-center p-1 rounded-full bg-[var(--card-bg)] border border-[var(--border-color)]"
             aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {/* Background Icons */}
+            {/* Theme Toggle Content */}
             <div className="flex items-center space-x-1">
               <div className="w-6 h-6 flex items-center justify-center">
                 <Moon className="h-3.5 w-3.5 text-[var(--text-secondary)]" />
@@ -123,7 +87,7 @@ export default function ToolPageClient({ toolId }: ToolPageClientProps) {
       </div>
 
       <div className="flex flex-col items-center justify-center pt-8">
-        <ToolInterface tool={adaptTool(tool)} isLoading={isLoading} />
+        <ToolInterface tool={tool} isLoading={isLoading} />
       </div>
     </main>
   );
