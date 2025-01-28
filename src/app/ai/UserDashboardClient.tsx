@@ -8,30 +8,25 @@ import { ToolContainer } from '@/app/ai/components/dashboard/layout/tool/ToolCon
 import CategorySidebar from '@/app/ai/components/dashboard/layout/category/CategorySidebar'
 import SuiteSelector from '@/app/ai/components/dashboard/layout/suite/SuiteSelector'
 import { type Tool } from '@/app/ai/components/dashboard/types'
+import { AIToolModal } from '@/app/ai/components/AIToolModal'
 
-type PageParams = {
-  id: string;
-}
-
-interface UserDashboardClientProps {
-  params: PageParams;
-  searchParams: { [key: string]: string | string[] | undefined };
-  hideCreationControls?: boolean;
-}
-
-export default function UserDashboardClient({ 
-  params, 
-  searchParams,
-  hideCreationControls = false 
-}: UserDashboardClientProps) {
+export default function UserDashboardClient({ hideCreationControls = false }) {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedSuite, setSelectedSuite] = useState<string | null>(null)
   const [selectedTool, setSelectedTool] = useState<Tool | null>(null)
   const [categoryInput, setCategoryInput] = useState('')
+  const [isModalOpen, setIsModalOpen] = useState(false)
 
   const { categories, isLoadingCategories } = useCategories()
   const { suites, isLoadingSuites } = useSuites(selectedCategory)
   const { tools, isLoadingTools } = useTools(selectedCategory, selectedSuite)
+
+  const handleToolSelect = (tool: Tool | null) => {
+    setSelectedTool(tool)
+    setIsModalOpen(!!tool)
+  }
+
+  console.log('Current state:', { selectedTool, isModalOpen })
 
   return (
     <div className="flex min-h-screen bg-[var(--background)] text-[var(--foreground)]">
@@ -62,7 +57,7 @@ export default function UserDashboardClient({
 
           <ToolContainer
             selectedTool={selectedTool}
-            setSelectedTool={setSelectedTool}
+            setSelectedTool={handleToolSelect}
             selectedCategory={selectedCategory!}
             selectedSuite={selectedSuite!}
             tools={tools}
@@ -74,6 +69,17 @@ export default function UserDashboardClient({
             success={null}
             hideCreationControls={hideCreationControls}
           />
+
+          {isModalOpen && selectedTool && (
+            <AIToolModal
+              tool={selectedTool}
+              isOpen={isModalOpen}
+              onClose={() => {
+                setIsModalOpen(false)
+                setSelectedTool(null)
+              }}
+            />
+          )}
         </div>
       </div>
     </div>

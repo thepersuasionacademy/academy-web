@@ -1,6 +1,6 @@
 // page.tsx
 import { redirect } from 'next/navigation'
-import AdminToolsClient from '../admin/ai/AdminToolsClient'
+import UserDashboardClient from './UserDashboardClient'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -16,9 +16,7 @@ export default async function Page(context: PageContext) {
   const params = await context.params
   return (
     <div className="bg-[var(--background)]">
-      <AdminToolsClient 
-        params={params} 
-        searchParams={context.searchParams} 
+      <UserDashboardClient 
         hideCreationControls={true} 
       />
     </div>

@@ -25,7 +25,7 @@ export async function GET(
       TableName: process.env.DYNAMODB_TABLE_NAME!,
       FilterExpression: 'contains(SK, :toolPattern)',
       ExpressionAttributeValues: {
-        ':toolPattern': `TOOL#${id}`  // Look for exact tool ID after TOOL#
+        ':toolPattern': `TOOL#${id}`
       }
     }));
 

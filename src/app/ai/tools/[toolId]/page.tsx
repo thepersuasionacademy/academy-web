@@ -1,17 +1,31 @@
 // src/app/ai/tools/[toolId]/page.tsx
-import { Suspense } from 'react';
-import ToolPageClient from './ToolPageClient';
+import { notFound } from 'next/navigation'
+import { AIToolFrame } from '@/app/content/components/dashboard/AIToolFrame'
 
-interface PageProps {
-  params: { toolId: string };
+interface ToolPageProps {
+  params: { 
+    toolId: string 
+  }
 }
 
-export default async function Page({ params }: PageProps) {
-  const toolId = params.toolId;
+export default function ToolPage({ params }: ToolPageProps) {
+  const isDev = process.env.NODE_ENV === 'development'
+  const toolId = params.toolId
   
+  if (!toolId) {
+    return notFound()
+  }
+
+  // Preserve existing functionality for slug-based URLs
+  const isSlugUrl = !toolId.includes('#') // Assuming SK contains '#' and slugs don't
+
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <ToolPageClient toolId={toolId} />
-    </Suspense>
-  );
+    <div className="h-screen w-full">
+      <AIToolFrame 
+        toolId={toolId}
+        bypassAuth={isDev && !isSlugUrl} // Only bypass auth for SK-based URLs in dev
+        {...(isSlugUrl && { isSlugUrl: true })} // Pass flag for slug-based routing
+      />
+    </div>
+  )
 }

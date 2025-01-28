@@ -75,7 +75,10 @@ export function ToolCard({
 
   return (
     <div 
-      onClick={() => onSelect(tool)}
+      onClick={() => {
+        console.log('ToolCard clicked:', tool)
+        onSelect(tool)
+      }}
       className={cn(
         "relative rounded-2xl p-6",
         "border border-[var(--border-color)] hover:border-[var(--accent)]",

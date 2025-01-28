@@ -5,6 +5,7 @@ import { type Tool, type SuccessState } from '@/app/ai/components/dashboard/type
 import ToolList from '@/app/ai/components/dashboard/layout/tool/ToolList'
 import { ToolForm } from '@/app/ai/components/dashboard/tool-editor/ToolForm'
 import { cn } from "@/lib/utils"
+import { usePathname } from 'next/navigation'
 
 interface ToolContainerProps {
   selectedTool: Tool | null
@@ -40,6 +41,8 @@ export function ToolContainer({
   hideCreationControls = false
 }: ToolContainerProps) {
   const [isPanelOpen, setIsPanelOpen] = useState(false)
+  const pathname = usePathname()
+  const isAdminRoute = pathname?.includes('/admin')
 
   const handleClose = () => {
     setIsPanelOpen(false)
@@ -47,8 +50,17 @@ export function ToolContainer({
   }
 
   const handleToolSelect = (tool: Tool) => {
+    console.log('ToolContainer handleToolSelect called with tool:', tool)
+    // Always call setSelectedTool with the tool
     setSelectedTool(tool)
-    setIsPanelOpen(true)
+    
+    // Only open the panel if we're in admin route
+    if (isAdminRoute) {
+      console.log('Admin route detected, opening panel')
+      setIsPanelOpen(true)
+    } else {
+      console.log('Non-admin route, just passing tool up')
+    }
   }
 
   const handleCreateNew = () => {
@@ -59,15 +71,16 @@ export function ToolContainer({
   return (
     <div className="relative">
       <ToolList 
-  tools={tools}
-  isLoading={isLoadingTools}
-  onSelectTool={handleToolSelect}
-  onCreateNew={handleCreateNew}
-  onDuplicate={onDuplicate}
-  hideCreationControls={hideCreationControls}
-/>
+        tools={tools}
+        isLoading={isLoadingTools}
+        onSelectTool={setSelectedTool}
+        onCreateNew={handleCreateNew}
+        onDuplicate={onDuplicate}
+        hideCreationControls={hideCreationControls}
+      />
 
-      {(!hideCreationControls || selectedTool) && (
+      {/* Only show editor panel in admin routes */}
+      {isAdminRoute && (!hideCreationControls || selectedTool) && (
         <>
           {/* Backdrop */}
           <div 
