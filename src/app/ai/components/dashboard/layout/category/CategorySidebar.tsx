@@ -4,6 +4,7 @@ import { Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import type { AICollection } from '@/lib/supabase/ai'
+import { useRouter } from 'next/navigation'
 
 interface CategorySidebarProps {
   categories: AICollection[]
@@ -30,6 +31,7 @@ export default function CategorySidebar({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [localCategories, setLocalCategories] = useState<AICollection[]>(categories)
   const supabase = createClientComponentClient()
+  const router = useRouter()
 
   useEffect(() => {
     setLocalCategories(categories)
@@ -70,6 +72,29 @@ export default function CategorySidebar({
       setError(err instanceof Error ? err.message : 'Failed to create category')
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  async function signInWithGoogle() {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${location.origin}/auth/callback`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+
+      if (error) {
+        console.error('Google OAuth error:', error);
+        router.push(`/auth/login?error=${encodeURIComponent(error.message)}`);
+      }
+    } catch (err) {
+      console.error('Unexpected error during Google sign-in:', err);
+      router.push(`/auth/login?error=${encodeURIComponent('Unexpected error occurred')}`);
     }
   }
 

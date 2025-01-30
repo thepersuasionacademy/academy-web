@@ -1,11 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { Tool, SuccessState } from '@/app/ai/components/dashboard/types'
 import ToolList from '@/app/ai/components/dashboard/layout/tool/ToolList'
 import { ToolForm } from '@/app/ai/components/dashboard/tool-editor/ToolForm'
 import { cn } from "@/lib/utils"
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface ToolContainerProps {
@@ -43,6 +43,7 @@ export function ToolContainer({
 }: ToolContainerProps) {
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
   const isAdminRoute = pathname?.includes('/admin')
   const supabase = createClientComponentClient()
 
@@ -96,6 +97,25 @@ export function ToolContainer({
       }
     }
   }
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error) {
+        console.error('Session check error:', error);
+        router.push('/auth/login');
+      } else if (!user) {
+        console.log('No user session, redirecting to login');
+        router.push('/auth/login');
+      }
+    };
+
+    // Only run check if not already on login page
+    if (!window.location.pathname.includes('/auth/login')) {
+      checkUser();
+    }
+  }, [router]);
 
   return (
     <div className="relative">
