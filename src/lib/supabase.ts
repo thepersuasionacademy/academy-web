@@ -14,7 +14,15 @@ export const supabase = createClient(
     auth: {
       persistSession: true,
       autoRefreshToken: true,
-      detectSessionInUrl: true
+      detectSessionInUrl: true,
+      flowType: 'pkce',
+      cookieOptions: {
+        name: 'sb-auth-token',
+        domain: 'app.thepersuasionacademy.com',
+        path: '/',
+        sameSite: 'lax',
+        secure: true
+      }
     }
   }
 ) 
