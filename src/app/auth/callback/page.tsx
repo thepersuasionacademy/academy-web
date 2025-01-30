@@ -1,51 +1,58 @@
-'use client'
+import { headers } from 'next/headers'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 
-import { useEffect } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useRouter } from 'next/navigation'
+export const dynamic = 'force-dynamic'
 
-export default function AuthCallbackPage() {
-  const router = useRouter()
-  const supabase = createClientComponentClient()
+export default async function AuthCallbackPage({
+  searchParams,
+}: {
+  searchParams: { code?: string }
+}) {
+  const code = searchParams.code
 
-  useEffect(() => {
-    const handleCallback = async () => {
-      try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        
-        if (sessionError) {
-          console.error('Session error:', sessionError)
-          router.replace(`/auth/login?error=${encodeURIComponent(sessionError.message)}`)
-          return
-        }
+  // If there's no code, this is not an OAuth callback
+  if (!code) {
+    console.error('No code provided in callback')
+    redirect(`/auth/login?error=${encodeURIComponent('No authentication code provided')}`)
+  }
 
-        if (session) {
-          router.replace('/')
-          return
-        }
+  try {
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
 
-        // If we don't have a session, check for error params
-        const url = new URL(window.location.href)
-        const error = url.searchParams.get('error')
-        
-        if (error) {
-          console.error('Auth error:', error)
-          router.replace(`/auth/login?error=${encodeURIComponent(error)}`)
-          return
-        }
-
-        // If no session and no error, redirect to login
-        router.replace('/auth/login')
-      } catch (error) {
-        console.error('Callback error:', error)
-        const errorMessage = error instanceof Error ? error.message : 'Authentication failed'
-        router.replace(`/auth/login?error=${encodeURIComponent(errorMessage)}`)
-      }
+    // Exchange the code for a session
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (exchangeError) {
+      console.error('Error exchanging code for session:', exchangeError)
+      redirect(`/auth/login?error=${encodeURIComponent(exchangeError.message)}`)
     }
 
-    handleCallback()
-  }, [supabase.auth, router])
+    // Get the session to verify it worked
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError) {
+      console.error('Error getting session:', sessionError)
+      redirect(`/auth/login?error=${encodeURIComponent(sessionError.message)}`)
+    }
 
+    // If we have a session, redirect to the app
+    if (session) {
+      redirect('/')
+    }
+
+    // If we don't have a session, something went wrong
+    console.error('No session after successful code exchange')
+    redirect(`/auth/login?error=${encodeURIComponent('Failed to create session')}`)
+  } catch (error) {
+    console.error('Unexpected error in auth callback:', error)
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred'
+    redirect(`/auth/login?error=${encodeURIComponent(errorMessage)}`)
+  }
+
+  // This is just for TypeScript, the code will never reach here due to redirects
   return (
     <div className="flex min-h-screen items-center justify-center">
       <div className="text-center">
