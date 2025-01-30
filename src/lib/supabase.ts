@@ -18,10 +18,9 @@ export const supabase = createClient(
       flowType: 'pkce',
       cookieOptions: {
         name: 'sb-auth-token',
-        domain: 'app.thepersuasionacademy.com',
         path: '/',
         sameSite: 'lax',
-        secure: true
+        secure: process.env.NODE_ENV === 'production'
       }
     }
   }
