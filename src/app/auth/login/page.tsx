@@ -23,27 +23,39 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search)
     const errorMsg = params.get('error')
     if (errorMsg) {
+      console.log('Login error received:', errorMsg)
       setError(errorMsg)
-      // Clean up the URL
+      // Clean up the URL but preserve the error in state
       window.history.replaceState({}, '', window.location.pathname)
     }
   }, [])
 
   const handleGoogleSignIn = async () => {
-    const redirectUrl = process.env.NODE_ENV === 'production'
-      ? 'https://app.thepersuasionacademy.com/api/auth-callback'
-      : `${window.location.origin}/api/auth-callback`
+    try {
+      setError(null) // Clear any existing errors
+      const redirectUrl = process.env.NODE_ENV === 'production'
+        ? 'https://app.thepersuasionacademy.com/api/auth-callback'
+        : `${window.location.origin}/api/auth-callback`
 
-    await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: redirectUrl,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         }
+      })
+
+      if (error) {
+        console.error('Sign in error:', error)
+        setError(error.message)
       }
-    })
+    } catch (err) {
+      console.error('Sign in error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to initiate sign in')
+    }
   }
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
