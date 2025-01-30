@@ -76,25 +76,20 @@ export default function CategorySidebar({
   }
 
   async function signInWithGoogle() {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          },
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${location.origin}/api/auth-callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
         },
-      });
+      },
+    });
 
-      if (error) {
-        console.error('Google OAuth error:', error);
-        router.push(`/auth/login?error=${encodeURIComponent(error.message)}`);
-      }
-    } catch (err) {
-      console.error('Unexpected error during Google sign-in:', err);
-      router.push(`/auth/login?error=${encodeURIComponent('Unexpected error occurred')}`);
+    if (error) {
+      console.error('Google OAuth error:', error);
+      router.push(`/auth/login?error=${encodeURIComponent(error.message)}`);
     }
   }
 
