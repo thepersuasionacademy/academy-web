@@ -100,23 +100,38 @@ export function ToolContainer({
 
   useEffect(() => {
     const checkUser = async () => {
-      console.log('[Auth Check] Checking user session...')
-      const { data: { user }, error } = await supabase.auth.getUser()
-      
-      console.log('[Auth Check] User:', user ? 'exists' : 'missing')
-      console.log('[Auth Check] Error:', error || 'none')
+      console.log('[Auth Check] Initiating session check...')
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        
+        console.log('[Auth Check] User status:', user ? 'Authenticated' : 'No user')
+        console.log('[Auth Check] Error status:', error || 'No error')
 
-      if (error) {
-        console.error('[Auth Check] Session error:', error)
-        router.push('/auth/login')
-      } else if (!user) {
-        console.warn('[Auth Check] No user session')
+        if (error) {
+          console.error('[Auth Check] Supabase error:', error)
+          localStorage.setItem('auth-error', error.message)
+          router.push('/auth/login')
+          return
+        }
+
+        if (!user) {
+          console.warn('[Auth Check] No user session found')
+          localStorage.setItem('auth-error', 'No active session')
+          router.push('/auth/login')
+          return
+        }
+
+        console.log('[Auth Check] User authenticated successfully')
+        localStorage.removeItem('auth-error')
+
+      } catch (err) {
+        console.error('[Auth Check] Unexpected error:', err)
+        localStorage.setItem('auth-error', 'Unexpected authentication error')
         router.push('/auth/login')
       }
     }
 
     if (!window.location.pathname.includes('/auth/login')) {
-      console.log('[Auth Check] Initiating check...')
       checkUser()
     }
   }, [router])

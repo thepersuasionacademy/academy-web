@@ -30,7 +30,17 @@ export default function CategorySidebar({
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [localCategories, setLocalCategories] = useState<AICollection[]>(categories)
-  const supabase = createClientComponentClient()
+  const supabase = createClientComponentClient({
+    options: {
+      auth: {
+        flowType: 'pkce',
+        detectSessionInUrl: false,
+        cookieOptions: {
+          domain: '.thepersuasionacademy.com' // Maintain parent domain
+        }
+      }
+    }
+  })
   const router = useRouter()
 
   useEffect(() => {
