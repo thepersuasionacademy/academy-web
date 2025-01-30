@@ -7,7 +7,24 @@ export const runtime = 'nodejs' // Force Node.js runtime
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
-  console.log('Auth callback started, URL:', request.url)
+  
+  // Return debug HTML instead of redirecting
+  const debugResponse = (message: string, details: any = {}) => {
+    const html = `
+      <html>
+        <body>
+          <h1>Auth Debug Info</h1>
+          <h2>${message}</h2>
+          <pre>${JSON.stringify(details, null, 2)}</pre>
+          <hr/>
+          <a href="/auth/login">Return to Login</a>
+        </body>
+      </html>
+    `
+    return new Response(html, {
+      headers: { 'Content-Type': 'text/html' },
+    })
+  }
 
   try {
     // Check for error from OAuth provider
@@ -15,59 +32,60 @@ export async function GET(request: Request) {
     const error_description = requestUrl.searchParams.get('error_description')
     
     if (error || error_description) {
-      console.log('OAuth provider error:', { error, error_description })
-      return NextResponse.redirect(
-        `${requestUrl.origin}/auth/login?error=${encodeURIComponent(error_description || error || 'OAuth error')}`
-      )
+      return debugResponse('OAuth Provider Error', {
+        error,
+        error_description,
+        url: request.url
+      })
     }
 
     // Get the code
     const code = requestUrl.searchParams.get('code')
-    console.log('Code present:', !!code)
-    
     if (!code) {
-      console.log('No code in request')
-      return NextResponse.redirect(
-        `${requestUrl.origin}/auth/login?error=${encodeURIComponent('Authentication code missing')}`
-      )
+      return debugResponse('No Code Present', {
+        searchParams: Object.fromEntries(requestUrl.searchParams.entries()),
+        url: request.url
+      })
     }
 
     // Create Supabase client
-    console.log('Creating Supabase client...')
     const supabase = createRouteHandlerClient({ cookies })
 
     // Exchange the code
-    console.log('Exchanging code for session...')
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
     
     if (exchangeError) {
-      console.log('Session exchange error:', {
-        message: exchangeError.message,
-        status: exchangeError.status,
-        name: exchangeError.name
+      return debugResponse('Session Exchange Error', {
+        error: {
+          message: exchangeError.message,
+          status: exchangeError.status,
+          name: exchangeError.name
+        },
+        code: code.substring(0, 10) + '...' // Show part of the code safely
       })
-      return NextResponse.redirect(
-        `${requestUrl.origin}/auth/login?error=${encodeURIComponent('Failed to exchange code: ' + exchangeError.message)}`
-      )
     }
 
-    // Check if we got a session
     if (!data.session) {
-      console.log('No session received after exchange')
-      return NextResponse.redirect(
-        `${requestUrl.origin}/auth/login?error=${encodeURIComponent('No session received')}`
-      )
+      return debugResponse('No Session Received', {
+        data,
+        code: code.substring(0, 10) + '...'
+      })
     }
 
-    console.log('Authentication successful, redirecting to home')
-    return NextResponse.redirect(requestUrl.origin)
+    // If we get here, authentication was successful
+    return debugResponse('Authentication Successful', {
+      session: {
+        user: data.session.user.email,
+        expires_at: data.session.expires_at
+      }
+    })
   } catch (error) {
-    console.log('Unexpected error:', error)
-    const message = error instanceof Error ? error.message : 'Unexpected error during authentication'
-    console.log('Error message:', message)
-    
-    return NextResponse.redirect(
-      `${requestUrl.origin}/auth/login?error=${encodeURIComponent(message)}`
-    )
+    return debugResponse('Unexpected Error', {
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack
+      } : error,
+      url: request.url
+    })
   }
 } 
