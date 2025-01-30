@@ -31,8 +31,8 @@ export default function LoginPage() {
 
   const handleGoogleSignIn = async () => {
     const redirectUrl = process.env.NODE_ENV === 'production'
-      ? 'https://app.thepersuasionacademy.com/auth/callback'
-      : `${window.location.origin}/auth/callback`
+      ? 'https://app.thepersuasionacademy.com/api/auth-callback'
+      : `${window.location.origin}/api/auth-callback`
 
     await supabase.auth.signInWithOAuth({
       provider: 'google',
