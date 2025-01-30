@@ -1,97 +1,74 @@
 'use client';
 
 import React from 'react';
-import type { Tool } from '@/app/api/ai/types/tools';
+import type { AITool, AIInput } from '@/lib/supabase/ai';
 import { useTheme } from '@/app/context/ThemeContext';
 import { ArrowRight } from 'lucide-react';
 
 interface InputFieldsProps {
-  tool: Tool | null;
+  tool: AITool | null;
+  toolInputs: AIInput[];
   isLoading: boolean;
-  inputs: Record<string, string>;
+  values: Record<string, string>;
   onInputChange: (field: string, value: string) => void;
   onKeyPress: (e: React.KeyboardEvent<HTMLInputElement>, field: string) => void;
 }
 
 export function InputFields({ 
   tool, 
+  toolInputs, 
   isLoading, 
-  inputs, 
+  values, 
   onInputChange, 
   onKeyPress 
 }: InputFieldsProps) {
-  return (
-    <div className="space-y-12 mb-16">
-      <div>
-        <label className="block text-[var(--foreground)] text-2xl font-semibold mb-3 flex items-center gap-2">
-          <ArrowRight className="h-6 w-6 text-[var(--text-secondary)]" />
-          {tool?.inputField1 || 'Loading...'}
-        </label>
-        <div className="text-base text-[var(--text-secondary)] mb-4 ml-8">
-          {tool?.inputField1Description || 'Loading...'}
-        </div>
-        <input 
-          type="text"
-          name="field1"
-          className="w-full bg-transparent text-xl py-4 px-2 
-            border-b border-[var(--border-color)] focus:border-[var(--accent)]
-            text-[var(--foreground)]
-            focus:outline-none transition-colors duration-200"
-          value={inputs.field1}
-          onChange={(e) => onInputChange('field1', e.target.value)}
-          onKeyPress={(e) => onKeyPress(e, 'field1')}
-          autoFocus
-          disabled={isLoading}
-        />
+  const { theme } = useTheme();
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-24 bg-[var(--hover-bg)] animate-pulse rounded-lg"></div>
+        <div className="h-24 bg-[var(--hover-bg)] animate-pulse rounded-lg"></div>
       </div>
+    );
+  }
 
-      {(isLoading || tool?.inputField2) && (
-        <div>
-          <label className="block text-[var(--foreground)] text-2xl font-semibold mb-3 flex items-center gap-2">
-            <ArrowRight className="h-6 w-6 text-[var(--text-secondary)]" />
-            {tool?.inputField2 || 'Loading...'}
+  return (
+    <div className="space-y-6">
+      {toolInputs.map((input, index) => (
+        <div 
+          key={input.id} 
+          className="bg-[var(--card-bg)] rounded-lg p-6 border border-[var(--border-color)]"
+        >
+          <label className="block text-[var(--foreground)] text-lg font-medium mb-2">
+            {input.input_name}
+            {input.is_required && <span className="text-red-500 ml-1">*</span>}
           </label>
-          <div className="text-base text-[var(--text-secondary)] mb-4 ml-8">
-            {tool?.inputField2Description || 'Loading...'}
-          </div>
-          <input 
-            type="text"
-            name="field2"
-            className="w-full bg-transparent text-xl py-4 px-2 
-              border-b border-[var(--border-color)] focus:border-[var(--accent)]
-              text-[var(--foreground)]
-              focus:outline-none transition-colors duration-200"
-            value={inputs.field2 || ''}
-            onChange={(e) => onInputChange('field2', e.target.value)}
-            onKeyPress={(e) => onKeyPress(e, 'field2')}
-            disabled={isLoading}
-          />
-        </div>
-      )}
+          
+          <p className="text-[var(--text-secondary)] mb-4">
+            {input.input_description}
+          </p>
 
-      {(isLoading || tool?.inputField3) && (
-        <div>
-          <label className="block text-[var(--foreground)] text-2xl font-semibold mb-3 flex items-center gap-2">
-            <ArrowRight className="h-6 w-6 text-[var(--text-secondary)]" />
-            {tool?.inputField3 || 'Loading...'}
-          </label>
-          <div className="text-base text-[var(--text-secondary)] mb-4 ml-8">
-            {tool?.inputField3Description || 'Loading...'}
+          <div className="relative">
+            <input
+              type="text"
+              value={values[input.input_name || ''] || ''}
+              onChange={(e) => onInputChange(input.input_name || '', e.target.value)}
+              onKeyPress={(e) => onKeyPress(e, input.input_name || '')}
+              placeholder={`Enter ${input.input_name?.toLowerCase()}`}
+              className="w-full p-4 bg-[var(--background)] border border-[var(--border-color)] 
+                       rounded-lg text-[var(--foreground)] placeholder-[var(--text-secondary)]
+                       focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+            />
+            
+            {index < toolInputs.length - 1 && (
+              <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                <ArrowRight className="w-5 h-5 text-[var(--text-secondary)]" />
+              </div>
+            )}
           </div>
-          <input 
-            type="text"
-            name="field3"
-            className="w-full bg-transparent text-xl py-4 px-2 
-              border-b border-[var(--border-color)] focus:border-[var(--accent)]
-              text-[var(--foreground)]
-              focus:outline-none transition-colors duration-200"
-            value={inputs.field3 || ''}
-            onChange={(e) => onInputChange('field3', e.target.value)}
-            onKeyPress={(e) => onKeyPress(e, 'field3')}
-            disabled={isLoading}
-          />
         </div>
-      )}
+      ))}
     </div>
   );
 }

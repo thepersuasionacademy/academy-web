@@ -1,21 +1,21 @@
 // src/lib/auth.ts
-import { getSession, Claims } from '@auth0/nextjs-auth0';
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-export interface UserProfile extends Claims {
+export interface UserProfile {
+  id: string;
   email: string;
   email_verified: boolean;
-  name: string;
-  nickname: string;
-  picture: string;
-  sub: string;
-  updated_at: string;
+  full_name?: string;
+  avatar_url?: string;
+  updated_at?: string;
 }
 
 export const checkAuth = async (req: NextRequest) => {
   try {
-    const res = new NextResponse();
-    const session = await getSession(req, res);
+    const supabase = createServerComponentClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
     return !!session;
   } catch (error) {
     return false;
@@ -24,9 +24,19 @@ export const checkAuth = async (req: NextRequest) => {
 
 export const getUser = async (req: NextRequest): Promise<UserProfile | null> => {
   try {
-    const res = new NextResponse();
-    const session = await getSession(req, res);
-    return session?.user as UserProfile || null;
+    const supabase = createServerComponentClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session?.user) return null;
+    
+    return {
+      id: session.user.id,
+      email: session.user.email!,
+      email_verified: session.user.email_verified ?? false,
+      full_name: session.user.user_metadata?.full_name,
+      avatar_url: session.user.user_metadata?.avatar_url,
+      updated_at: session.user.updated_at
+    };
   } catch (error) {
     return null;
   }
@@ -34,9 +44,9 @@ export const getUser = async (req: NextRequest): Promise<UserProfile | null> => 
 
 export const getAuthToken = async (req: NextRequest): Promise<string | null> => {
   try {
-    const res = new NextResponse();
-    const session = await getSession(req, res);
-    return session?.accessToken || null;
+    const supabase = createServerComponentClient({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+    return session?.access_token || null;
   } catch (error) {
     return null;
   }

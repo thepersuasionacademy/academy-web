@@ -8,54 +8,59 @@ interface MediaPlayerProps {
   title: string;
   description: string;
   isOpen: boolean;
-  trackNumber: number;
   category?: string;
-  suite?: string;
-  toolId?: string;
+  videoId?: string;
+  courseName?: string;
 }
 
-export const MediaPlayer = ({ 
-  title, 
-  description, 
-  isOpen, 
-  trackNumber,
+export const MediaPlayer = ({
+  title,
+  description,
+  isOpen,
   category,
-  suite,
-  toolId = "buyer-psychology-modeling"
+  videoId,
+  courseName,
 }: MediaPlayerProps) => {
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<'content' | 'ai-tool' | 'quiz'>('content');
+  const [activeTab, setActiveTab] = useState<'content' | 'ai-tool'>('content');
 
-  const libraryId = '369599';
-  const videoId = '1e7bb7f1-5b1e-4b9b-b00e-49e1f83c5f19';
-  const token = 'c86d59f1-6bd0-42e1-bf13-791c708199a7';
-  const playerUrl = `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?token=${token}&autoplay=false`;
+  if (!isOpen) return null;
+
+  // Get library ID from environment variable
+  const libraryId = process.env.NEXT_PUBLIC_BUNNY_LIBRARY_ID || '376351';
+  const playerUrl = videoId ? 
+    `https://iframe.mediadelivery.net/embed/376351/${videoId}?autoplay=true` : 
+    null;
+
+  console.log('Video Player URL:', playerUrl);
+  console.log('Video ID:', videoId);
+  console.log('Library ID:', libraryId);
 
   return (
     <div className={cn(
-      "h-full flex flex-col z-50 flex-1 px-16",
-      "bg-[var(--card-bg)]",
+      "h-full flex flex-col z-50 flex-1",
+      "bg-[var(--background)]",
       "transform transition-transform duration-300 ease-out",
       isOpen ? "translate-x-0" : "-translate-x-full"
     )}>
       {/* Top Navigation Bar */}
-      <div className="flex justify-between items-center mb-5 mt-5">
+      <div className="flex justify-between items-center py-5 px-6 bg-[var(--background)]">
         {/* Breadcrumb Navigation */}
         <div className="text-sm text-[var(--text-secondary)]">
           <div className="flex items-center gap-2">
             {category && (
               <>
-                <span className="hover:text-[var(--foreground)] cursor-pointer">{category}</span>
+                <span className="text-[var(--text-secondary)]">{category}</span>
                 <ChevronRight className="w-4 h-4" />
               </>
             )}
-            {suite && (
+            {courseName && (
               <>
-                <span className="hover:text-[var(--foreground)] cursor-pointer">{suite}</span>
+                <span className="text-[var(--text-secondary)]">{courseName}</span>
                 <ChevronRight className="w-4 h-4" />
               </>
             )}
-            <span className="text-[var(--foreground)]">{`Track ${trackNumber}`}</span>
+            <span className="text-[var(--foreground)]">{title}</span>
           </div>
         </div>
 
@@ -87,115 +92,66 @@ export const MediaPlayer = ({
           >
             AI Tool
           </button>
-          <button 
-            onClick={() => setActiveTab('quiz')}
+        </div>
+      </div>
+
+      {/* Content Area (Video/AI Tool) */}
+      <div className="relative flex-1 bg-black">
+        {activeTab === 'ai-tool' ? (
+          <iframe 
+            src={`/ai/tools/buyer-psychology-modeling`}
+            className="absolute inset-0 w-full h-full"
+            style={{ border: 'none' }}
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
+            allowFullScreen
+          />
+        ) : playerUrl ? (
+          <iframe 
+            src={playerUrl}
+            loading="lazy"
+            className="absolute inset-0 w-full h-full"
+            style={{ border: 'none' }}
+            allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+            allowFullScreen
+            title={title}
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-white">
+            No video available
+          </div>
+        )}
+      </div>
+
+      {/* Description Section */}
+      <div className="shrink-0 p-6 bg-[var(--background)] border-t border-[var(--border-color)]">
+        <div className="max-w-[1280px]">
+          <h1 className="text-2xl font-semibold mb-2">{title}</h1>
+          <div 
             className={cn(
-              "px-6 py-2 rounded-full text-base font-medium transition-all hover:scale-105",
-              "hover:border-[var(--accent)]/50 hover:shadow-[0_0_15px_rgba(var(--accent-rgb),0.15)]",
-              "border border-transparent",
-              activeTab === 'quiz'
-                ? "bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90"
-                : "bg-[var(--hover-bg)] text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--hover-bg)]/80"
+              "text-[var(--text-secondary)]",
+              !isDescriptionExpanded && "line-clamp-2"
             )}
           >
-            Quiz
-          </button>
-        </div>
-      </div>
-
-      {/* Content Area (Video/AI Tool/Quiz) */}
-      <div className="relative bg-[var(--card-bg)] pt-2 pb-5">
-        <div className="absolute inset-0 bg-gradient-to-t from-[var(--card-bg)]/20 to-transparent pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[var(--card-bg)]/20 to-transparent pointer-events-none" />
-        <div className="w-full">
-          <div className="aspect-video w-full relative shadow-[0_0_50px_-12px_rgba(0,0,0,0.8)] rounded-lg overflow-hidden">
-            {activeTab === 'ai-tool' ? (
-              <iframe 
-                src={`/ai/tools/buyer-psychology-modeling`}
-                className="absolute inset-0 w-full h-full"
-                style={{ border: 'none' }}
-                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-                allowFullScreen
-              />
-            ) : activeTab === 'quiz' ? (
-              <div className="absolute inset-0 flex items-center justify-center text-[var(--text-secondary)]">
-                Quiz Coming Soon
-              </div>
+            {description}
+          </div>
+          <button
+            onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+            className="mt-2 flex items-center gap-1 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
+          >
+            {isDescriptionExpanded ? (
+              <>
+                Show less <ChevronUp className="w-4 h-4" />
+              </>
             ) : (
-              <iframe 
-                src={playerUrl}
-                loading="lazy"
-                className="absolute inset-0 w-full h-full"
-                style={{ border: 'none', marginBottom: 0, paddingBottom: 0 }}
-                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
-                allowFullScreen
-              />
+              <>
+                Show more <ChevronDown className="w-4 h-4" />
+              </>
             )}
-          </div>
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-r from-[var(--card-bg)]/20 via-transparent to-[var(--card-bg)]/20 pointer-events-none" />
-      </div>
-
-      {/* Content Section */}
-      <div className="shrink-0 relative">
-        {/* Glassmorphic background effect */}
-        <div className="absolute inset-0 bg-gradient-to-b from-[var(--card-bg)]/5 to-transparent" />
-        <div className="absolute inset-0 backdrop-blur-[2px]" />
-        
-        {/* Content with glass effect */}
-        <div className="relative border-t border-[var(--border-color)]">
-          <div className="max-w-[1280px]">
-            {/* Title Section */}
-            <div className="pt-4 pb-2">
-              <div className="relative">
-                <div className="absolute -inset-x-1 inset-y-0 bg-gradient-to-r from-[var(--card-bg)]/50 via-transparent to-[var(--card-bg)]/50 blur-sm" />
-                <h1 className="text-4xl font-semibold text-[var(--foreground)]">{`Track ${trackNumber}`}</h1>
-              </div>
-            </div>
-            
-            {/* Description Section */}
-            <div className="pb-4 mt-2">
-              <div 
-                className={cn(
-                  "text-xl whitespace-pre-wrap relative",
-                  "before:absolute before:inset-0 before:bg-gradient-to-r before:from-[var(--card-bg)]/30 before:to-transparent before:pointer-events-none",
-                  "text-[var(--foreground)]",
-                  !isDescriptionExpanded && "line-clamp-2"
-                )}
-                ref={(el) => {
-                  if (el) {
-                    const isTextTruncated = el.scrollHeight > el.clientHeight;
-                    if (!isTextTruncated && isDescriptionExpanded) {
-                      setIsDescriptionExpanded(false);
-                    }
-                  }
-                }}
-              >
-                {description}
-              </div>
-
-              {isDescriptionExpanded && (
-                <button
-                  onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-                  className="mt-2 flex items-center gap-1 text-lg font-medium text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors relative z-10"
-                >
-                  {isDescriptionExpanded ? (
-                    <>
-                      Show less <ChevronUp className="w-4 h-4" />
-                    </>
-                  ) : (
-                    <>
-                      Show more <ChevronDown className="w-4 h-4" />
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
+          </button>
         </div>
       </div>
     </div>
   );
-}
+};
 
 export default MediaPlayer;

@@ -1,147 +1,225 @@
 'use client';
 
-import React, { useState } from 'react';
-import type { Tool } from '@/app/api/ai/types/tools';
-import { InputFields } from './output/InputFields';
-import { ResponseDisplay } from './output/ResponseDisplay';
+import { useState, useEffect } from 'react';
+import type { AITool, AIInput, AIPrompt } from '@/lib/supabase/ai';
 import { ToolHeader } from './output/ToolHeader';
-import { LoadingState } from './output/LoadingState';
-import GridLoader from './GridLoader';
+import { InputFields } from './output/InputFields';
 import { useTheme } from '@/app/context/ThemeContext';
+import { ArrowRight, ArrowLeft, RotateCcw, Copy } from 'lucide-react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { markdownComponents } from './output/MarkdownStyles';
+import GridLoader from './GridLoader';
 
 interface GenerateSectionProps {
-  tool: Tool | null;
+  tool: AITool | null;
+  inputs: AIInput[];
+  prompts: AIPrompt[];
   isLoading: boolean;
 }
 
-export default function GenerateSection({ tool, isLoading }: GenerateSectionProps) {
-  const [inputs, setInputs] = useState<Record<string, string>>({ field1: '' });
+export default function GenerateSection({ tool, inputs, prompts, isLoading }: GenerateSectionProps) {
+  const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
-  const [response, setResponse] = useState('');
-  const [credits, setCredits] = useState(1000);
+  const [output, setOutput] = useState<string | null>(null);
+  const [displayedOutput, setDisplayedOutput] = useState<string>('');
+  const [fullResponse, setFullResponse] = useState<string>('');
   const { theme } = useTheme();
 
-  const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>, currentField: string) => {
-    if (e.key === 'Enter') {
-      if (currentField === 'field1' && tool?.inputField2) {
-        const nextInput = document.querySelector<HTMLInputElement>(`[name="field2"]`);
-        nextInput?.focus();
-      } else if (currentField === 'field2' && tool?.inputField3) {
-        const nextInput = document.querySelector<HTMLInputElement>(`[name="field3"]`);
-        nextInput?.focus();
-      } else if (inputs.field1.trim()) {
-        await handleGenerate();
-      }
+  useEffect(() => {
+    if (fullResponse && isGenerating) {
+      let currentIndex = 0;
+      const interval = setInterval(() => {
+        if (currentIndex <= fullResponse.length) {
+          setDisplayedOutput(fullResponse.slice(0, currentIndex));
+          currentIndex++;
+        } else {
+          clearInterval(interval);
+          setIsGenerating(false);
+        }
+      }, 1);
+
+      return () => clearInterval(interval);
     }
-  };
+  }, [fullResponse, isGenerating]);
 
   const handleInputChange = (field: string, value: string) => {
-    setInputs(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setInputValues(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>, field: string) => {
+    if (e.key === 'Enter' && !isGenerating) {
+      await handleGenerate();
+    }
   };
 
   const handleGenerate = async () => {
-    if (!tool || isGenerating || !inputs.field1.trim()) return;
-    
-    if (credits < tool.creditCost) {
-      alert('Not enough credits!');
-      return;
-    }
-    
-    setCredits(prev => prev - tool.creditCost);
-    await generateResponse();
-  };
+    if (!tool || isGenerating) return;
 
-  const generateResponse = async () => {
-    if (!tool) return;
     setIsGenerating(true);
-    setResponse('');
+    setOutput('');
+    setDisplayedOutput('');
+    setFullResponse('');
     
     try {
-      const requestPayload = {
-        promptTemplate: tool.promptTemplate,
-        inputs
-      };
+      // Validate required inputs
+      const missingInputs = inputs
+        .filter(input => input.is_required && !inputValues[input.input_name || ''])
+        .map(input => input.input_name || '');
 
-      const resp = await fetch('/api/ai/models/claude', {
+      if (missingInputs.length > 0) {
+        throw new Error(`Missing required inputs: ${missingInputs.join(', ')}`);
+      }
+
+      // Prepare the prompts with input values
+      const preparedPrompts = prompts.map(prompt => ({
+        ...prompt,
+        content: replaceInputPlaceholders(prompt.input_description || '', inputValues)
+      }));
+
+      const response = await fetch('/api/ai/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        body: JSON.stringify(requestPayload)
+        body: JSON.stringify({
+          toolId: tool.id,
+          inputs: inputValues,
+          prompts: preparedPrompts
+        })
       });
 
-      let data;
-      try {
-        const rawText = await resp.text();
-        data = JSON.parse(rawText);
-      } catch (e) {
-        throw new Error(`Failed to parse response as JSON: ${e}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.error || 
+          `Failed to generate response: ${response.status} ${response.statusText}`
+        );
       }
 
-      if (!resp.ok) {
-        throw new Error(data.error || 'Failed to generate response');
+      const data = await response.json();
+      if (!data || !data.output) {
+        throw new Error('Invalid response format from server');
       }
-      
-      const content = data.content;
-      
-      for (let i = 0; i < content.length; i++) {
-        await new Promise(resolve => setTimeout(resolve, 5));
-        setResponse(prev => prev + content[i]);
-      }
+
+      setFullResponse(data.output);
+      setOutput(data.output);
+
     } catch (error) {
-      console.error('Error generating response:', error);
-      setResponse(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsGenerating(false);
+      console.error('Generation error:', error);
+      const errorMessage = error instanceof Error 
+        ? `Error: ${error.message}` 
+        : 'An unexpected error occurred during generation';
+      setFullResponse(errorMessage);
+      setOutput(errorMessage);
     }
   };
 
-  const handleRegenerate = () => {
-    if (!tool || credits < tool.creditCost) {
-      alert('Not enough credits!');
-      return;
-    }
-    setCredits(prev => prev - tool.creditCost);
-    setResponse('');
-    const resetInputs: Record<string, string> = { field1: '' };
-    if (tool.inputField2) resetInputs.field2 = '';
-    if (tool.inputField3) resetInputs.field3 = '';
-    setInputs(resetInputs);
+  const replaceInputPlaceholders = (template: string, values: Record<string, string>): string => {
+    return template.replace(/\{\{(\w+)\}\}/g, (match, key) => values[key] || match);
   };
 
-  if (!response) {
-    if (isGenerating) {
-      return <LoadingState />;
-    }
-
+  if (!tool || isLoading) {
     return (
-      <div className="max-w-3xl w-full px-4 py-18">
-        <ToolHeader tool={tool} isLoading={isLoading} />
-        <InputFields
-          tool={tool}
-          isLoading={isLoading}
-          inputs={inputs}
-          onInputChange={handleInputChange}
-          onKeyPress={handleKeyPress}
-        />
-        <div className="flex flex-col items-center gap-4">
-        <button
-  onClick={handleGenerate}
-  disabled={!tool || isLoading || !inputs.field1.trim() || isGenerating || credits < (tool?.creditCost || 0)}
-  className={`text-xl font-bold rounded-xl transition-all duration-200 w-[340px] py-5
-    ${(!isLoading && inputs.field1.trim() && credits >= (tool?.creditCost || 0))
-      ? 'bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90'
-      : theme === 'dark'
-        ? 'bg-gray-800 text-gray-500'
-        : 'bg-gray-200 text-gray-400'}`}
->
-  {isLoading ? 'Loading...' : `Generate for ${tool?.creditCost || '...'} Credits`}
-</button>
-          <div className="text-[var(--text-secondary)]">
-            {credits} Credits Remaining
+      <div className="flex justify-center">
+        <div className="max-w-3xl w-full px-4 py-18">
+          <div className="animate-pulse space-y-8">
+            <div>
+              <div className="h-10 w-48 bg-[var(--hover-bg)] rounded mb-3"></div>
+              <div className="h-6 w-96 bg-[var(--hover-bg)] rounded"></div>
+            </div>
+            <div className="space-y-6">
+              <div className="h-24 bg-[var(--hover-bg)] rounded-lg"></div>
+              <div className="h-24 bg-[var(--hover-bg)] rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isGenerating && !output) {
+    return (
+      <div className="flex justify-center">
+        <div className="flex flex-col items-center justify-center min-h-screen w-full">
+          <GridLoader />
+        </div>
+      </div>
+    );
+  }
+
+  if (output) {
+    return (
+      <div className="flex justify-center">
+        <div className="max-w-3xl w-full px-4 pb-16 relative">
+          <div className="mb-8">
+            <h2 className="text-4xl text-[var(--foreground)] mb-3">
+              {tool.title}
+            </h2>
+          </div>
+
+          <div className="bg-[var(--card-bg)] rounded-xl border border-[var(--border-color)] pt-2 px-6 pb-6 mb-12">
+            <div className={`prose max-w-none ${theme === 'dark' ? 'prose-invert' : 'prose-gray'}`}>
+              <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {isGenerating ? displayedOutput : output}
+              </Markdown>
+            </div>
+          </div>
+
+          <div className="fixed bottom-0 left-0 right-0 border-t border-[var(--border-color)] bg-[var(--card-bg)]">
+            <div className="flex justify-center gap-4 max-w-3xl mx-auto px-4 py-3">
+              <button
+                onClick={() => {
+                  setOutput(null);
+                  setIsGenerating(false);
+                }}
+                className="text-lg font-semibold rounded-xl transition-all duration-300 w-[280px] py-5
+                  bg-[var(--card-bg)] text-[var(--foreground)] border border-[var(--border-color)]
+                  hover:border-[var(--accent)]
+                  hover:shadow-[0_0_10px_rgba(var(--accent),0.1)]
+                  group relative overflow-hidden"
+                disabled={isGenerating}
+              >
+                <div className="absolute inset-0 bg-[var(--accent)] opacity-0 group-hover:opacity-5 transition-opacity duration-300" />
+                <div className="flex items-center justify-center gap-2">
+                  <ArrowLeft className="w-5 h-5" />
+                  Go Back
+                </div>
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(output);
+                    const button = document.getElementById('copyButton');
+                    if (button) {
+                      const textSpan = button.querySelector('span');
+                      if (textSpan) textSpan.textContent = 'Copied!';
+                      setTimeout(() => {
+                        if (textSpan) textSpan.textContent = 'Copy';
+                      }, 2000);
+                    }
+                  } catch (err) {
+                    console.error('Failed to copy:', err);
+                    alert('Failed to copy to clipboard');
+                  }
+                }}
+                id="copyButton"
+                className="text-lg font-semibold rounded-xl transition-all duration-300 w-[280px] py-5
+                  bg-[var(--card-bg)] text-[var(--foreground)] border border-[var(--border-color)]
+                  hover:border-[var(--accent)]
+                  hover:shadow-[0_0_10px_rgba(var(--accent),0.1)]
+                  group relative overflow-hidden"
+                disabled={isGenerating}
+              >
+                <div className="absolute inset-0 bg-[var(--accent)] opacity-0 group-hover:opacity-5 transition-opacity duration-300" />
+                <div className="flex items-center justify-center gap-2">
+                  <Copy className="w-5 h-5" />
+                  <span>Copy</span>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -149,11 +227,51 @@ export default function GenerateSection({ tool, isLoading }: GenerateSectionProp
   }
 
   return (
-    <ResponseDisplay
-      response={response}
-      onRegenerate={handleRegenerate}
-      isGenerating={isGenerating}
-      isLoading={isLoading}
-    />
+    <div className="flex justify-center">
+      <div className="max-w-3xl w-full px-4 py-18">
+        <ToolHeader tool={tool} isLoading={isLoading} />
+        
+        <div className="space-y-12 mb-16">
+          {inputs.map((input, index) => (
+            <div key={input.id}>
+              <label className="block text-[var(--foreground)] text-2xl font-semibold mb-3 flex items-center gap-2">
+                <ArrowRight className="h-6 w-6 text-[var(--text-secondary)]" />
+                {input.input_name}
+              </label>
+              <div className="text-base text-[var(--text-secondary)] mb-4 ml-8">
+                {input.input_description}
+              </div>
+              <input 
+                type="text"
+                className="w-full bg-transparent text-xl py-4 px-2 
+                  border-b border-[var(--border-color)] focus:border-[var(--accent)]
+                  text-[var(--foreground)]
+                  focus:outline-none transition-colors duration-200"
+                value={inputValues[input.input_name || ''] || ''}
+                onChange={(e) => handleInputChange(input.input_name || '', e.target.value)}
+                onKeyPress={(e) => handleKeyPress(e, input.input_name || '')}
+                autoFocus={index === 0}
+                disabled={isGenerating}
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex flex-col items-center w-full mb-20">
+          <button
+            onClick={handleGenerate}
+            disabled={isGenerating || Object.keys(inputValues).length === 0}
+            className={`text-xl font-bold rounded-xl transition-all duration-200 w-full py-6
+              ${(!isGenerating && Object.keys(inputValues).length > 0)
+                ? 'bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90'
+                : theme === 'dark'
+                  ? 'bg-gray-800 text-gray-500'
+                  : 'bg-gray-200 text-gray-400'}`}
+          >
+            {isGenerating ? 'Generating...' : `Generate for ${tool.credits_cost} Credits`}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

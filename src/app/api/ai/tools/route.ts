@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@auth0/nextjs-auth0'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
 import { 
   DynamoDBDocumentClient, 
@@ -113,6 +114,13 @@ const getSuiteId = async (suiteName: string, categoryId: string): Promise<string
 
 export async function GET(req: Request) {
   try {
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     console.log('=== Starting GET request for tools ===')
     const selectedCategory = req.headers.get('x-selected-category')
     const selectedSuite = req.headers.get('x-selected-suite')
@@ -190,6 +198,13 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { 
       categoryName, 
       suiteName, 
@@ -204,14 +219,6 @@ export async function POST(req: Request) {
       inputField3,
       inputField3Description
     }: ToolCreationRequest = await req.json()
-
-    // Skip authentication in development
-    if (process.env.NODE_ENV === 'production') {
-      const session = await getSession()
-      if (!session?.user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-    }
 
     if (!name || !categoryName || !suiteName || !description || !promptTemplate || creditCost === undefined || !inputField1) {
       const missingFields = []
@@ -343,14 +350,6 @@ export async function DELETE(req: Request) {
         error: 'Missing required headers',
         details: 'Category and suite must be specified'
       }, { status: 400 })
-    }
-
-    // Skip authentication in development
-    if (process.env.NODE_ENV === 'production') {
-      const session = await getSession()
-      if (!session?.user) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
     }
 
     const categoryId = await getCategoryId(selectedCategory)

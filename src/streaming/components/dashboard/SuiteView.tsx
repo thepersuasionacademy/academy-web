@@ -1,20 +1,15 @@
-import React, { useEffect, useMemo } from 'react';
-import { Play, X } from 'lucide-react';
+import React, { useEffect } from 'react';
+import { Play, X, FileText, Video } from 'lucide-react';
 import { cn } from "@/lib/utils";
-
-interface Track {
-  id: string;
-  title: string;
-  duration: string;
-}
+import type { Lesson } from '@/lib/supabase/learning';
 
 interface SuiteViewProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   description: string;
-  tracks: number;
-  onPlay: (trackId: string) => void;
+  lessons: Lesson[];
+  onPlay: (lessonId: string) => void;
 }
 
 export const SuiteView = ({
@@ -22,18 +17,9 @@ export const SuiteView = ({
   onClose,
   title,
   description,
-  tracks: trackCount,
+  lessons,
   onPlay,
 }: SuiteViewProps) => {
-  const generatedTracks = useMemo(() => 
-    Array.from({ length: trackCount }, (_, i) => ({
-      id: `${i + 1}`,
-      title: `Track ${i + 1}`,
-      duration: "20:00"
-    })),
-    [trackCount, title]
-  );
-
   useEffect(() => {
     const originalStyle = window.getComputedStyle(document.body).overflow;
     if (isOpen) {
@@ -52,11 +38,13 @@ export const SuiteView = ({
 
   if (!isOpen) return null;
 
+  const sortedLessons = [...lessons].sort((a, b) => (a.order || 0) - (b.order || 0));
+
   return (
     <div 
       className={cn(
         "fixed inset-y-0 right-0 z-50",
-        "w-[450px]",
+        "w-[400px]",
         "transform transition-transform duration-300 ease-out",
         "bg-[var(--card-bg)] text-[var(--foreground)] flex-shrink-0",
         "border-l border-[var(--border-color)]",
@@ -78,16 +66,25 @@ export const SuiteView = ({
         </div>
 
         <div className="px-6 pb-safe">
-          {generatedTracks.map((track, index) => (
-            <div key={track.id}>
+          {sortedLessons.map((lesson, index) => (
+            <div key={lesson.id}>
               <button
-                onClick={() => onPlay(track.id)}
+                onClick={() => onPlay(lesson.id)}
                 className="w-full flex items-center justify-between py-4 transition-colors duration-200 hover:bg-[var(--hover-bg)] rounded-lg px-3"
               >
-                <span className="font-medium text-lg">{`Track ${index + 1}`}</span>
-                <span className="text-[var(--text-secondary)] text-base">{track.duration}</span>
+                <div className="flex items-center gap-3">
+                  {lesson.lesson_type === 'video' ? (
+                    <Video className="w-5 h-5 text-[var(--text-secondary)]" />
+                  ) : (
+                    <FileText className="w-5 h-5 text-[var(--text-secondary)]" />
+                  )}
+                  <span className="font-medium text-lg">{lesson.title || `Lesson ${index + 1}`}</span>
+                </div>
+                {lesson.lesson_type === 'video' && (
+                  <Play className="w-5 h-5 text-[var(--text-secondary)]" />
+                )}
               </button>
-              {index < generatedTracks.length - 1 && (
+              {index < sortedLessons.length - 1 && (
                 <div className="h-px bg-[var(--border-color)]" />
               )}
             </div>

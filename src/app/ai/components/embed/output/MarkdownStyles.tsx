@@ -51,14 +51,14 @@ export const markdownComponents: Components = {
     </em>
   ),
   table: ({children}) => (
-    <div className="overflow-hidden rounded-lg border my-6 dark:border-gray-800 light:border-gray-200">
+    <div className="overflow-hidden rounded-lg border my-6 border-[var(--border-color)]">
       <table className="w-full border-collapse">
         {children}
       </table>
     </div>
   ),
   thead: ({children}) => (
-    <thead>
+    <thead className="bg-[var(--card-bg)]">
       {children}
     </thead>
   ),
@@ -68,21 +68,19 @@ export const markdownComponents: Components = {
     </tbody>
   ),
   tr: ({children}) => (
-    <tr>
+    <tr className="border-b border-[var(--border-color)] last:border-b-0">
       {children}
     </tr>
   ),
   th: ({children}) => (
     <th className="p-6 text-left text-lg font-semibold border-r last:border-r-0 
-      dark:text-white dark:border-gray-800 
-      light:text-black light:border-gray-200">
+      text-[var(--foreground)] border-[var(--border-color)]">
       {children}
     </th>
   ),
   td: ({children}) => (
-    <td className="p-6 border-t border-r last:border-r-0
-      dark:text-white dark:border-gray-800
-      light:text-black light:border-gray-200">
+    <td className="p-6 border-r last:border-r-0
+      text-[var(--foreground)] border-[var(--border-color)]">
       {children}
     </td>
   ),
@@ -97,7 +95,7 @@ export const markdownComponents: Components = {
       </code>
     ),
   blockquote: ({children}) => (
-    <blockquote className="border-l-4 border-gray-700 pl-4 italic my-4 text-gray-400">
+    <blockquote className="border-l-4 border-[var(--border-color)] pl-4 italic my-4 text-[var(--text-secondary)]">
       {children}
     </blockquote>
   ),
@@ -111,5 +109,5 @@ export const markdownComponents: Components = {
       {children}
     </a>
   ),
-  hr: () => <hr className="my-8 border-gray-700" />,
+  hr: () => <hr className="my-8 border-[var(--border-color)]" />,
 };

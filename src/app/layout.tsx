@@ -1,10 +1,14 @@
 // src/app/layout.tsx
+'use client'
+
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import { UserProvider } from '@auth0/nextjs-auth0/client';
 import { ThemeProvider } from './context/ThemeContext';
 import ClientLayout from './ClientLayout';
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -23,6 +27,21 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter()
+  const supabase = createClientComponentClient()
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    // Check for error parameter in URL
+    const params = new URLSearchParams(window.location.search)
+    const errorMsg = params.get('error')
+    if (errorMsg) {
+      setError(errorMsg)
+      // Clean up the URL
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body 
@@ -30,11 +49,20 @@ export default function RootLayout({
           transition-colors duration-200`}
       >
         <ThemeProvider>
-          <UserProvider>
-            <ClientLayout>
-              {children}
-            </ClientLayout>
-          </UserProvider>
+          {error && (
+            <div className="fixed top-4 right-4 z-50 bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-md shadow-lg">
+              {error}
+              <button 
+                onClick={() => setError(null)}
+                className="ml-2 text-red-400 hover:text-red-600"
+              >
+                ×
+              </button>
+            </div>
+          )}
+          <ClientLayout>
+            {children}
+          </ClientLayout>
         </ThemeProvider>
       </body>
     </html>

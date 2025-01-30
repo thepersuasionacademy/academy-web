@@ -11,5 +11,5 @@ export interface MediaItem {
 export interface Category {
   name: string;
   items: MediaItem[];
-  categoryType: 'mind' | 'training';
+  categoryType: 'learning' | 'imprinting';
 } 

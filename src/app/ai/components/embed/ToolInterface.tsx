@@ -1,13 +1,15 @@
 'use client';
 
-import type { Tool } from '@/app/api/ai/types/tools';
+import type { AITool, AIInput, AIPrompt } from '@/lib/supabase/ai';
 import GenerateSection from './GenerateSection';
 
 interface ToolInterfaceProps {
-  tool: Tool | null;
+  tool: AITool | null;
+  inputs: AIInput[];
+  prompts: AIPrompt[];
   isLoading: boolean;
 }
 
-export default function ToolInterface({ tool, isLoading }: ToolInterfaceProps) {
-  return <GenerateSection tool={tool} isLoading={isLoading} />;
+export default function ToolInterface({ tool, inputs, prompts, isLoading }: ToolInterfaceProps) {
+  return <GenerateSection tool={tool} inputs={inputs} prompts={prompts} isLoading={isLoading} />;
 }

@@ -3,23 +3,23 @@
 @tailwind utilities;
 
 :root {
-  --background: linear-gradient(to bottom, #f8f9fa, #f6f6f6, #f4f4f4);
+  --background: #ededef;
   --foreground: #2c2c2c;
   --card-bg: #f8f8f8;
-  --border-color: #e8e8e8;
+  --border-color: #d1d1d1;
   --hover-bg: #f0f0f0;
   --text-secondary: #4a4a4a;
-  --accent: #d42121;
+  --accent: #d92626;
 }
 
 .dark {
-  --background: linear-gradient(to bottom, #161618, #1d1d20, #242428);
+  --background: #161618;
   --foreground: #e8e8e3;
   --card-bg: #1d1d20;
   --border-color: #2d2d32;
   --hover-bg: rgba(255, 255, 255, 0.06);
   --text-secondary: #a8a8a8;
-  --accent: #d42121;
+  --accent: #b91c1c;
 }
 
 @media (max-width: 1280px) {

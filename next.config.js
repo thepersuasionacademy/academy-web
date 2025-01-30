@@ -18,7 +18,10 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true  // Temporarily ignore TS errors during build to test if it fixes deployment
-  }
+  },
+  images: {
+    domains: ['wltjkhsmqhospeezdgga.supabase.co'],
+  },
 };
 
 module.exports = nextConfig;

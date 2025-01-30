@@ -1,0 +1,192 @@
+/* Import this in your page.tsx file */
+
+.auth-container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* Override Supabase Auth UI styles */
+.auth-container [data-button="true"]:not([class*="social"]) {
+  background-color: #B22222 !important;
+  color: white !important;
+}
+
+.auth-container [data-button="true"]:not([class*="social"]):hover {
+  background-color: #8B0000 !important;
+}
+
+.auth-container input {
+  border-radius: 4px !important;
+  border: 1px solid #E5E7EB !important;
+}
+
+.auth-container input:focus {
+  border-color: #4F46E5 !important;
+  ring-color: #4F46E5 !important;
+}
+
+/* Social Button Styles */
+.auth-container [data-provider="google"] {
+  background-color: white !important;
+  border: 1px solid #E5E7EB !important;
+  color: #374151 !important;
+  border-radius: 4px !important;
+}
+
+.auth-container [data-provider="google"]:hover {
+  background-color: #f9fafb !important;
+}
+
+/* Remove welcome text */
+.auth-container [class*="title"] {
+  display: none !important;
+}
+
+.auth-container [class*="description"] {
+  display: none !important;
+}
+
+.auth-wrapper {
+  --auth-button-background: #B22222;
+}
+
+/* Hide all labels and messages */
+.auth-container label,
+.auth-container [class*="message"],
+.auth-container [class*="title"],
+.auth-container [class*="description"] {
+  display: none !important;
+}
+
+/* Style the Google button */
+.auth-container [data-provider="google"] {
+  background-color: white !important;
+  border: 1px solid #E5E7EB !important;
+  color: #374151 !important;
+  border-radius: 4px !important;
+}
+
+.auth-container [data-provider="google"]:hover {
+  background-color: #f9fafb !important;
+}
+
+/* Style regular buttons */
+.auth-container button:not([data-provider]) {
+  background: var(--auth-button-background) !important;
+  color: white !important;
+  border-radius: 4px !important;
+}
+
+/* Style inputs */
+.auth-container input {
+  border-radius: 4px !important;
+  border: 1px solid #E5E7EB !important;
+  padding: 0.5rem 1rem !important;
+}
+
+.auth-container input:focus {
+  border-color: #4F46E5 !important;
+  outline: none !important;
+  ring: 2px !important;
+  ring-color: #4F46E5 !important;
+}
+
+/* Hide unwanted elements */
+.auth-container [class*="title"],
+.auth-container [class*="description"],
+.auth-container [class*="divider"] {
+  display: none !important;
+}
+
+.auth-form {
+  --brand-color: #B22222;
+}
+
+/* Hide all unwanted elements */
+.auth-form [class*="title"],
+.auth-form [class*="description"],
+.auth-form [class*="divider"],
+.auth-form [class*="label"],
+.auth-form [class*="message"],
+.auth-form [class*="container"] > div:first-child {
+  display: none !important;
+}
+
+/* Google Sign In Button */
+.auth-form [data-provider="google"] {
+  background-color: white !important;
+  color: #374151 !important;
+  border: 1px solid #E5E7EB !important;
+  border-radius: 4px !important;
+  width: 100% !important;
+  height: 44px !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  margin-bottom: 16px !important;
+  transition: background-color 0.2s !important;
+}
+
+.auth-form [data-provider="google"]:hover {
+  background-color: #f3f4f6 !important;
+}
+
+/* Input Fields */
+.auth-form input {
+  width: 100% !important;
+  height: 44px !important;
+  border: 1px solid #E5E7EB !important;
+  border-radius: 4px !important;
+  padding: 0 12px !important;
+  margin-bottom: 16px !important;
+  font-size: 16px !important;
+  background: white !important;
+}
+
+.auth-form input:focus {
+  border-color: var(--brand-color) !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px rgba(178, 34, 34, 0.1) !important;
+}
+
+/* Regular Sign In Button */
+.auth-form button:not([data-provider]) {
+  background-color: var(--brand-color) !important;
+  color: white !important;
+  border: none !important;
+  border-radius: 4px !important;
+  width: 100% !important;
+  height: 44px !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+  cursor: pointer !important;
+  margin-top: 8px !important;
+}
+
+/* Links */
+.auth-form a {
+  color: #4F46E5 !important;
+  font-size: 14px !important;
+  text-decoration: none !important;
+}
+
+.auth-form a:hover {
+  text-decoration: underline !important;
+}
+
+/* Base input styles */
+input::placeholder {
+  color: #9CA3AF;
+}
+
+/* Hide autofill background */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0px 1000px white inset;
+  transition: background-color 5000s ease-in-out 0s;
+} 

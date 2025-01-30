@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ContentGrid } from '@/app/content/components/dashboard/ContentGrid';
 import { SuiteView } from '@/streaming/components/dashboard/SuiteView';
 import { MediaPlayer } from '@/app/content/components/dashboard/MediaPlayer';
 import ScrollProgress from '@/app/content/components/ScrollProgress';
 import { CategoryPills } from '@/app/content/components/CategoryPills';
-import { categories } from '@/app/content/lib/data';
 import type { MediaItem } from '@/app/content/lib/types';
 import { FeaturedContent } from '@/app/content/components/dashboard/FeaturedContent';
 import { cn } from '@/lib/utils';
+import { getCollections, getCourses, getLessons, type Collection, type Course, type Lesson } from '@/lib/supabase/learning';
 
 // Featured content that matches the design
 const featuredItem = {
@@ -23,42 +23,110 @@ const featuredItem = {
 // Mock description for all media items
 const MOCK_DESCRIPTION = "Experience transformative content designed to enhance your mental capabilities and unlock your full potential. This carefully crafted series combines cutting-edge techniques with proven methodologies to deliver exceptional results.";
 
+// Convert Supabase Course to MediaItem format for ContentGrid
+function convertCourseToMediaItem(course: Course): MediaItem {
+  return {
+    id: course.id,
+    title: course.title,
+    description: course.description || MOCK_DESCRIPTION,
+    image: course.thumbnail || '/images/default-course.jpg',
+    tracks: 1, // Each course will show as one track for now
+  };
+}
+
+// Convert Collection and its Courses to Category format for ContentGrid
+function convertToCategory(collection: Collection, courses: Course[]) {
+  return {
+    name: collection.name,
+    items: courses.map(convertCourseToMediaItem),
+    categoryType: 'learning' as const,
+  };
+}
+
 export default function Page(): React.JSX.Element {
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
-  const [activeCategory, setActiveCategory] = useState<'mind' | 'training'>('mind');
-  const [selectedTrackNumber, setSelectedTrackNumber] = useState<number | undefined>();
+  const [activeCategory, setActiveCategory] = useState<'learning' | 'imprinting'>('learning');
+  const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
+  const [collections, setCollections] = useState<Collection[]>([]);
+  const [coursesByCollection, setCoursesByCollection] = useState<Record<string, Course[]>>({});
+  const [lessonsByCourse, setLessonsByCourse] = useState<Record<string, Lesson[]>>({});
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Filter categories based on active category
-  const filteredCategories = categories.filter(cat => {
-    return cat.categoryType === activeCategory;
-  });
+  useEffect(() => {
+    async function loadData() {
+      try {
+        console.log('Fetching collections...');
+        const collectionsData = await getCollections();
+        console.log('Collections fetched:', collectionsData);
+        setCollections(collectionsData);
+
+        const coursesData: Record<string, Course[]> = {};
+        const lessonsData: Record<string, Lesson[]> = {};
+        
+        for (const collection of collectionsData) {
+          try {
+            console.log(`Fetching courses for collection ${collection.id}...`);
+            const collectionCourses = await getCourses(collection.id);
+            console.log(`Courses fetched for collection ${collection.id}:`, collectionCourses);
+            if (Array.isArray(collectionCourses)) {
+              coursesData[collection.id] = collectionCourses;
+              
+              // Fetch lessons for each course
+              for (const course of collectionCourses) {
+                try {
+                  console.log(`Fetching lessons for course ${course.id}...`);
+                  const courseLessons = await getLessons(course.id);
+                  console.log(`Lessons fetched for course ${course.id}:`, courseLessons);
+                  if (Array.isArray(courseLessons)) {
+                    lessonsData[course.id] = courseLessons;
+                  }
+                } catch (error) {
+                  console.error(`Error fetching lessons for course ${course.id}:`, error);
+                  lessonsData[course.id] = [];
+                }
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching courses for collection ${collection.id}:`, error);
+            coursesData[collection.id] = [];
+          }
+        }
+        
+        console.log('All courses data:', coursesData);
+        console.log('All lessons data:', lessonsData);
+        setCoursesByCollection(coursesData);
+        setLessonsByCourse(lessonsData);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadData();
+  }, []);
+
+  // Convert Supabase data to the format expected by ContentGrid
+  const categories = collections
+    .map(collection => convertToCategory(collection, coursesByCollection[collection.id] || []));
 
   const handleItemClick = (itemId: string) => {
-    const item = filteredCategories
+    const item = categories
       .flatMap(cat => cat.items)
       .find(item => item.id === itemId);
     if (item) {
       setSelectedItem(item);
-      setSelectedTrackNumber(undefined);
+      setSelectedLesson(null);
     }
   };
 
-  const handleSuiteClose = () => {
-    setSelectedItem(null);
-    setSelectedTrackNumber(undefined);
-  };
-
-  const handleTrackSelect = (trackNumber: number) => {
+  const handleLessonSelect = (lessonId: string) => {
     if (selectedItem) {
-      setSelectedTrackNumber(trackNumber);
-    }
-  };
-
-  const handleSuiteAction = (action: 'play') => {
-    if (!selectedItem) return;
-    
-    if (action === 'play') {
-      handleTrackSelect(0); // Play first track
+      const lessons = lessonsByCourse[selectedItem.id] || [];
+      const lesson = lessons.find(l => l.id === lessonId);
+      if (lesson) {
+        setSelectedLesson(lesson);
+      }
     }
   };
 
@@ -77,32 +145,40 @@ export default function Page(): React.JSX.Element {
           <FeaturedContent 
             content={featuredItem}
             onPlay={() => console.log('Play featured')}
+            onLike={() => console.log('Like featured')}
+            onShare={() => console.log('Share featured')}
           />
-          <div className="mt-8">
-            <ContentGrid
-              categories={filteredCategories}
-              onItemClick={handleItemClick}
-            />
-          </div>
+          {isLoading ? (
+            <div className="flex justify-center items-center min-h-[200px]">
+              <div className="text-[var(--text-secondary)]">Loading content...</div>
+            </div>
+          ) : (
+            <div className="mt-8">
+              <ContentGrid
+                categories={categories}
+                onItemClick={handleItemClick}
+              />
+            </div>
+          )}
         </div>
 
         {/* Overlay layer for MediaPlayer and SuiteView */}
         {selectedItem && (
           <div className="fixed inset-0 z-50 flex overflow-hidden">
             {/* Main Content Area - MediaPlayer Container */}
-            {selectedTrackNumber !== undefined && (
+            {selectedLesson?.lesson_type === 'video' && (
               <div className="flex-1 flex bg-[var(--card-bg)] relative">
                 <div className="absolute inset-0 pr-[400px]">
-                  <div className="w-full h-full pr-16">
+                  <div className="w-full h-full">
                     <MediaPlayer
-                      title={selectedItem.title}
-                      trackNumber={selectedTrackNumber + 1}
-                      description={MOCK_DESCRIPTION}
+                      title={selectedLesson.title || selectedItem.title}
+                      description={selectedLesson.description || selectedItem.description}
                       isOpen={true}
-                      category={filteredCategories.find(cat => 
+                      category={categories.find(cat => 
                         cat.items.some(item => item.id === selectedItem?.id)
                       )?.name}
-                      suite={selectedItem.title}
+                      courseName={selectedItem.title}
+                      videoId={selectedLesson.video_id}
                     />
                   </div>
                 </div>
@@ -113,12 +189,14 @@ export default function Page(): React.JSX.Element {
             <div className="absolute right-0 top-0 bottom-0 w-[400px] bg-[var(--card-bg)]">
               <SuiteView
                 isOpen={true}
-                onClose={handleSuiteClose}
+                onClose={() => {
+                  setSelectedItem(null);
+                  setSelectedLesson(null);
+                }}
                 title={selectedItem.title}
                 description={selectedItem.description}
-                image={selectedItem.image}
-                tracks={selectedItem.tracks || 0}
-                onPlay={handleTrackSelect}
+                lessons={lessonsByCourse[selectedItem.id] || []}
+                onPlay={handleLessonSelect}
               />
             </div>
           </div>

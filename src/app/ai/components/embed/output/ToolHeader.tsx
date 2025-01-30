@@ -2,11 +2,11 @@
 'use client';
 
 import React from 'react';
-import type { Tool } from '@/app/api/ai/types/tools';
+import type { AITool } from '@/lib/supabase/ai';
 import { useTheme } from '@/app/context/ThemeContext';
 
 interface ToolHeaderProps {
-  tool: Tool | null;
+  tool: AITool | null;
   isLoading: boolean;
 }
 
@@ -23,7 +23,7 @@ export function ToolHeader({ tool, isLoading }: ToolHeaderProps) {
       ) : (
         <>
           <h2 className="text-4xl text-[var(--foreground)] mb-3">
-            {tool?.name || 'Loading...'}
+            {tool?.title || 'Loading...'}
           </h2>
           <p className="text-lg text-[var(--text-secondary)] leading-relaxed">
             {tool?.description || 'Loading description...'}

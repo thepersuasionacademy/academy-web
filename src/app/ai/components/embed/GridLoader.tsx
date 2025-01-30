@@ -3,9 +3,11 @@
 // GridLoader.tsx
 import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useTheme } from '@/app/context/ThemeContext';
 
 const GridLoader = () => {
   const [isClient, setIsClient] = useState(false);
+  const { theme } = useTheme();
 
   useEffect(() => {
     const registerGrid = async () => {
@@ -17,12 +19,14 @@ const GridLoader = () => {
     setIsClient(true);
   }, []);
 
+  const loaderColor = theme === 'dark' ? '#e8e8e3' : '#2c2c2c';
+
   if (!isClient) {
     return (
       <div className="flex flex-col items-center justify-center space-y-4">
-        <div className="w-[60px] h-[60px] bg-[#e6e9f0]/20 rounded-md animate-pulse" />
-        <div className="text-[#e6e9f0] font-medium animate-pulse">
-          Synthesizing...
+        <div className="w-[150px] h-[150px] bg-[var(--hover-bg)] rounded-md animate-pulse" />
+        <div className="text-[var(--foreground)] text-xl font-medium animate-pulse">
+          Generating...
         </div>
       </div>
     );
@@ -32,11 +36,11 @@ const GridLoader = () => {
     <div className="flex flex-col items-center justify-center space-y-4">
       <div 
         dangerouslySetInnerHTML={{
-          __html: '<l-grid size="60" speed="1.5" color="#e6e9f0"></l-grid>'
+          __html: `<l-grid size="150" speed="1.5" color="${loaderColor}"></l-grid>`
         }}
       />
-      <div className="text-[#e6e9f0] font-medium animate-pulse">
-        Synthesizing...
+      <div className="text-[var(--foreground)] text-xl font-medium animate-pulse">
+        Generating...
       </div>
     </div>
   );

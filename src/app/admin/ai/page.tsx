@@ -1,5 +1,6 @@
 // src/app/admin/ai/page.tsx
-import { getSession } from '@auth0/nextjs-auth0'
+import { createServerComponentClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import AdminToolsClient from './AdminToolsClient'
@@ -25,9 +26,11 @@ export default async function Page(context: PageContext) {
 
   // Only check auth if we're not in development
   if (!isDevelopmentServer) {
-    const session = await getSession()
+    const supabase = createServerComponentClient({ cookies })
+    const { data: { session } } = await supabase.auth.getSession()
+    
     if (!session) {
-      redirect('/api/auth/login')
+      redirect('/auth/login')
     }
   }
 

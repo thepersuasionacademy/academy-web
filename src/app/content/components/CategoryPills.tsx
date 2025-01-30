@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 const categories = [
-  { name: 'Neuro-Imprinting', id: 'mind' },
-  { name: 'Persuasion Training', id: 'training' }
+  { name: 'Learning', id: 'learning' },
+  { name: 'Imprinting', id: 'imprinting' }
 ] as const;
 
 type CategoryId = typeof categories[number]['id'];
@@ -15,7 +15,7 @@ interface CategoryPillsProps {
 }
 
 export function CategoryPills({ onCategoryChange }: CategoryPillsProps) {
-  const [activeCategory, setActiveCategory] = useState<CategoryId>('mind');
+  const [activeCategory, setActiveCategory] = useState<CategoryId>('learning');
 
   const handleCategoryClick = (categoryId: CategoryId) => {
     setActiveCategory(categoryId);
