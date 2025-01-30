@@ -2,8 +2,10 @@
 
 import { useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useRouter } from 'next/navigation'
 
 export default function AuthCallbackPage() {
+  const router = useRouter()
   const supabase = createClientComponentClient()
 
   useEffect(() => {
@@ -13,61 +15,45 @@ export default function AuthCallbackPage() {
         
         if (sessionError) {
           console.error('Session error:', sessionError)
-          throw sessionError
-        }
-
-        const url = new URL(window.location.href)
-        const hasError = url.searchParams.has('error') || url.searchParams.has('error_code')
-
-        if (hasError) {
-          const errorDescription = url.searchParams.get('error_description') || 'Authentication failed'
-          console.error('Auth error:', errorDescription)
-          
-          // If they have a session, let them into the app but show the error
-          if (session) {
-            window.location.replace(`/?error=${encodeURIComponent(errorDescription)}`)
-            return
-          }
-          
-          // If no session, send them to login with the error
-          window.location.replace(`/auth/login?error=${encodeURIComponent(errorDescription)}`)
+          router.replace(`/auth/login?error=${encodeURIComponent(sessionError.message)}`)
           return
         }
 
-        // Exchange the code for a session
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(window.location.search)
-        
-        if (exchangeError) {
-          console.error('Exchange error:', exchangeError)
-          throw exchangeError
+        if (session) {
+          router.replace('/')
+          return
         }
 
-        // Get the updated session after exchange
-        const { data: { session: newSession }, error: newSessionError } = await supabase.auth.getSession()
+        // If we don't have a session, check for error params
+        const url = new URL(window.location.href)
+        const error = url.searchParams.get('error')
         
-        if (newSessionError) {
-          console.error('New session error:', newSessionError)
-          throw newSessionError
+        if (error) {
+          console.error('Auth error:', error)
+          router.replace(`/auth/login?error=${encodeURIComponent(error)}`)
+          return
         }
 
-        if (newSession) {
-          // Successful login - redirect to home
-          window.location.replace('/')
-        } else {
-          // No session after exchange - redirect to login
-          window.location.replace('/auth/login?error=Failed to create session')
-        }
+        // If no session and no error, redirect to login
+        router.replace('/auth/login')
       } catch (error) {
         console.error('Callback error:', error)
         const errorMessage = error instanceof Error ? error.message : 'Authentication failed'
-        window.location.replace(`/auth/login?error=${encodeURIComponent(errorMessage)}`)
+        router.replace(`/auth/login?error=${encodeURIComponent(errorMessage)}`)
       }
     }
 
     handleCallback()
-  }, [supabase.auth])
+  }, [supabase.auth, router])
 
-  return null
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-center">
+        <h2 className="text-lg font-semibold mb-2">Completing sign in...</h2>
+        <p className="text-sm text-gray-500">Please wait while we verify your credentials.</p>
+      </div>
+    </div>
+  )
 }
 
 export const config = {
