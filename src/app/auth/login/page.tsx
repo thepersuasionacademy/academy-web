@@ -3,7 +3,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import ResetPasswordView from './ResetPasswordView'
 import SignupView from './SignupView'
 import './styles.css'
@@ -12,11 +12,12 @@ import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid'
 export default function LoginPage() {
   const supabase = createClientComponentClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [view, setView] = useState<'login' | 'reset' | 'signup'>('login')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(searchParams.get('error') || null)
 
   useEffect(() => {
     // Check for error parameter in URL
@@ -87,8 +88,8 @@ export default function LoginPage() {
           <>
             {/* Show error message if exists */}
             {error && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-600 rounded-md">
-                {error}
+              <div className="text-red-500 p-4 border rounded-lg mt-4">
+                <strong>Authentication Error:</strong> {error}
               </div>
             )}
             

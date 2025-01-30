@@ -9,6 +9,8 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   
+  console.log('[Auth Callback] Received code:', code ? 'exists' : 'missing')
+
   if (code) {
     const supabase = createRouteHandlerClient({ 
       cookies,
@@ -22,12 +24,18 @@ export async function GET(request: Request) {
     })
     
     try {
-      const { error } = await supabase.auth.exchangeCodeForSession(code)
-      if (error) throw error
+      console.log('[Auth Callback] Exchanging code for session...')
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
       
+      if (error) {
+        console.error('[Auth Callback] Exchange error:', error)
+        return NextResponse.redirect(`${requestUrl.origin}/auth/login?error=AuthFailed`)
+      }
+
+      console.log('[Auth Callback] Session data:', data)
       return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
     } catch (error) {
-      console.error('Exchange error:', error)
+      console.error('[Auth Callback] Unexpected error:', error)
       return NextResponse.redirect(`${requestUrl.origin}/auth/login?error=AuthFailed`)
     }
   }

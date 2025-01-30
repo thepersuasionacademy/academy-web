@@ -100,22 +100,26 @@ export function ToolContainer({
 
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { user }, error } = await supabase.auth.getUser();
+      console.log('[Auth Check] Checking user session...')
+      const { data: { user }, error } = await supabase.auth.getUser()
       
-      if (error) {
-        console.error('Session check error:', error);
-        router.push('/auth/login');
-      } else if (!user) {
-        console.log('No user session, redirecting to login');
-        router.push('/auth/login');
-      }
-    };
+      console.log('[Auth Check] User:', user ? 'exists' : 'missing')
+      console.log('[Auth Check] Error:', error || 'none')
 
-    // Only run check if not already on login page
-    if (!window.location.pathname.includes('/auth/login')) {
-      checkUser();
+      if (error) {
+        console.error('[Auth Check] Session error:', error)
+        router.push('/auth/login')
+      } else if (!user) {
+        console.warn('[Auth Check] No user session')
+        router.push('/auth/login')
+      }
     }
-  }, [router]);
+
+    if (!window.location.pathname.includes('/auth/login')) {
+      console.log('[Auth Check] Initiating check...')
+      checkUser()
+    }
+  }, [router])
 
   return (
     <div className="relative">
