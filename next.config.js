@@ -21,6 +21,19 @@ const nextConfig = {
   },
   typescript: {
     ignoreBuildErrors: true  // Temporarily ignore TS errors during build to test if it fixes deployment
+  },
+  async headers() {
+    return [
+      {
+        source: '/auth/callback',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, max-age=0',
+          },
+        ],
+      },
+    ]
   }
 };
 
