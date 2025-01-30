@@ -1,27 +1,9 @@
 //src/app/ai/components/dashboard/types/index.ts
-export type Category = {
-  id: string
-  name: string
-}
+import type { AICollection, AISuite, AITool } from '@/lib/supabase/ai'
 
-export type Suite = {
-  id: string
-  name: string
-}
-
-export type Tool = {
-  name: string
-  SK: string
-  description: string
-  creditCost: number
-  promptTemplate: string
-  inputField1: string
-  inputField1Description: string
-  inputField2?: string;
-  inputField2Description?: string;
-  inputField3?: string;
-  inputField3Description?: string;
-}
+export type { AICollection as Category }
+export type { AISuite as Suite }
+export type { AITool as Tool }
 
 export type SuccessState = {
   name: string

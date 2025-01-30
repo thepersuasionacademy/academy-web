@@ -1,28 +1,47 @@
 'use client'
 
-import { type Tool } from '@/app/ai/components/dashboard/types'
+import { type AITool } from '@/lib/supabase/ai'
 import ToolPageClient from '@/app/ai/tools/[toolId]/ToolPageClient'
+import { useEffect, useCallback } from 'react'
 
 interface AIToolModalProps {
-  tool: Tool;
+  tool: AITool;
   isOpen: boolean;
   onClose: () => void;
 }
 
 export function AIToolModal({ tool, isOpen, onClose }: AIToolModalProps) {
+  const lockScroll = useCallback(() => {
+    document.body.style.overflow = 'hidden'
+    document.body.style.height = '100vh'
+    document.body.style.position = 'fixed'
+    document.body.style.width = '100%'
+  }, [])
+
+  const unlockScroll = useCallback(() => {
+    document.body.style.overflow = ''
+    document.body.style.height = ''
+    document.body.style.position = ''
+    document.body.style.width = ''
+  }, [])
+
+  useEffect(() => {
+    if (isOpen) {
+      lockScroll()
+      return unlockScroll
+    }
+  }, [isOpen, lockScroll, unlockScroll])
+
   if (!isOpen) return null;
 
-  // Extract the ID part after the # from the SK
-  const toolId = tool.SK.split('#')[3]; // Get the last part after TOOL#
-
   return (
-    <>
+    <div className="fixed inset-0 z-50 overflow-hidden">
       <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      <div className="fixed inset-y-4 left-[15%] right-[15%] z-50 bg-[var(--card-bg)] rounded-xl shadow-xl border border-[var(--border-color)] flex flex-col">
+      <div className="absolute inset-4 md:inset-y-4 md:left-[15%] md:right-[15%] flex flex-col bg-[var(--card-bg)] rounded-xl shadow-xl border border-[var(--border-color)] overflow-hidden">
         <button 
           onClick={onClose}
           className="absolute top-4 right-4 z-10 p-2 hover:bg-[var(--hover-bg)] rounded-lg transition-colors"
@@ -32,10 +51,10 @@ export function AIToolModal({ tool, isOpen, onClose }: AIToolModalProps) {
           </svg>
         </button>
 
-        <div className="flex-1">
-          <ToolPageClient toolId={toolId} />
+        <div className="flex-1 overflow-auto bg-[var(--background)]">
+          <ToolPageClient toolId={tool.id} />
         </div>
       </div>
-    </>
+    </div>
   )
 } 

@@ -1,11 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { type Tool, type SuccessState } from '@/app/ai/components/dashboard/types'
+import type { Tool, SuccessState } from '@/app/ai/components/dashboard/types'
 import ToolList from '@/app/ai/components/dashboard/layout/tool/ToolList'
 import { ToolForm } from '@/app/ai/components/dashboard/tool-editor/ToolForm'
 import { cn } from "@/lib/utils"
 import { usePathname } from 'next/navigation'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 
 interface ToolContainerProps {
   selectedTool: Tool | null
@@ -43,6 +44,7 @@ export function ToolContainer({
   const [isPanelOpen, setIsPanelOpen] = useState(false)
   const pathname = usePathname()
   const isAdminRoute = pathname?.includes('/admin')
+  const supabase = createClientComponentClient()
 
   const handleClose = () => {
     setIsPanelOpen(false)
@@ -68,14 +70,41 @@ export function ToolContainer({
     setIsPanelOpen(true)
   }
 
+  const handleDuplicate = async (tool: Tool) => {
+    if (onDuplicate) {
+      await onDuplicate(tool)
+    } else {
+      try {
+        const { data: newTool, error } = await supabase.rpc('duplicate_tool', {
+          tool_id: tool.id
+        })
+        
+        if (error) throw error
+        
+        // Refresh the tools list
+        const { data: tools, error: refreshError } = await supabase.rpc('get_tools_by_suite', {
+          suite_id: tool.suite_id
+        })
+        
+        if (refreshError) throw refreshError
+        
+        // Update the tools list
+        setSelectedTool(newTool)
+      } catch (err) {
+        console.error('Error duplicating tool:', err)
+        throw err
+      }
+    }
+  }
+
   return (
     <div className="relative">
       <ToolList 
         tools={tools}
         isLoading={isLoadingTools}
-        onSelectTool={setSelectedTool}
+        onSelectTool={handleToolSelect}
         onCreateNew={handleCreateNew}
-        onDuplicate={onDuplicate}
+        onDuplicate={handleDuplicate}
         hideCreationControls={hideCreationControls}
       />
 

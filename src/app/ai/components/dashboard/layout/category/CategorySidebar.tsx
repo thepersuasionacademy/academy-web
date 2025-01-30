@@ -2,14 +2,11 @@
 
 import { Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
-
-type Category = {
-  id: string
-  name: string
-}
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import type { AICollection } from '@/lib/supabase/ai'
 
 interface CategorySidebarProps {
-  categories: Category[]
+  categories: AICollection[]
   selectedCategory: string | null
   onSelectCategory: (category: string) => void
   isLoadingCategories: boolean
@@ -31,7 +28,8 @@ export default function CategorySidebar({
   const [newCategoryName, setNewCategoryName] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [localCategories, setLocalCategories] = useState<Category[]>(categories)
+  const [localCategories, setLocalCategories] = useState<AICollection[]>(categories)
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     setLocalCategories(categories)
@@ -39,13 +37,11 @@ export default function CategorySidebar({
 
   const refreshCategories = async () => {
     try {
-      const response = await fetch('/api/ai/categories')
-      if (!response.ok) throw new Error('Failed to fetch categories')
-      const data = await response.json()
-      if (Array.isArray(data.categories)) {
-        setLocalCategories(data.categories)
-        return data.categories
-      }
+      const { data: collections, error } = await supabase.rpc('list_collections')
+      if (error) throw error
+      
+      setLocalCategories(collections)
+      return collections
     } catch (err) {
       console.error('Error refreshing categories:', err)
       throw err
@@ -58,27 +54,18 @@ export default function CategorySidebar({
     setError('')
 
     try {
-      const response = await fetch('/api/ai/categories', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name: newCategoryName })
+      const { data: category, error } = await supabase.rpc('create_collection', {
+        title: newCategoryName
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create category')
-      }
+      if (error) throw error
 
-      const data = await response.json()
-      
       await refreshCategories()
       
       setNewCategoryName('')
       setIsCreatingCategory(false)
       
-      onSelectCategory(data.category.name)
+      onSelectCategory(category.title)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create category')
     } finally {
@@ -151,13 +138,13 @@ export default function CategorySidebar({
           <div
             key={category.id}
             className={`mb-2 p-2 rounded-lg cursor-pointer transition-colors duration-200 ${
-              selectedCategory === category.name 
+              selectedCategory === category.title 
                 ? 'bg-[var(--accent)] text-white' 
                 : 'text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
             }`}
-            onClick={() => onSelectCategory(category.name)}
+            onClick={() => onSelectCategory(category.title || '')}
           >
-            {category.name}
+            {category.title}
           </div>
         ))
       )}

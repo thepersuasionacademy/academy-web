@@ -1,24 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { 
-  DynamoDBDocumentClient, 
-  GetCommand, 
-  QueryCommand, 
-  PutCommand,
-  DeleteCommand 
-} from '@aws-sdk/lib-dynamodb'
-
-const client = new DynamoDBClient({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
-  }
-})
-
-const docClient = DynamoDBDocumentClient.from(client)
 
 interface ToolCreationRequest {
   categoryName: string
@@ -35,83 +17,6 @@ interface ToolCreationRequest {
   inputField3Description?: string
 }
 
-interface ToolData {
-  PK: string
-  SK: string
-  name: string
-  description: string
-  promptTemplate: string
-  creditCost: number
-  inputField1: string
-  inputField1Description: string
-  inputField2?: string
-  inputField2Description?: string
-  inputField3?: string
-  inputField3Description?: string
-}
-
-const formatForDynamoDB = (name: string): string => {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9-\s]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-}
-
-const getCategoryId = async (categoryName: string): Promise<string | null> => {
-  try {
-    const result = await docClient.send(new QueryCommand({
-      TableName: process.env.DYNAMODB_TABLE_NAME!,
-      IndexName: 'GSI1',
-      KeyConditionExpression: '#gsi1pk = :pk',
-      FilterExpression: '#name = :categoryName',
-      ExpressionAttributeNames: {
-        '#gsi1pk': 'GSI1-PK',  
-        '#name': 'name'
-      },
-      ExpressionAttributeValues: {
-        ':pk': 'AI#CATEGORIES',
-        ':categoryName': categoryName
-      }
-    }))
-    
-    if (result.Items?.[0]) {
-      return result.Items[0].PK.split('#')[2]
-    }
-    return null
-  } catch (error) {
-    console.error('Error in getCategoryId:', error)
-    return null
-  }
-}
-
-const getSuiteId = async (suiteName: string, categoryId: string): Promise<string | null> => {
-  try {
-    const result = await docClient.send(new QueryCommand({
-      TableName: process.env.DYNAMODB_TABLE_NAME!,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
-      FilterExpression: '#name = :suiteName',
-      ExpressionAttributeNames: {
-        '#name': 'name'
-      },
-      ExpressionAttributeValues: {
-        ':pk': `AI#CATEGORY#${categoryId}`,
-        ':sk': 'SUITE#',
-        ':suiteName': suiteName
-      }
-    }))
-
-    if (result.Items?.[0]) {
-      return result.Items[0].SK.split('#')[1]
-    }
-    return null
-  } catch (error) {
-    console.error('Error in getSuiteId:', error)
-    return null
-  }
-}
-
 export async function GET(req: Request) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
@@ -121,11 +26,8 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    console.log('=== Starting GET request for tools ===')
     const selectedCategory = req.headers.get('x-selected-category')
     const selectedSuite = req.headers.get('x-selected-suite')
-
-    console.log('Headers received:', { selectedCategory, selectedSuite })
 
     if (!selectedCategory || !selectedSuite) {
       return NextResponse.json({ 
@@ -134,62 +36,49 @@ export async function GET(req: Request) {
       }, { status: 400 })
     }
 
-    const categoryId = await getCategoryId(selectedCategory)
-    console.log('Category ID lookup:', { selectedCategory, categoryId })
+    // First get the collection ID from the title
+    const { data: collection, error: collectionError } = await supabase
+      .from('ai.collections')
+      .select('id')
+      .eq('title', selectedCategory)
+      .single()
 
-    if (!categoryId) {
+    if (collectionError) throw collectionError
+    if (!collection) {
       return NextResponse.json({ 
         error: 'Category not found',
         details: `Category not found: ${selectedCategory}`
       }, { status: 404 })
     }
 
-    const suiteName = await getSuiteId(selectedSuite, categoryId)
-    console.log('Suite name lookup:', { selectedSuite, suiteName })
+    // Then get the suite ID using the collection ID
+    const { data: suite, error: suiteError } = await supabase
+      .from('ai.suites')
+      .select('id')
+      .eq('collection_id', collection.id)
+      .eq('title', selectedSuite)
+      .single()
 
-    if (!suiteName) {
+    if (suiteError) throw suiteError
+    if (!suite) {
       return NextResponse.json({ 
         error: 'Suite not found',
         details: `Suite not found: ${selectedSuite}`
       }, { status: 404 })
     }
 
-    const queryParams = {
-      TableName: process.env.DYNAMODB_TABLE_NAME!,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
-      ExpressionAttributeValues: {
-        ':pk': `AI#CATEGORY#${categoryId}`,
-        ':sk': `SUITE#${suiteName}#TOOL#`
-      }
-    }
+    // Finally get the tools for this suite
+    const { data: tools, error } = await supabase
+      .rpc('get_tools_by_suite', { suite_id: suite.id })
 
-    console.log('DynamoDB Query:', {
-      TableName: process.env.DYNAMODB_TABLE_NAME,
-      PK: `AI#CATEGORY#${categoryId}`,
-      SK_prefix: `SUITE#${suiteName}#TOOL#`
-    })
+    if (error) throw error
 
-    const result = await docClient.send(new QueryCommand(queryParams))
-    console.log('DynamoDB result:', result)
-
-    return NextResponse.json({
-      tools: result.Items?.map(item => ({
-        name: item.name,
-        SK: item.SK,
-        description: item.description,
-        creditCost: item.creditCost,
-        promptTemplate: item.promptTemplate,
-        inputField1: item.inputField1,
-        inputField1Description: item.inputField1Description
-      })) || []
-    })
-
+    return NextResponse.json({ tools })
   } catch (error) {
     console.error('Error in GET handler:', error)
     return NextResponse.json(
       { 
-        error: error instanceof Error ? error.message : 'Failed to fetch tools',
-        stack: error instanceof Error ? error.stack : undefined
+        error: error instanceof Error ? error.message : 'Failed to fetch tools'
       },
       { status: 500 }
     )
@@ -236,73 +125,94 @@ export async function POST(req: Request) {
       }, { status: 400 })
     }
 
-    const foundCategoryId = await getCategoryId(categoryName)
-    if (!foundCategoryId) {
+    // First get the collection ID from the title
+    const { data: collection, error: collectionError } = await supabase
+      .from('ai.collections')
+      .select('id')
+      .eq('title', categoryName)
+      .single()
+
+    if (collectionError) throw collectionError
+    if (!collection) {
       return NextResponse.json({ 
-        error: 'Invalid category',
+        error: 'Category not found',
         details: `Category not found: ${categoryName}`
-      }, { status: 400 })
+      }, { status: 404 })
     }
 
-    const foundSuiteId = await getSuiteId(suiteName, foundCategoryId)
-    if (!foundSuiteId) {
+    // Then get the suite ID using the collection ID
+    const { data: suite, error: suiteError } = await supabase
+      .from('ai.suites')
+      .select('id')
+      .eq('collection_id', collection.id)
+      .eq('title', suiteName)
+      .single()
+
+    if (suiteError) throw suiteError
+    if (!suite) {
       return NextResponse.json({ 
-        error: 'Invalid suite',
-        details: `Suite not found: ${suiteName} in category ${categoryName}`
-      }, { status: 400 })
+        error: 'Suite not found',
+        details: `Suite not found: ${suiteName}`
+      }, { status: 404 })
     }
 
-    const toolId = formatForDynamoDB(name)
+    // Create the tool using RPC function
+    const { data: tool, error } = await supabase.rpc('create_tool', {
+      suite_id: suite.id,
+      title: name,
+      description,
+      credits_cost: creditCost
+    })
 
-    // Check for existing tool
-    const existingTool = await docClient.send(new GetCommand({
-      TableName: process.env.DYNAMODB_TABLE_NAME!,
-      Key: {
-        PK: `AI#CATEGORY#${foundCategoryId}`,
-        SK: `SUITE#${foundSuiteId}#TOOL#${toolId}`
-      }
-    }))
+    if (error) throw error
 
-    if (existingTool.Item) {
-      return NextResponse.json(
-        { 
-          error: 'Tool already exists',
-          details: `A tool with the name "${name}" already exists in this suite`
+    // Create the inputs
+    const { error: inputError } = await supabase
+      .from('ai.inputs')
+      .insert([
+        {
+          tool_id: tool.id,
+          input_order: 1,
+          input_name: inputField1,
+          input_description: inputField1Description,
+          is_required: true
         },
-        { status: 409 }
-      )
-    }
+        ...(inputField2 ? [{
+          tool_id: tool.id,
+          input_order: 2,
+          input_name: inputField2,
+          input_description: inputField2Description,
+          is_required: false
+        }] : []),
+        ...(inputField3 ? [{
+          tool_id: tool.id,
+          input_order: 3,
+          input_name: inputField3,
+          input_description: inputField3Description,
+          is_required: false
+        }] : [])
+      ])
 
-    // Create tool
-    await docClient.send(new PutCommand({
-      TableName: process.env.DYNAMODB_TABLE_NAME!,
-      Item: {
-        PK: `AI#CATEGORY#${foundCategoryId}`,
-        SK: `SUITE#${foundSuiteId}#TOOL#${toolId}`,
-        name,
-        description,
-        promptTemplate,
-        creditCost,
-        inputField1,
-        inputField1Description,
-        ...(inputField2 && {
-          inputField2,
-          inputField2Description
-        }),
-        ...(inputField3 && {
-          inputField3,
-          inputField3Description
-        })
-      }
-    }))
+    if (inputError) throw inputError
+
+    // Create the prompt
+    const { error: promptError } = await supabase
+      .from('ai.prompts')
+      .insert({
+        tool_id: tool.id,
+        prompt_order: 1,
+        prompt_text: promptTemplate
+      })
+
+    if (promptError) throw promptError
 
     return NextResponse.json({
-      toolId,
-      name,
+      tool_id: tool.id,
+      name: tool.title,
       status: 'ACTIVE',
-      category: foundCategoryId,
+      category: collection.id,
       categoryName,
-      suite: foundSuiteId,
+      suite: suite.id,
       suiteName,
       inputField1,
       inputField1Description,
@@ -311,19 +221,11 @@ export async function POST(req: Request) {
       inputField3,
       inputField3Description
     })
-
   } catch (error) {
     console.error('Error creating tool:', error)
     return NextResponse.json(
       { 
-        error: error instanceof Error ? `Failed to create tool: ${error.message}` : 'Failed to create tool',
-        details: process.env.NODE_ENV === 'development' ? error : undefined,
-        env: {
-          hasRegion: !!process.env.AWS_REGION,
-          hasAccessKey: !!process.env.AWS_ACCESS_KEY_ID,
-          hasSecretKey: !!process.env.AWS_SECRET_ACCESS_KEY,
-          hasTableName: !!process.env.DYNAMODB_TABLE_NAME
-        }
+        error: error instanceof Error ? `Failed to create tool: ${error.message}` : 'Failed to create tool'
       },
       { status: 500 }
     )
@@ -332,6 +234,13 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const supabase = createRouteHandlerClient({ cookies })
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const url = new URL(req.url)
     const toolName = url.pathname.split('/').pop()
 
@@ -352,42 +261,70 @@ export async function DELETE(req: Request) {
       }, { status: 400 })
     }
 
-    const categoryId = await getCategoryId(selectedCategory)
-    if (!categoryId) {
+    // First get the collection ID from the title
+    const { data: collection, error: collectionError } = await supabase
+      .from('ai.collections')
+      .select('id')
+      .eq('title', selectedCategory)
+      .single()
+
+    if (collectionError) throw collectionError
+    if (!collection) {
       return NextResponse.json({ 
         error: 'Category not found',
         details: `Category not found: ${selectedCategory}`
       }, { status: 404 })
     }
 
-    const suiteId = await getSuiteId(selectedSuite, categoryId)
-    if (!suiteId) {
+    // Then get the suite ID using the collection ID
+    const { data: suite, error: suiteError } = await supabase
+      .from('ai.suites')
+      .select('id')
+      .eq('collection_id', collection.id)
+      .eq('title', selectedSuite)
+      .single()
+
+    if (suiteError) throw suiteError
+    if (!suite) {
       return NextResponse.json({ 
         error: 'Suite not found',
         details: `Suite not found: ${selectedSuite}`
       }, { status: 404 })
     }
 
-    const formattedToolName = formatForDynamoDB(toolName)
-    await docClient.send(new DeleteCommand({
-      TableName: process.env.DYNAMODB_TABLE_NAME!,
-      Key: {
-        PK: `AI#CATEGORY#${categoryId}`,
-        SK: `SUITE#${suiteId}#TOOL#${formattedToolName}`
-      }
-    }))
+    // Get the tool ID
+    const { data: tool, error: toolError } = await supabase
+      .from('ai.tools')
+      .select('id')
+      .eq('suite_id', suite.id)
+      .eq('title', toolName)
+      .single()
+
+    if (toolError) throw toolError
+    if (!tool) {
+      return NextResponse.json({ 
+        error: 'Tool not found',
+        details: `Tool not found: ${toolName}`
+      }, { status: 404 })
+    }
+
+    // Delete the tool (this will cascade delete inputs and prompts)
+    const { error } = await supabase
+      .from('ai.tools')
+      .delete()
+      .eq('id', tool.id)
+
+    if (error) throw error
 
     return NextResponse.json({ 
       message: 'Tool deleted successfully',
       toolName: toolName
     })
-
   } catch (error) {
     console.error('Error deleting tool:', error)
     return NextResponse.json(
       { 
-        error: error instanceof Error ? `Failed to delete tool: ${error.message}` : 'Failed to delete tool',
-        details: process.env.NODE_ENV === 'development' ? error : undefined
+        error: error instanceof Error ? error.message : 'Failed to delete tool'
       },
       { status: 500 }
     )

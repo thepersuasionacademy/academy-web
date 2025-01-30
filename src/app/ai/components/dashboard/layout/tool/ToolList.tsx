@@ -4,22 +4,13 @@ import { Plus, Link, Copy, CheckCircle } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-
-type Tool = {
-  name: string
-  SK: string
-  description: string
-  creditCost: number
-  promptTemplate: string
-  inputField1: string
-  inputField1Description: string
-}
+import type { AITool } from '@/lib/supabase/ai'
 
 interface ToolCardProps {
-  tool: Tool
-  onSelect: (tool: Tool) => void
+  tool: AITool
+  onSelect: (tool: AITool) => void
   isAdmin: boolean
-  onDuplicate?: (tool: Tool) => Promise<void>
+  onDuplicate?: (tool: AITool) => Promise<void>
 }
 
 export function ToolCard({ 
@@ -40,7 +31,7 @@ export function ToolCard({
 
   const handleCopyLink = (e: React.MouseEvent) => {
     e.stopPropagation()
-    const link = generateToolLink(tool.name)
+    const link = generateToolLink(tool.title || '')
     navigator.clipboard.writeText(link).then(() => {
       setAlertMessage('Link copied!')
       setShowCopied(true)
@@ -55,7 +46,7 @@ export function ToolCard({
   const handleDuplicate = async (e: React.MouseEvent) => {
     e.stopPropagation()
     if (onDuplicate && !isDuplicating) {
-      console.log('Duplicate clicked for tool:', tool.name)
+      console.log('Duplicate clicked for tool:', tool.title)
       setIsDuplicating(true)
       try {
         await onDuplicate(tool)
@@ -91,12 +82,12 @@ export function ToolCard({
       )}
     >
       <div>
-        <h3 className="text-2xl font-bold text-[var(--foreground)] mb-3">{tool.name}</h3>
+        <h3 className="text-2xl font-bold text-[var(--foreground)] mb-3">{tool.title}</h3>
         <p className="text-lg text-[var(--text-secondary)] mb-4 line-clamp-2">{tool.description}</p>
       </div>
 
       <div className="text-lg text-[var(--text-secondary)] mt-auto">
-        Credits: {tool.creditCost}
+        Credits: {tool.credits_cost}
       </div>
 
       {/* Admin Controls */}
@@ -159,11 +150,11 @@ export function ToolList({
   onDuplicate,
   hideCreationControls = false 
 }: {
-  tools: Tool[]
+  tools: AITool[]
   isLoading: boolean
-  onSelectTool: (tool: Tool) => void
+  onSelectTool: (tool: AITool) => void
   onCreateNew: () => void
-  onDuplicate?: (tool: Tool) => Promise<void>
+  onDuplicate?: (tool: AITool) => Promise<void>
   hideCreationControls?: boolean
 }) {
   const pathname = usePathname()
@@ -216,7 +207,7 @@ export function ToolList({
       {/* Tool Cards */}
       {tools?.map(tool => (
         <ToolCard
-          key={tool.SK}
+          key={tool.id}
           tool={tool}
           onSelect={onSelectTool}
           isAdmin={isAdminRoute}

@@ -2,14 +2,11 @@
 
 import { Plus } from 'lucide-react'
 import { useState, useEffect } from 'react'
-
-type Suite = {
-  id: string
-  name: string
-}
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import type { AISuite } from '@/lib/supabase/ai'
 
 interface SuiteSelectorProps {
-  suites: Suite[]
+  suites: AISuite[]
   selectedSuite: string | null
   onSelectSuite: (suite: string) => void
   isLoadingSuites: boolean
@@ -29,7 +26,8 @@ export default function SuiteSelector({
   const [newSuiteName, setNewSuiteName] = useState('')
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [localSuites, setLocalSuites] = useState<Suite[]>(suites)
+  const [localSuites, setLocalSuites] = useState<AISuite[]>(suites)
+  const supabase = createClientComponentClient()
 
   useEffect(() => {
     setLocalSuites(suites)
@@ -37,19 +35,23 @@ export default function SuiteSelector({
 
   const refreshSuites = async () => {
     try {
-      const response = await fetch('/api/ai/categories/suites', {
-        headers: {
-          'x-selected-category': selectedCategory
-        }
-      })
+      // First get the collection ID from the title
+      const { data: collections, error: collectionError } = await supabase
+        .from('ai.collections')
+        .select('id')
+        .eq('title', selectedCategory)
+        .single()
+
+      if (collectionError) throw collectionError
+      if (!collections) throw new Error('Collection not found')
+
+      const { data: suites, error } = await supabase
+        .rpc('get_suites_by_collection', { collection_id: collections.id })
       
-      if (!response.ok) {
-        throw new Error('Failed to fetch suites')
-      }
+      if (error) throw error
       
-      const data = await response.json()
-      setLocalSuites(data.suites)
-      return data.suites
+      setLocalSuites(suites)
+      return suites
     } catch (err) {
       console.error('Error refreshing suites:', err)
       throw err
@@ -64,28 +66,29 @@ export default function SuiteSelector({
     setError('')
 
     try {
-      const response = await fetch('/api/ai/categories/suites', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-selected-category': selectedCategory
-        },
-        body: JSON.stringify({ name: newSuiteName })
+      // First get the collection ID from the title
+      const { data: collections, error: collectionError } = await supabase
+        .from('ai.collections')
+        .select('id')
+        .eq('title', selectedCategory)
+        .single()
+
+      if (collectionError) throw collectionError
+      if (!collections) throw new Error('Collection not found')
+
+      const { data: suite, error } = await supabase.rpc('create_suite', {
+        collection_id: collections.id,
+        title: newSuiteName
       })
 
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create suite')
-      }
-
-      const data = await response.json()
+      if (error) throw error
       
-      const updatedSuites = await refreshSuites()
+      await refreshSuites()
       
       setNewSuiteName('')
       setIsCreatingSuite(false)
       
-      onSelectSuite(data.suite.name)
+      onSelectSuite(suite.title)
     } catch (err) {
       console.error('Error in suite creation:', err)
       setError(err instanceof Error ? err.message : 'Failed to create suite')
@@ -111,13 +114,13 @@ export default function SuiteSelector({
           <button
             key={suite.id}
             className={`px-4 py-2 rounded-full transition-colors duration-200 ${
-              selectedSuite === suite.name
+              selectedSuite === suite.title
                 ? 'bg-[var(--accent)] text-white'
                 : 'text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
             }`}
-            onClick={() => onSelectSuite(suite.name)}
+            onClick={() => onSelectSuite(suite.title || '')}
           >
-            {suite.name}
+            {suite.title}
           </button>
         ))}
         

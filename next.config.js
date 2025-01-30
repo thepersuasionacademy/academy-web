@@ -1,6 +1,7 @@
 const imageDomains = [
   'api.placeholder.com',
   'thepersuasionacademy-com.b-cdn.net',
+  'wltjkhsmqhospeezdgga.supabase.co'
   // Add more domains as needed
 ];
 
@@ -13,15 +14,14 @@ const nextConfig = {
     domains: imageDomains,
   },
   experimental: {
-    serverActions: true,
+    serverActions: {
+      allowedOrigins: ['localhost:3000']
+    },
     typedRoutes: true
   },
   typescript: {
     ignoreBuildErrors: true  // Temporarily ignore TS errors during build to test if it fixes deployment
-  },
-  images: {
-    domains: ['wltjkhsmqhospeezdgga.supabase.co'],
-  },
+  }
 };
 
 module.exports = nextConfig;

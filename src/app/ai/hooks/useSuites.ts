@@ -1,11 +1,13 @@
 //src/app/ai/hooks/useSuites.ts
-import { useState, useEffect } from 'react'
-import { type Suite } from '@/app/ai/components/dashboard/types'
+import { useState, useEffect, useMemo } from 'react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { type AISuite, type AICollection } from '@/lib/supabase/ai'
 
 export function useSuites(selectedCategory: string | null) {
-  const [suites, setSuites] = useState<Suite[]>([])
+  const [suites, setSuites] = useState<AISuite[]>([])
   const [isLoadingSuites, setIsLoadingSuites] = useState(false)
   const [error, setError] = useState('')
+  const supabase = useMemo(() => createClientComponentClient(), [])
 
   useEffect(() => {
     if (!selectedCategory) {
@@ -15,24 +17,36 @@ export function useSuites(selectedCategory: string | null) {
 
     const fetchSuites = async () => {
       try {
+        console.log('useSuites: Starting fetch for category:', selectedCategory)
         setIsLoadingSuites(true)
-        const response = await fetch('/api/ai/categories/suites', {
-          headers: {
-            'x-selected-category': selectedCategory
-          }
+        setError('')
+
+        const { data: collections, error: collectionError } = await supabase.rpc('list_collections')
+        
+        if (collectionError) {
+          console.error('useSuites: Error fetching collections:', collectionError)
+          throw collectionError
+        }
+
+        const collection = collections.find((c: AICollection) => c.title === selectedCategory)
+        if (!collection) {
+          console.error('useSuites: Collection not found for category:', selectedCategory)
+          throw new Error('Collection not found')
+        }
+
+        const { data: suites, error: suitesError } = await supabase.rpc('get_suites_by_collection', {
+          collection_id: collection.id
         })
         
-        if (!response.ok) {
-          const errorText = await response.text()
-          throw new Error('Failed to fetch suites')
+        if (suitesError) {
+          console.error('useSuites: Error fetching suites:', suitesError)
+          throw suitesError
         }
-        
-        const data = await response.json()
-        if (Array.isArray(data.suites)) {
-          setSuites(data.suites)
-        }
+
+        console.log('useSuites: Fetched suites:', suites)
+        setSuites(suites || [])
       } catch (error) {
-        console.error('Error fetching suites:', error)
+        console.error('useSuites: Error in hook:', error)
         setError('Failed to load suites')
       } finally {
         setIsLoadingSuites(false)
@@ -40,7 +54,7 @@ export function useSuites(selectedCategory: string | null) {
     }
 
     fetchSuites()
-  }, [selectedCategory])
+  }, [selectedCategory, supabase])
 
   return { suites, isLoadingSuites, error, setSuites }
 }

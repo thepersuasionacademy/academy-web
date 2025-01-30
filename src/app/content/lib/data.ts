@@ -3,7 +3,7 @@ import type { Category } from './types';
 export const categories: Category[] = [
   {
     name: 'Encoded Audio',
-    categoryType: 'mind',
+    categoryType: 'imprinting',
     items: [
       {
         id: 'encoded-focus',
@@ -51,7 +51,7 @@ export const categories: Category[] = [
   },
   {
     name: 'Guided Meditation',
-    categoryType: 'mind',
+    categoryType: 'imprinting',
     items: [
       {
         id: 'guided-confidence',
@@ -99,7 +99,7 @@ export const categories: Category[] = [
   },
   {
     name: 'Ambient Soundscapes',
-    categoryType: 'mind',
+    categoryType: 'imprinting',
     items: [
       {
         id: 'ambient-focus',
@@ -147,7 +147,7 @@ export const categories: Category[] = [
   },
   {
     name: 'DreamState Selling',
-    categoryType: 'training',
+    categoryType: 'learning',
     items: [
       {
         id: 'dream-basics',
@@ -195,7 +195,7 @@ export const categories: Category[] = [
   },
   {
     name: 'Framing',
-    categoryType: 'training',
+    categoryType: 'learning',
     items: [
       {
         id: 'framing-101',
@@ -243,7 +243,7 @@ export const categories: Category[] = [
   },
   {
     name: 'MaxPersuasion',
-    categoryType: 'training',
+    categoryType: 'learning',
     items: [
       {
         id: 'max-influence',

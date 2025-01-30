@@ -1,91 +1,124 @@
 import { NextResponse } from 'next/server'
-import { DynamoDBClient } from '@aws-sdk/client-dynamodb'
-import { 
-  DynamoDBDocumentClient, 
-  QueryCommand,
-  PutCommand
-} from '@aws-sdk/lib-dynamodb'
-
-const client = new DynamoDBClient({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
-  }
-})
-
-const docClient = DynamoDBDocumentClient.from(client)
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   try {
-    const selectedCategory = request.headers.get('x-selected-category') || 'Cat'
+    const supabase = createRouteHandlerClient({ cookies })
+    const selectedCategory = request.headers.get('x-selected-category')
     
-    const result = await docClient.send(new QueryCommand({
-      TableName: process.env.DYNAMODB_TABLE_NAME!,
-      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
-      ExpressionAttributeValues: {
-        ':pk': `AI#CATEGORY#${selectedCategory}`,
-        ':sk': 'SUITE#'
-      }
-    }))
+    if (!selectedCategory) {
+      return NextResponse.json(
+        { error: 'Category is required' },
+        { status: 400 }
+      )
+    }
 
-    const suites = result.Items
-      ?.filter(item => (item.SK.match(/#/g) || []).length === 1)
-      ?.map(item => ({
-        id: item.SK.split('#')[1],
-        name: item.name
-      })) || []
+    // First get the collection ID from the title
+    const { data: collection, error: collectionError } = await supabase
+      .from('ai.collections')
+      .select('id')
+      .eq('title', selectedCategory)
+      .single()
+
+    if (collectionError) throw collectionError
+    if (!collection) {
+      return NextResponse.json(
+        { error: 'Category not found' },
+        { status: 404 }
+      )
+    }
+
+    // Get suites for this collection
+    const { data: suites, error } = await supabase
+      .rpc('get_suites_by_collection', { collection_id: collection.id })
+
+    if (error) throw error
 
     return NextResponse.json({ suites })
   } catch (error) {
     console.error('Error:', error)
-    return NextResponse.json({ error: 'Failed to fetch suites' }, { status: 500 })
+    return NextResponse.json(
+      { error: 'Failed to fetch suites' },
+      { status: 500 }
+    )
   }
 }
 
 export async function POST(request: Request) {
   try {
+    const supabase = createRouteHandlerClient({ cookies })
     const selectedCategory = request.headers.get('x-selected-category')
+    
     if (!selectedCategory) {
-      return NextResponse.json({ error: 'Category is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Category is required' },
+        { status: 400 }
+      )
     }
 
     const body = await request.json()
     if (!body.name) {
-      return NextResponse.json({ error: 'Suite name is required' }, { status: 400 })
+      return NextResponse.json(
+        { error: 'Suite name is required' },
+        { status: 400 }
+      )
     }
 
-    const suiteId = body.name.toLowerCase().replace(/[^a-z0-9]/g, '-')
+    // First get the collection ID from the title
+    const { data: collection, error: collectionError } = await supabase
+      .from('ai.collections')
+      .select('id')
+      .eq('title', selectedCategory)
+      .single()
 
-    await docClient.send(new PutCommand({
-      TableName: process.env.DYNAMODB_TABLE_NAME!,
-      Item: {
-        PK: `AI#CATEGORY#${selectedCategory}`,
-        SK: `SUITE#${suiteId}`,
-        name: body.name
-      },
-      // Ensure we don't overwrite an existing suite
-      ConditionExpression: 'attribute_not_exists(PK) AND attribute_not_exists(SK)'
-    }))
+    if (collectionError) throw collectionError
+    if (!collection) {
+      return NextResponse.json(
+        { error: 'Category not found' },
+        { status: 404 }
+      )
+    }
+
+    // Check if suite already exists
+    const { data: existingSuite, error: checkError } = await supabase
+      .from('ai.suites')
+      .select('id')
+      .eq('collection_id', collection.id)
+      .eq('title', body.name)
+      .single()
+
+    if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      throw checkError
+    }
+
+    if (existingSuite) {
+      return NextResponse.json(
+        { error: 'Suite already exists' },
+        { status: 409 }
+      )
+    }
+
+    // Create new suite using RPC function
+    const { data: suite, error } = await supabase.rpc('create_suite', {
+      collection_id: collection.id,
+      title: body.name
+    })
+
+    if (error) throw error
 
     return NextResponse.json({
       success: true,
       suite: {
-        id: suiteId,
-        name: body.name
+        id: suite.id,
+        name: suite.title
       }
     })
-  } catch (err) {
-    console.error('Error creating suite:', err)
-    
-    // Type guard for ConditionalCheckFailedException
-    if (err && 
-        typeof err === 'object' && 
-        'name' in err && 
-        err.name === 'ConditionalCheckFailedException') {
-      return NextResponse.json({ error: 'Suite already exists' }, { status: 409 })
-    }
-    
-    return NextResponse.json({ error: 'Failed to create suite' }, { status: 500 })
+  } catch (error) {
+    console.error('Error creating suite:', error)
+    return NextResponse.json(
+      { error: 'Failed to create suite' },
+      { status: 500 }
+    )
   }
 }
