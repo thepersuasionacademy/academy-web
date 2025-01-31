@@ -18,12 +18,16 @@ interface GenerateSectionProps {
   isLoading: boolean;
 }
 
+const MAX_RETRIES = 2;
+const TIMEOUT_MS = 58000; // 58 seconds (slightly less than Vercel's 60s to account for network latency)
+
 export default function GenerateSection({ tool, inputs, prompts, isLoading }: GenerateSectionProps) {
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
   const [displayedOutput, setDisplayedOutput] = useState<string>('');
   const [fullResponse, setFullResponse] = useState<string>('');
+  const [retryCount, setRetryCount] = useState(0);
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -77,42 +81,85 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
         content: replaceInputPlaceholders(prompt.input_description || '', inputValues)
       }));
 
-      const response = await fetch('/api/ai/generate', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          toolId: tool.id,
-          inputs: inputValues,
-          prompts: preparedPrompts
-        })
-      });
+      // Create AbortController for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(
-          errorData?.error || 
-          `Failed to generate response: ${response.status} ${response.statusText}`
-        );
+      try {
+        const response = await fetch('/api/ai/generate', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            toolId: tool.id,
+            inputs: inputValues,
+            prompts: preparedPrompts
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null);
+          
+          // Handle timeout specifically
+          if (response.status === 504 || (errorData?.error && errorData.error.includes('timeout'))) {
+            if (retryCount < MAX_RETRIES) {
+              setRetryCount(prev => prev + 1);
+              throw new Error('RETRY_NEEDED');
+            } else {
+              throw new Error('The request timed out. The AI model is taking longer than expected to respond. Please try again with a simpler prompt or try again later.');
+            }
+          }
+
+          throw new Error(
+            errorData?.error?.message || errorData?.error || 
+            `Failed to generate response: ${response.status} ${response.statusText}`
+          );
+        }
+
+        const data = await response.json();
+        if (!data || !data.output) {
+          throw new Error('Invalid response format from server');
+        }
+
+        setFullResponse(data.output);
+        setOutput(data.output);
+        setRetryCount(0); // Reset retry count on success
+
+      } catch (fetchError: unknown) {
+        if (fetchError instanceof Error && fetchError.message === 'RETRY_NEEDED') {
+          // Retry the request
+          console.log(`Retrying request (${retryCount + 1}/${MAX_RETRIES})...`);
+          await handleGenerate();
+          return;
+        }
+        throw fetchError;
       }
 
-      const data = await response.json();
-      if (!data || !data.output) {
-        throw new Error('Invalid response format from server');
-      }
-
-      setFullResponse(data.output);
-      setOutput(data.output);
-
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Generation error:', error);
-      const errorMessage = error instanceof Error 
-        ? `Error: ${error.message}` 
-        : 'An unexpected error occurred during generation';
-      setFullResponse(errorMessage);
-      setOutput(errorMessage);
+      let errorMessage: string;
+
+      if (error instanceof Error) {
+        if (error.name === 'AbortError') {
+          errorMessage = 'The request was cancelled due to timeout. Please try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      } else if (typeof error === 'object' && error !== null && 'message' in error) {
+        errorMessage = String(error.message);
+      } else {
+        errorMessage = 'An unexpected error occurred during generation';
+      }
+      
+      setFullResponse(`Error: ${errorMessage}`);
+      setOutput(`Error: ${errorMessage}`);
+      setIsGenerating(false);
+      setRetryCount(0); // Reset retry count on final error
     }
   };
 
