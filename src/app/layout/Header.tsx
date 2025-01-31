@@ -14,7 +14,7 @@ interface HeaderProps {
 }
 
 const categories = [
-  { name: 'Content', path: '/training' as Route },
+  { name: 'Content', path: '/content' as Route },
   { name: 'AI Engine', path: '/ai' as Route },
 ] as const;
 

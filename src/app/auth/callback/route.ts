@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${requestUrl.origin}/auth/login?error=${encodeURIComponent(authError.message)}`)
     }
 
-    return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
+    return NextResponse.redirect(`${requestUrl.origin}/content`)
 
   } catch (err) {
     console.error('Unexpected callback error:', err)

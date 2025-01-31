@@ -50,7 +50,7 @@ export async function GET(request: Request) {
     }
 
     console.log('[Auth Callback] Session established successfully')
-    return NextResponse.redirect(`${requestUrl.origin}/dashboard`)
+    return NextResponse.redirect(`${requestUrl.origin}/content`)
 
   } catch (err) {
     console.error('[Auth Callback] Unexpected error:', err)
