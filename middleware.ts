@@ -14,19 +14,22 @@ export async function middleware(req: NextRequest) {
   debugMiddleware(req)
   try {
     const res = NextResponse.next()
+    const isDevelopment = process.env.NODE_ENV === 'development'
+    
     const supabase = createMiddlewareClient({ 
       req, 
-      res,
-      options: {
-        cookies: {
-          name: 'sb-auth-token',
-          domain: 'app.thepersuasionacademy.com',
-          path: '/',
-          sameSite: 'lax',
-          secure: true
-        }
-      }
+      res
     })
+
+    // Configure cookies after client creation
+    if (!isDevelopment) {
+      res.cookies.set('sb-auth-token', '', {
+        domain: 'app.thepersuasionacademy.com',
+        path: '/',
+        sameSite: 'lax',
+        secure: true
+      })
+    }
 
     // Add debug logging
     console.log('Middleware URL:', req.url)

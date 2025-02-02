@@ -10,9 +10,21 @@ import './styles.css'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid'
 
 export default function LoginPage() {
+  // Add debugging before client creation
+  console.log('Environment:', process.env.NODE_ENV)
+  console.log('Supabase URL from env:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+  
   const supabase = createClientComponentClient()
+  
+  // Log the actual client config
+  console.log('Supabase Client Config:', (supabase as any).supabaseUrl)
+  
   const router = useRouter()
   const searchParams = useSearchParams()
+  
+  // Add this temporarily for debugging
+  console.log('Current Supabase URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+  
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [view, setView] = useState<'login' | 'reset' | 'signup'>('login')
@@ -38,6 +50,8 @@ export default function LoginPage() {
         ? 'https://app.thepersuasionacademy.com/api/auth-callback'
         : `${window.location.origin}/api/auth-callback`
 
+      console.log('Redirect URL:', redirectUrl)
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -61,10 +75,29 @@ export default function LoginPage() {
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
-    await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+
+      console.log('Sign in response:', { data, error })
+
+      if (error) {
+        console.error('Sign in error:', error)
+        setError(error.message)
+        return
+      }
+
+      if (data?.user) {
+        console.log('Sign in successful, redirecting...')
+        // Redirect to the dashboard or home page after successful sign in
+        router.push('/app' as any)
+      }
+    } catch (err) {
+      console.error('Sign in error:', err)
+      setError(err instanceof Error ? err.message : 'An error occurred during sign in')
+    }
   }
 
   const handleSignIn = async (email: string) => {
@@ -96,7 +129,7 @@ export default function LoginPage() {
             {/* Logo */}
             <div className="flex flex-col items-center mb-12">
               <Image
-                src="https://wltjkhsmqhospeezdgga.supabase.co/storage/v1/object/public/Public%20Images//The%20TPA%20Logo%20New%20Black.png"
+                src={process.env.NEXT_PUBLIC_LOGO_BLACK_URL!}
                 alt="Logo"
                 width={100}
                 height={100}
@@ -198,7 +231,7 @@ export default function LoginPage() {
     <div className="relative min-h-screen flex flex-col items-center justify-center">
       {/* Background Image with blur */}
       <Image
-        src="https://wltjkhsmqhospeezdgga.supabase.co/storage/v1/object/public/Public%20Images//thepowerark_black_background_magic_4k_wallpaper_background_burg_8b1627cb-2a30-4594-9766-7512a94c2a31%20(1)%20(1).jpeg"
+        src={process.env.NEXT_PUBLIC_BACKGROUND_IMAGE_URL!}
         alt="Background"
         fill
         className="object-cover blur-[2px]"

@@ -1,7 +1,8 @@
 const imageDomains = [
   'api.placeholder.com',
   'thepersuasionacademy-com.b-cdn.net',
-  'wltjkhsmqhospeezdgga.supabase.co'
+  'wltjkhsmqhospeezdgga.supabase.co',
+  'itolhrognjngmyycodzv.supabase.co'  // Add development Supabase domain
   // Add more domains as needed
 ];
 
