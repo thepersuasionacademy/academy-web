@@ -95,7 +95,7 @@ export default function CategorySidebar({
   }
 
   return (
-    <div className="w-64 border-r border-[var(--border-color)] p-6">
+    <div className="w-64 border-r border-[var(--border-color)] p-6 bg-[var(--background)]">
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-[var(--foreground)]">Categories</h2>
         

@@ -69,12 +69,10 @@ export default function Header() {
   }, []);
 
   const headerClassName = cn(
-    "sticky top-0",
-    "border-b border-b-2",
-    "border-[var(--border-color)]",
-    "bg-[var(--card-bg)]",
-    "backdrop-blur-sm",
-    "z-50"
+    "sticky top-0 z-50",
+    "border-b border-[var(--border-color)]",
+    "bg-[#fafafa] dark:bg-[var(--background)]",
+    "transition-colors duration-300"
   );
 
   const logoClassName = cn(

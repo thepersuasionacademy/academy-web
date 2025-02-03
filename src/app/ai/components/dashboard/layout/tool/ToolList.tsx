@@ -71,7 +71,7 @@ export function ToolCard({
         "group relative rounded-2xl p-6",
         "border border-[var(--border-color)]",
         "transition-all duration-300",
-        "bg-[var(--card-bg)]",
+        "bg-[#fafafa] hover:bg-white dark:bg-[var(--card-bg)]",
         "hover:scale-[1.02] hover:shadow-lg",
         "hover:border-[var(--accent)]",
         "cursor-pointer",
@@ -178,12 +178,12 @@ export function ToolList({
 
   if (isLoading) {
     return (
-      <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-[var(--background)]">
         {[1, 2, 3].map(i => (
           <div key={i} className={cn(
             "rounded-2xl p-6",
             "border border-[var(--border-color)]",
-            "bg-[var(--card-bg)]",
+            "bg-[var(--hover-bg)]",
             "animate-pulse",
             "min-h-[220px]"
           )}>
@@ -201,7 +201,7 @@ export function ToolList({
   }
 
   return (
-    <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-[var(--background)]">
       {/* Create New Button */}
       {!hideCreationControls && (
         <button
@@ -210,7 +210,7 @@ export function ToolList({
             "group relative rounded-2xl p-6",
             "border border-dashed border-[var(--border-color)]",
             "transition-all duration-300",
-            "bg-[var(--card-bg)]",
+            "bg-[#fafafa] hover:bg-white dark:bg-[var(--card-bg)]",
             "hover:scale-[1.02] hover:shadow-lg",
             "hover:border-[var(--accent)]",
             "flex flex-col items-center justify-center text-center",

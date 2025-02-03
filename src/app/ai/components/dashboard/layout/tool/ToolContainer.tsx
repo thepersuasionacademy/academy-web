@@ -137,7 +137,7 @@ export function ToolContainer({
   }, [router])
 
   return (
-    <div className="relative">
+    <div className="relative bg-[var(--card-bg)]">
       <ToolList 
         tools={tools}
         isLoading={isLoadingTools}

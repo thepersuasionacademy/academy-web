@@ -51,9 +51,30 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
     setInputValues(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>, field: string) => {
-    if (e.key === 'Enter' && !isGenerating) {
-      await handleGenerate();
+  const handleKeyPress = async (e: React.KeyboardEvent<HTMLInputElement>, field: string, index: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      
+      // Check if there are more inputs after this one
+      if (index < inputs.length - 1) {
+        // Focus the next input
+        const nextInput = document.querySelector(`input[name="input-${index + 1}"]`) as HTMLInputElement;
+        if (nextInput) {
+          nextInput.focus();
+        }
+      } else {
+        // If all inputs have values, focus the generate button
+        const allInputsFilled = inputs.every(input => 
+          !input.is_required || inputValues[input.input_name || '']
+        );
+        
+        if (allInputsFilled) {
+          const generateButton = document.querySelector('button[data-generate-button]') as HTMLButtonElement;
+          if (generateButton) {
+            generateButton.focus();
+          }
+        }
+      }
     }
   };
 
@@ -290,13 +311,14 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
               </div>
               <input 
                 type="text"
+                name={`input-${index}`}
                 className="w-full bg-transparent text-xl py-4 px-2 
                   border-b border-[var(--border-color)] focus:border-[var(--accent)]
                   text-[var(--foreground)]
                   focus:outline-none transition-colors duration-200"
                 value={inputValues[input.input_name || ''] || ''}
                 onChange={(e) => handleInputChange(input.input_name || '', e.target.value)}
-                onKeyPress={(e) => handleKeyPress(e, input.input_name || '')}
+                onKeyPress={(e) => handleKeyPress(e, input.input_name || '', index)}
                 autoFocus={index === 0}
                 disabled={isGenerating}
               />
@@ -308,6 +330,7 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
           <button
             onClick={handleGenerate}
             disabled={isGenerating || Object.keys(inputValues).length === 0}
+            data-generate-button
             className={`text-xl font-bold rounded-xl transition-all duration-200 w-full py-6
               ${(!isGenerating && Object.keys(inputValues).length > 0)
                 ? 'bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90'
