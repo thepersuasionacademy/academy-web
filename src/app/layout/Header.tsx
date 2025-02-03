@@ -1,7 +1,7 @@
 // Header.tsx
 'use client';
 
-import { Search, CreditCard, User, Moon, Sun } from 'lucide-react';
+import { CreditCard, User, Moon, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 const categories = [
   { name: 'Content', path: '/content' as Route },
   { name: 'AI Engine', path: '/ai' as Route },
+  { name: 'Store', path: '/store' as Route },
 ] as const;
 
 interface CreditBalance {
@@ -68,9 +69,12 @@ export default function Header() {
   }, []);
 
   const headerClassName = cn(
+    "sticky top-0",
     "border-b border-b-2",
     "border-[var(--border-color)]",
-    "bg-[var(--card-bg)]"
+    "bg-[var(--card-bg)]",
+    "backdrop-blur-sm",
+    "z-50"
   );
 
   const logoClassName = cn(
@@ -79,9 +83,10 @@ export default function Header() {
   );
 
   const navLinkClassName = (isActive: boolean) => cn(
-    "px-3 py-2 text-sm font-medium transition-colors",
+    "px-3 h-14 flex items-center text-base font-medium transition-colors relative",
+    isActive && "after:absolute after:bottom-[-2px] after:left-0 after:right-0 after:h-[3px] after:bg-[var(--accent)]",
     isActive
-      ? "text-[var(--foreground)]"
+      ? "text-[var(--foreground)] font-semibold"
       : "text-[var(--text-secondary)] hover:text-[var(--foreground)]"
   );
 
@@ -100,37 +105,34 @@ export default function Header() {
   return (
     <header className={headerClassName}>
       <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Left Section - Logo */}
-        <div className="flex items-center">
+        {/* Left Section - Logo and Navigation */}
+        <div className="flex items-center h-full">
           <Link
             href={'/' as Route}
             className={logoClassName}
           >
             The Persuasion Academy
           </Link>
-        </div>
 
-        {/* Center Section - Navigation Categories */}
-        <nav className="hidden sm:block">
-          <ul className="flex space-x-8">
-            {categories.map((category) => (
-              <li key={category.path}>
-                <Link
-                  href={category.path}
-                  className={navLinkClassName(pathname?.startsWith(category.path))}
-                >
-                  {category.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+          {/* Navigation Categories */}
+          <nav className="hidden sm:block h-full ml-8">
+            <ul className="flex space-x-8 h-full">
+              {categories.map((category) => (
+                <li key={category.path} className="h-full">
+                  <Link
+                    href={category.path}
+                    className={navLinkClassName(pathname?.startsWith(category.path))}
+                  >
+                    {category.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        </div>
 
         {/* Right Section - Actions */}
         <div className="flex items-center space-x-4">
-          <button className={iconClassName}>
-            <Search className="h-5 w-5" />
-          </button>
           <div className="relative" ref={dropdownRef}>
             <button 
               className={`flex items-center ${iconClassName}`}

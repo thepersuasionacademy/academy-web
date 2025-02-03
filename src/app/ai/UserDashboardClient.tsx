@@ -26,6 +26,12 @@ export default function UserDashboardClient({ hideCreationControls = false }) {
     setIsModalOpen(!!tool)
   }
 
+  const handleCategorySelect = (name: string) => {
+    setSelectedCategory(name)
+    setSelectedSuite(null)
+    setSelectedTool(null)
+  }
+
   console.log('Current state:', { selectedTool, isModalOpen })
 
   return (
@@ -34,9 +40,7 @@ export default function UserDashboardClient({ hideCreationControls = false }) {
         <CategorySidebar
           categories={categories}
           selectedCategory={selectedCategory}
-          onSelectCategory={(name: string) => {
-            setSelectedCategory(name)
-          }}
+          onSelectCategory={handleCategorySelect}
           isLoadingCategories={isLoadingCategories}
           categoryInput={categoryInput}
           setCategoryInput={setCategoryInput}

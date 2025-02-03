@@ -66,76 +66,92 @@ export function ToolCard({
 
   return (
     <div 
-      onClick={() => {
-        console.log('ToolCard clicked:', tool)
-        onSelect(tool)
-      }}
+      onClick={() => onSelect(tool)}
       className={cn(
-        "relative rounded-2xl p-6",
-        "border border-[var(--border-color)] hover:border-[var(--accent)]",
-        "transition-all duration-200",
+        "group relative rounded-2xl p-6",
+        "border border-[var(--border-color)]",
+        "transition-all duration-300",
         "bg-[var(--card-bg)]",
-        "shadow-lg",
-        "hover:shadow-[0_0_10px_rgba(var(--accent),0.3)]",
-        "flex flex-col min-h-[200px] cursor-pointer",
-        "text-left relative"
+        "hover:scale-[1.02] hover:shadow-lg",
+        "hover:border-[var(--accent)]",
+        "cursor-pointer",
+        "flex flex-col min-h-[220px]"
       )}
     >
-      <div>
-        <h3 className="text-2xl font-bold text-[var(--foreground)] mb-3">{tool.title}</h3>
-        <p className="text-lg text-[var(--text-secondary)] mb-4 line-clamp-2">{tool.description}</p>
+      <div className="space-y-4">
+        <h3 className="text-2xl font-bold text-[var(--foreground)] group-hover:text-[var(--accent)] transition-colors">
+          {tool.title}
+        </h3>
+        <p className="text-lg text-[var(--text-secondary)] line-clamp-2 group-hover:text-[var(--foreground)] transition-colors">
+          {tool.description}
+        </p>
       </div>
 
-      <div className="text-lg text-[var(--text-secondary)] mt-auto">
-        Credits: {tool.credits_cost}
+      <div className="mt-auto pt-4 flex items-center justify-between">
+        <div className="flex-1" /> {/* Spacer */}
+        
+        {/* Credits */}
+        <div className="text-xl font-semibold text-[var(--foreground)]">
+          {tool.credits_cost} Credits
+        </div>
+
+        {/* Admin Controls */}
+        {isAdmin && (
+          <div className="absolute top-6 right-6 flex gap-2">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleDuplicate(e)
+              }}
+              className={cn(
+                "p-2 rounded-xl",
+                "text-[var(--text-secondary)]",
+                "hover:text-[var(--accent)] hover:bg-[var(--accent)]/10",
+                "transition-all duration-200",
+                isDuplicating && "opacity-50 cursor-not-allowed"
+              )}
+              title="Duplicate tool"
+              disabled={isDuplicating}
+            >
+              <Copy className="w-5 h-5" />
+            </button>
+            
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopyLink(e)
+              }}
+              className={cn(
+                "p-2 rounded-xl",
+                "text-[var(--text-secondary)]",
+                "hover:text-[var(--accent)] hover:bg-[var(--accent)]/10",
+                "transition-all duration-200"
+              )}
+              title="Copy tool link"
+            >
+              {showCopied ? (
+                <CheckCircle className="w-5 h-5 text-[var(--success)]" />
+              ) : (
+                <Link className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Admin Controls */}
-      {isAdmin && (
-        <div className="absolute bottom-6 right-6 flex gap-2">
-          <div
-            onClick={handleDuplicate}
-            className={cn(
-              "flex items-center gap-2 p-2",
-              "text-[var(--text-secondary)] hover:text-[var(--foreground)]",
-              "transition-colors rounded-md hover:bg-[var(--accent)]/10",
-              "cursor-pointer",
-              isDuplicating && "opacity-50 cursor-not-allowed"
-            )}
-            title="Duplicate tool"
-          >
-            <Copy className="w-5 h-5" />
+      {/* Alert Toast */}
+      {showAlert && (
+        <div className="absolute bottom-full right-0 mb-2 z-10">
+          <div className={cn(
+            "px-4 py-2 rounded-xl",
+            "bg-[var(--card-bg)]",
+            "border border-[var(--accent)]",
+            "text-[var(--foreground)]",
+            "shadow-lg shadow-[var(--accent)]/10",
+            "animate-in slide-in-from-bottom-2"
+          )}>
+            {alertMessage}
           </div>
-          
-          <div
-            onClick={handleCopyLink}
-            className={cn(
-              "flex items-center gap-2 p-2",
-              "text-[var(--text-secondary)] hover:text-[var(--foreground)]",
-              "transition-colors rounded-md hover:bg-[var(--accent)]/10",
-              "cursor-pointer"
-            )}
-            title="Copy tool link"
-          >
-            {showCopied ? (
-              <CheckCircle className="w-5 h-5 text-[var(--success)]" />
-            ) : (
-              <Link className="w-5 h-5" />
-            )}
-          </div>
-          
-          {showAlert && (
-            <div className="absolute bottom-full right-0 mb-2 z-10">
-              <div className={cn(
-                "bg-[var(--card-bg)]",
-                "border border-[var(--border-color)]",
-                "text-[var(--foreground)]",
-                "px-4 py-2 rounded-md shadow-sm text-base whitespace-nowrap"
-              )}>
-                {alertMessage}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -162,17 +178,22 @@ export function ToolList({
 
   if (isLoading) {
     return (
-      <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {[1, 2, 3].map(i => (
           <div key={i} className={cn(
-            "relative rounded-2xl p-4 animate-pulse",
-            "bg-[var(--card-bg)]",
+            "rounded-2xl p-6",
             "border border-[var(--border-color)]",
-            "shadow-lg"
+            "bg-[var(--card-bg)]",
+            "animate-pulse",
+            "min-h-[220px]"
           )}>
-            <div className="h-8 w-3/4 bg-[var(--hover-bg)] rounded mb-3" />
-            <div className="h-6 w-full bg-[var(--hover-bg)] rounded mb-3" />
-            <div className="h-6 w-1/2 bg-[var(--hover-bg)] rounded" />
+            <div className="space-y-4">
+              <div className="h-8 w-3/4 bg-[var(--hover-bg)] rounded-lg" />
+              <div className="h-20 w-full bg-[var(--hover-bg)] rounded-lg" />
+            </div>
+            <div className="mt-auto pt-4">
+              <div className="h-8 w-24 bg-[var(--hover-bg)] rounded-full" />
+            </div>
           </div>
         ))}
       </div>
@@ -180,28 +201,38 @@ export function ToolList({
   }
 
   return (
-    <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {/* Create New Button */}
       {!hideCreationControls && (
-        <div
+        <button
           onClick={onCreateNew}
           className={cn(
-            "relative rounded-2xl p-6",
-            "border border-[var(--border-color)] hover:border-[var(--accent)]",
-            "transition-all duration-200",
+            "group relative rounded-2xl p-6",
+            "border border-dashed border-[var(--border-color)]",
+            "transition-all duration-300",
             "bg-[var(--card-bg)]",
-            "shadow-lg",
-            "hover:shadow-[0_0_10px_rgba(var(--accent),0.3)]",
-            "flex flex-col items-center justify-center text-center group min-h-[200px]",
+            "hover:scale-[1.02] hover:shadow-lg",
+            "hover:border-[var(--accent)]",
+            "flex flex-col items-center justify-center text-center",
+            "min-h-[220px]",
             "cursor-pointer"
           )}
         >
-          <div className="bg-[var(--accent)]/10 p-3 rounded-full mb-3 group-hover:bg-[var(--accent)]/20 transition-colors duration-200">
+          <div className={cn(
+            "p-4 rounded-full",
+            "bg-[var(--accent)]/10",
+            "group-hover:bg-[var(--accent)]/20",
+            "transition-all duration-300"
+          )}>
             <Plus className="h-8 w-8 text-[var(--accent)]" />
           </div>
-          <h3 className="text-2xl font-bold text-[var(--foreground)] mb-2">Create New Tool</h3>
-          <p className="text-lg text-[var(--text-secondary)]">Add a new tool to this suite</p>
-        </div>
+          <h3 className="text-2xl font-bold text-[var(--foreground)] mt-4 mb-2 group-hover:text-[var(--accent)] transition-colors">
+            Create New Tool
+          </h3>
+          <p className="text-lg text-[var(--text-secondary)] group-hover:text-[var(--foreground)] transition-colors">
+            Add a new tool to this suite
+          </p>
+        </button>
       )}
 
       {/* Tool Cards */}

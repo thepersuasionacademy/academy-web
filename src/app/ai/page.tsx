@@ -15,10 +15,18 @@ interface PageContext {
 export default async function Page(context: PageContext) {
   const params = await context.params
   return (
-    <div className="bg-[var(--background)]">
+    <div className="min-h-screen bg-[var(--background)]">
       <UserDashboardClient 
         hideCreationControls={true} 
       />
     </div>
   )
 }
+
+// Add this to your global CSS
+// .bg-grid-pattern {
+//   background-size: 40px 40px;
+//   background-image: 
+//     linear-gradient(to right, var(--border-color) 1px, transparent 1px),
+//     linear-gradient(to bottom, var(--border-color) 1px, transparent 1px);
+// }

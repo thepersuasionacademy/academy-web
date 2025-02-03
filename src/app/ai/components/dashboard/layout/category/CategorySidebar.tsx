@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import type { AICollection } from '@/lib/supabase/ai'
 import { useRouter } from 'next/navigation'
+import { cn } from "@/lib/utils"
 
 interface CategorySidebarProps {
   categories: AICollection[]
@@ -30,17 +31,7 @@ export default function CategorySidebar({
   const [error, setError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [localCategories, setLocalCategories] = useState<AICollection[]>(categories)
-  const supabase = createClientComponentClient({
-    options: {
-      auth: {
-        flowType: 'pkce',
-        detectSessionInUrl: false,
-        cookieOptions: {
-          domain: '.thepersuasionacademy.com' // Maintain parent domain
-        }
-      }
-    }
-  })
+  const supabase = createClientComponentClient()
   const router = useRouter()
 
   useEffect(() => {
@@ -104,28 +95,41 @@ export default function CategorySidebar({
   }
 
   return (
-    <div className="w-64 border-r border-[var(--border-color)] p-4">
-      <h2 className="text-[var(--foreground)] font-bold text-lg mb-4">Categories</h2>
-      
-      <div className="mb-4 space-y-2">
+    <div className="w-64 border-r border-[var(--border-color)] p-6">
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-[var(--foreground)]">Categories</h2>
+        
         {!hideCreationControls && (
-          <>
+          <div className="space-y-4">
             {!isCreatingCategory ? (
               <button
                 onClick={() => setIsCreatingCategory(true)}
-                className="w-full flex items-center justify-center px-4 py-2 bg-[var(--hover-bg)] hover:bg-[var(--hover-bg)] rounded-lg text-[var(--text-secondary)] transition-colors duration-200 gap-2"
+                className={cn(
+                  "w-full flex items-center justify-center px-4 py-3",
+                  "bg-[var(--accent)] text-white",
+                  "rounded-xl hover:opacity-90",
+                  "transition-all duration-200 gap-2",
+                  "font-semibold"
+                )}
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-5 w-5" />
                 New Category
               </button>
             ) : (
-              <form onSubmit={handleCreateCategory} className="space-y-2">
+              <form onSubmit={handleCreateCategory} className="space-y-3">
                 <input
                   type="text"
                   value={newCategoryName}
                   onChange={(e) => setNewCategoryName(e.target.value)}
                   placeholder="Category name"
-                  className="w-full px-4 py-2 bg-[var(--hover-bg)] rounded-lg text-[var(--foreground)] border border-[var(--border-color)] focus:outline-none focus:border-[var(--accent)]"
+                  className={cn(
+                    "w-full bg-transparent text-lg py-3 px-4",
+                    "border border-[var(--border-color)]",
+                    "focus:border-[var(--accent)]",
+                    "text-[var(--foreground)]",
+                    "rounded-xl",
+                    "focus:outline-none transition-colors"
+                  )}
                   disabled={isSubmitting}
                   autoFocus
                 />
@@ -133,7 +137,14 @@ export default function CategorySidebar({
                   <button
                     type="submit"
                     disabled={isSubmitting || !newCategoryName.trim()}
-                    className="flex-1 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent)] disabled:opacity-50 rounded-lg text-white transition-colors duration-200 text-sm"
+                    className={cn(
+                      "flex-1 px-4 py-2",
+                      "bg-[var(--accent)] text-white",
+                      "rounded-xl",
+                      "hover:opacity-90 disabled:opacity-50",
+                      "transition-all duration-200",
+                      "font-semibold"
+                    )}
                   >
                     {isSubmitting ? 'Creating...' : 'Create'}
                   </button>
@@ -144,14 +155,22 @@ export default function CategorySidebar({
                       setNewCategoryName('')
                       setError('')
                     }}
-                    className="flex-1 px-4 py-2 bg-[var(--hover-bg)] hover:bg-[var(--hover-bg)] rounded-lg text-[var(--text-secondary)] transition-colors duration-200 text-sm"
+                    className={cn(
+                      "flex-1 px-4 py-2",
+                      "border border-[var(--border-color)]",
+                      "text-[var(--text-secondary)]",
+                      "rounded-xl",
+                      "hover:border-[var(--accent)] hover:text-[var(--foreground)]",
+                      "transition-all duration-200",
+                      "font-semibold"
+                    )}
                   >
                     Cancel
                   </button>
                 </div>
               </form>
             )}
-          </>
+          </div>
         )}
 
         {error && (
@@ -159,25 +178,38 @@ export default function CategorySidebar({
             {error}
           </div>
         )}
-      </div>
-      
-      {isLoadingCategories ? (
-        <div className="text-[var(--text-secondary)] p-2">Loading categories...</div>
-      ) : (
-        localCategories.map((category) => (
-          <div
-            key={category.id}
-            className={`mb-2 p-2 rounded-lg cursor-pointer transition-colors duration-200 ${
-              selectedCategory === category.title 
-                ? 'bg-[var(--accent)] text-white' 
-                : 'text-[var(--text-secondary)] hover:bg-[var(--hover-bg)]'
-            }`}
-            onClick={() => onSelectCategory(category.title || '')}
-          >
-            {category.title}
+
+        {isLoadingCategories ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="h-12 bg-[var(--hover-bg)] rounded-xl animate-pulse"
+              />
+            ))}
           </div>
-        ))
-      )}
+        ) : (
+          <div className="space-y-2">
+            {localCategories.map((category) => (
+              <button
+                key={category.id}
+                onClick={() => onSelectCategory(category.title || '')}
+                className={cn(
+                  "w-full text-left px-6 py-3 rounded-xl",
+                  "transition-all duration-200",
+                  "font-semibold",
+                  "border",
+                  selectedCategory === category.title
+                    ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                    : "text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--hover-bg)] hover:border-[var(--accent)] border-transparent"
+                )}
+              >
+                {category.title}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
