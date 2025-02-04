@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import * as React from 'react';
 import { Mail, User, ChevronLeft, ChevronRight } from 'lucide-react';
 import { UserGrid } from './components/user-grid';
 import { cn } from "@/lib/utils";
@@ -8,14 +8,14 @@ import type { User as UserType } from './components/types';
 
 export default function AdminUsersPage() {
   // Search states
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [emailQuery, setEmailQuery] = useState('');
-  const [nameQuery, setNameQuery] = useState('');
-  const [users, setUsers] = useState<UserType[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<UserType | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
+  const [emailQuery, setEmailQuery] = React.useState('');
+  const [nameQuery, setNameQuery] = React.useState('');
+  const [users, setUsers] = React.useState<UserType[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [selectedUser, setSelectedUser] = React.useState<UserType | null>(null);
 
-  const searchUsers = async (type: 'email' | 'name', value: string) => {
+  const searchUsers = React.useCallback(async (type: 'email' | 'name', value: string) => {
     if (value.length < 3) return;
 
     setIsLoading(true);
@@ -43,9 +43,9 @@ export default function AdminUsersPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const handleSearch = (type: 'email' | 'name', value: string) => {
+  const handleSearch = React.useCallback((type: 'email' | 'name', value: string) => {
     if (type === 'email') {
       setEmailQuery(value);
     } else {
@@ -63,18 +63,19 @@ export default function AdminUsersPage() {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  };
+  }, [emailQuery, nameQuery, searchUsers]);
 
-  const handleUserSelect = (user: UserType) => {
+  const handleUserSelect = React.useCallback((user: UserType) => {
     setSelectedUser(user);
     // Close sidebar on mobile
     if (window.innerWidth < 1024) {
       setIsSidebarOpen(false);
     }
-  };
+  }, []);
 
   return (
     <div className="h-screen flex bg-[var(--background)] relative overflow-hidden">
+      {/* Rest of your JSX remains exactly the same */}
       {/* Collapsible Sidebar */}
       <div className={cn(
         "fixed inset-y-0 left-0 z-50",
@@ -165,7 +166,7 @@ export default function AdminUsersPage() {
           <span className="text-sm">Search</span>
         </button>
       )}
-
+      
       {/* Main Content - Dashboard */}
       <div className={cn(
         "flex-1 transition-all duration-300 overflow-auto",
@@ -198,4 +199,4 @@ export default function AdminUsersPage() {
       </div>
     </div>
   );
-}
+} 

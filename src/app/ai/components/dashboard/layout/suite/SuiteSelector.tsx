@@ -104,7 +104,7 @@ export default function SuiteSelector({
         <div className="space-y-6">
           {/* Header and Suites */}
           <div className="flex items-center gap-4">
-            <h2 className="text-2xl font-bold text-[var(--foreground)]">AI Suites</h2>
+            <h2 className="text-2xl font-bold text-[var(--foreground)]">Suites</h2>
             
             <div className="flex items-center gap-2">
               {isLoadingSuites ? (
