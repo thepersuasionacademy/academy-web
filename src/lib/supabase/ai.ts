@@ -17,12 +17,11 @@ export interface AISuite {
 
 export interface AITool {
   id: string;
-  suite_id: string | null;
   title: string | null;
   description: string | null;
   credits_cost: number;
-  created_at: string;
-  updated_at: string;
+  collection_title?: string | null;
+  suite_title?: string | null;
 }
 
 export interface AIInput {
@@ -93,9 +92,9 @@ export async function getAITools(suiteId: string) {
 export async function getAITool(toolId: string) {
   const supabase = createClientComponentClient();
   
-  // Fetch the tool
+  // Fetch the tool with collection and suite titles
   const { data: tools, error: toolError } = await supabase
-    .rpc('get_tool_by_id', { tool_id: toolId });
+    .rpc('get_tool_with_names', { p_tool_id: toolId });
 
   if (toolError) {
     console.error('Error fetching AI tool:', toolError);
@@ -106,7 +105,8 @@ export async function getAITool(toolId: string) {
     throw new Error('Tool not found');
   }
 
-  const tool = tools[0];
+  // The returned data already matches our interface - no need to remap
+  const tool: AITool = tools[0];
 
   // Fetch the inputs
   const { data: inputs, error: inputsError } = await supabase

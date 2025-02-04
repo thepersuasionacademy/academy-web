@@ -10,18 +10,39 @@ import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownComponents } from './output/MarkdownStyles';
 import GridLoader from './GridLoader';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+interface CreditBalance {
+  total: number;
+  subscription_credits: number;
+  additional_credits: number;
+}
+
+interface ToolRun {
+  user_id?: string | null;
+  collection_name?: string | null;  // Matches database column
+  suite_name?: string | null;       // Matches database column
+  tool_name?: string | null;
+  credits_before: number;
+  credits_cost: number;
+  credits_after: number;
+  ai_response?: string | null;
+}
 
 interface GenerateSectionProps {
   tool: AITool | null;
   inputs: AIInput[];
   prompts: AIPrompt[];
   isLoading: boolean;
+  credits: CreditBalance;
+  isLoadingCredits: boolean;
+  onCreditsUpdated?: () => void;  // Add callback prop
 }
 
 const MAX_RETRIES = 2;
 const TIMEOUT_MS = 58000; // 58 seconds (slightly less than Vercel's 60s to account for network latency)
 
-export default function GenerateSection({ tool, inputs, prompts, isLoading }: GenerateSectionProps) {
+export default function GenerateSection({ tool, inputs, prompts, isLoading, credits, isLoadingCredits, onCreditsUpdated }: GenerateSectionProps) {
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
@@ -29,6 +50,8 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
   const [fullResponse, setFullResponse] = useState<string>('');
   const [retryCount, setRetryCount] = useState(0);
   const { theme } = useTheme();
+
+  const hasEnoughCredits = tool && credits.total >= tool.credits_cost;
 
   useEffect(() => {
     if (fullResponse && isGenerating) {
@@ -46,6 +69,18 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
       return () => clearInterval(interval);
     }
   }, [fullResponse, isGenerating]);
+
+  useEffect(() => {
+    // Debug log when tool is loaded
+    if (tool) {
+      console.log('Tool data loaded:', {
+        id: tool.id,
+        title: tool.title,
+        collection_title: tool.collection_title,
+        suite_title: tool.suite_title
+      });
+    }
+  }, [tool]);
 
   const handleInputChange = (field: string, value: string) => {
     setInputValues(prev => ({ ...prev, [field]: value }));
@@ -78,6 +113,69 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
     }
   };
 
+  const logToolRun = async (toolRun: ToolRun) => {
+    try {
+      const supabase = createClientComponentClient();
+      
+      // Get the current user's session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session?.user) {
+        console.error('No authenticated user found');
+        return;
+      }
+
+      // Debug log before insert
+      console.log('Tool run data:', {
+        collection_name: toolRun.collection_name,
+        suite_name: toolRun.suite_name,
+        tool_name: toolRun.tool_name
+      });
+
+      const insertData = {
+        user_id: session.user.id,
+        collection_name: toolRun.collection_name,
+        suite_name: toolRun.suite_name,
+        tool_name: toolRun.tool_name,
+        credits_before: toolRun.credits_before,
+        credits_cost: toolRun.credits_cost,
+        credits_after: toolRun.credits_after,
+        ai_response: toolRun.ai_response
+      };
+
+      // Debug log the actual data being inserted
+      console.log('Final insert data:', insertData);
+
+      // Use RPC function to insert through public schema
+      const { data: toolRunData, error: toolRunError } = await supabase
+        .rpc('log_tool_run', insertData);
+
+      if (toolRunError) {
+        console.error('Error logging tool run:', toolRunError);
+        return;
+      }
+
+      console.log('Successfully inserted tool run:', toolRunData);
+
+      // Deduct credits from user balance
+      const { data: balanceData, error: balanceError } = await supabase
+        .rpc('deduct_user_credits', {
+          p_user_id: session.user.id,
+          p_credits_cost: toolRun.credits_cost
+        });
+
+      if (balanceError) {
+        console.error('Error deducting credits:', balanceError);
+      } else {
+        console.log('Successfully deducted credits:', balanceData);
+        // Trigger credits refresh after successful deduction
+        onCreditsUpdated?.();
+      }
+    } catch (err) {
+      console.error('Unexpected error logging tool run:', err);
+    }
+  };
+
   const handleGenerate = async () => {
     if (!tool || isGenerating) return;
 
@@ -95,6 +193,9 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
       if (missingInputs.length > 0) {
         throw new Error(`Missing required inputs: ${missingInputs.join(', ')}`);
       }
+
+      // Store initial credit amount for logging
+      const creditsBefore = credits.total;
 
       // Prepare the prompts with input values
       const preparedPrompts = prompts.map(prompt => ({
@@ -151,6 +252,23 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
         setOutput(data.output);
         setRetryCount(0); // Reset retry count on success
 
+        // Log the tool run after successful response
+        console.log('Tool data before logging:', {
+          collection_title: tool.collection_title,
+          suite_title: tool.suite_title,
+          title: tool.title
+        });
+
+        await logToolRun({
+          collection_name: tool.collection_title || null,
+          suite_name: tool.suite_title || null,
+          tool_name: tool.title || null,
+          credits_before: creditsBefore,
+          credits_cost: tool.credits_cost,
+          credits_after: creditsBefore - tool.credits_cost,
+          ai_response: data.output
+        });
+
       } catch (fetchError: unknown) {
         if (fetchError instanceof Error && fetchError.message === 'RETRY_NEEDED') {
           // Retry the request
@@ -179,6 +297,18 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
       
       setFullResponse(`Error: ${errorMessage}`);
       setOutput(`Error: ${errorMessage}`);
+
+      // Log the failed tool run
+      await logToolRun({
+        collection_name: tool.collection_title || null,
+        suite_name: tool.suite_title || null,
+        tool_name: tool.title || null,
+        credits_before: credits.total,
+        credits_cost: tool.credits_cost,
+        credits_after: credits.total - tool.credits_cost,
+        ai_response: `Error: ${errorMessage}`
+      });
+
       setIsGenerating(false);
       setRetryCount(0); // Reset retry count on final error
     }
@@ -188,7 +318,7 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
     return template.replace(/\{\{(\w+)\}\}/g, (match, key) => values[key] || match);
   };
 
-  if (!tool || isLoading) {
+  if (!tool || isLoading || isLoadingCredits) {
     return (
       <div className="flex justify-center">
         <div className="max-w-3xl w-full px-4 py-18">
@@ -222,6 +352,14 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
       <div className="flex justify-center">
         <div className="max-w-3xl w-full px-4 pb-16 relative">
           <div className="mb-8">
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-2">
+                <span>{tool.collection_title === null ? '' : tool.collection_title || ''}</span>
+                <ArrowRight className="w-4 h-4" />
+                <span>{tool.suite_title === null ? '' : tool.suite_title || ''}</span>
+              </div>
+              <div className="h-px bg-[var(--border-color)] w-full mb-4" />
+            </div>
             <h2 className="text-4xl text-[var(--foreground)] mb-3">
               {tool.title}
             </h2>
@@ -297,6 +435,23 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
   return (
     <div className="flex justify-center">
       <div className="max-w-3xl w-full px-4 py-18">
+        {!hasEnoughCredits && (
+          <div className="mb-8 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-red-700 dark:text-red-400">
+              You don&apos;t have enough credits to use this tool. This tool requires {tool.credits_cost} credits, but you only have {credits.total} credits available.
+            </p>
+          </div>
+        )}
+
+        <div className="flex flex-col">
+          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-2">
+            <span>{tool.collection_title === null ? '' : tool.collection_title || ''}</span>
+            <ArrowRight className="w-4 h-4" />
+            <span>{tool.suite_title === null ? '' : tool.suite_title || ''}</span>
+          </div>
+          <div className="h-px bg-[var(--border-color)] w-full mb-4" />
+        </div>
+
         <ToolHeader tool={tool} isLoading={isLoading} />
         
         <div className="space-y-12 mb-16">
@@ -329,16 +484,20 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading }: Ge
         <div className="flex flex-col items-center w-full mb-20">
           <button
             onClick={handleGenerate}
-            disabled={isGenerating || Object.keys(inputValues).length === 0}
+            disabled={isGenerating || Object.keys(inputValues).length === 0 || !hasEnoughCredits}
             data-generate-button
             className={`text-xl font-bold rounded-xl transition-all duration-200 w-full py-6
-              ${(!isGenerating && Object.keys(inputValues).length > 0)
+              ${(!isGenerating && Object.keys(inputValues).length > 0 && hasEnoughCredits)
                 ? 'bg-[var(--accent)] text-white hover:bg-[var(--accent)]/90'
                 : theme === 'dark'
                   ? 'bg-gray-800 text-gray-500'
                   : 'bg-gray-200 text-gray-400'}`}
           >
-            {isGenerating ? 'Generating...' : `Generate for ${tool.credits_cost} Credits`}
+            {isGenerating 
+              ? 'Generating...' 
+              : !hasEnoughCredits
+                ? `Insufficient Credits (${credits.total}/${tool.credits_cost})`
+                : `Generate for ${tool.credits_cost} Credits`}
           </button>
         </div>
       </div>
