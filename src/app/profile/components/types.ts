@@ -28,7 +28,12 @@ export interface PaymentItem {
     amount: number;
     status: 'paid' | 'pending' | 'failed';
     receipt: string;
-    paymentType: 'subscription' | 'one-time';
+    paymentType: 'one-time' | 'subscription' | 'payment-plan';
     nextBillingDate?: string;
     billingCycle?: 'monthly' | 'yearly';
+    installments?: {
+        completed: number;
+        total: number;
+        nextPaymentDate: string;
+    };
 }
