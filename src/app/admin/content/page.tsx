@@ -140,13 +140,13 @@ export default function ContentPage() {
               </Link>
               <h1 className="text-2xl font-semibold text-[var(--foreground)]">Content</h1>
             </div>
-            <button 
-              onClick={() => setIsNewContentOpen(true)}
+            <Link 
+              href="/admin/content/new"
               className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
               <span>New Content</span>
-            </button>
+            </Link>
           </div>
         </div>
       </div>

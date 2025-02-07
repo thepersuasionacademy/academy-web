@@ -25,7 +25,8 @@ import {
   Search,
   Check,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronRight
 } from 'lucide-react';
 import { marked } from 'marked';
 import { cn } from "@/lib/utils";
@@ -38,7 +39,9 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragEndEvent
+  DragEndEvent,
+  MeasuringStrategy,
+  defaultDropAnimationSideEffects
 } from '@dnd-kit/core';
 import {
   arrayMove,
@@ -69,6 +72,218 @@ interface ModuleMedia {
 interface Collection {
   id: string;
   name: string;
+}
+
+interface SortableMediaItemProps {
+  media: ModuleMedia;
+  mediaIndex: number;
+  selectedModule: Module;
+  updateModule: (moduleId: string, updates: Partial<Module>) => void;
+}
+
+function SortableMediaItem({ media, mediaIndex, selectedModule, updateModule }: SortableMediaItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ 
+    id: media.id,
+    data: {
+      type: 'media',
+      media
+    }
+  });
+
+  const style = transform ? {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    ...(isDragging ? {
+      position: 'relative' as const,
+      zIndex: 50,
+    } : {})
+  } : undefined;
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "group/media bg-[var(--card-bg)] rounded-lg border border-[var(--border-color)]",
+        isDragging && "shadow-lg opacity-90"
+      )}
+    >
+      <div className="flex">
+        <div
+          {...attributes}
+          {...listeners}
+          className="w-6 flex-shrink-0 cursor-grab opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center justify-center border-r border-[var(--border-color)]"
+        >
+          <Grip className="w-4 h-4 text-[var(--text-secondary)]" />
+        </div>
+        <div className="flex-1">
+          <div className="p-6">
+            <div className="flex items-center gap-4">
+              <input
+                type="text"
+                value={media.title}
+                onChange={e => {
+                  const newModule = { ...selectedModule };
+                  newModule.media[mediaIndex].title = e.target.value;
+                  updateModule(selectedModule.id, newModule);
+                }}
+                className="flex-1 text-xl font-medium bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
+                placeholder="Media Title"
+              />
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => {
+                    const newModule = { ...selectedModule };
+                    newModule.media[mediaIndex].items.push({
+                      type: MediaType.VIDEO,
+                      title: 'New Item',
+                      order: newModule.media[mediaIndex].items.length
+                    });
+                    updateModule(selectedModule.id, newModule);
+                  }}
+                  className="p-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors opacity-0 group-hover/media:opacity-100"
+                >
+                  <Plus className="w-5 h-5 text-[var(--text-secondary)]" />
+                </button>
+                <button
+                  onClick={() => {
+                    const newModule = { ...selectedModule };
+                    newModule.media.splice(mediaIndex, 1);
+                    updateModule(selectedModule.id, newModule);
+                  }}
+                  className="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors opacity-0 group-hover/media:opacity-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {media.items.length > 0 && (
+            <div className="px-6 pb-6">
+              <div className="space-y-4">
+                {media.items.map((item, itemIndex) => (
+                  <MediaItemContainer
+                    key={itemIndex}
+                    item={item}
+                    onUpdate={(updates) => {
+                      const newModule = { ...selectedModule };
+                      newModule.media[mediaIndex].items[itemIndex] = {
+                        ...item,
+                        ...updates
+                      };
+                      updateModule(selectedModule.id, newModule);
+                    }}
+                    onRemove={() => {
+                      const newModule = { ...selectedModule };
+                      newModule.media[mediaIndex].items.splice(itemIndex, 1);
+                      updateModule(selectedModule.id, newModule);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SortableModuleItem({ 
+  module, 
+  isSelected, 
+  onSelect, 
+  onRemove,
+  updateModule 
+}: {
+  module: Module;
+  isSelected: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+  updateModule: (moduleId: string, updates: Partial<Module>) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ 
+    id: module.id,
+    data: {
+      type: 'module',
+      module
+    }
+  });
+
+  const style = transform ? {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    ...(isDragging ? {
+      position: 'relative' as const,
+      zIndex: 50,
+    } : {})
+  } : undefined;
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      onClick={onSelect}
+      className={cn(
+        "group w-full flex rounded-lg border transition-colors",
+        isSelected
+          ? "border-[var(--accent)] bg-[var(--accent)]/5"
+          : "border-[var(--border-color)] hover:border-[var(--accent)] bg-transparent",
+        isDragging && "shadow-lg opacity-90"
+      )}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className={cn(
+          "w-6 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center border-r",
+          isSelected ? "border-[var(--accent)]" : "border-[var(--border-color)]"
+        )}
+        onClick={e => e.stopPropagation()}
+      >
+        <Grip className="w-4 h-4 text-[var(--text-secondary)]" />
+      </div>
+      <div className="flex-1 flex items-center gap-4 p-4">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            value={module.title}
+            onChange={e => {
+              e.stopPropagation();
+              updateModule(module.id, { title: e.target.value });
+            }}
+            onClick={e => e.stopPropagation()}
+            className="w-full bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none text-xl font-medium"
+            placeholder="Module Title"
+          />
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+    </button>
+  );
 }
 
 export default function NewContentPage() {
@@ -234,35 +449,65 @@ export default function NewContentPage() {
     <div className="min-h-screen bg-[var(--background)]">
       {/* Header */}
       <div className="sticky top-0 z-10 border-b border-[var(--border-color)] bg-[var(--background)]/80 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
-              <Link 
-                href="/admin/content"
-                className="p-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors"
-              >
-                <ChevronLeft className="w-5 h-5 text-[var(--text-secondary)]" />
-              </Link>
-              <h1 className="text-2xl font-semibold text-[var(--foreground)]">New Content</h1>
+        <div className="flex items-center justify-between h-16 px-4">
+          <div className="flex items-center gap-2">
+            <Link 
+              href="/admin/content"
+              className="p-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-[var(--text-secondary)]" />
+            </Link>
+            <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+              <span>Admin</span>
+              <ChevronRight className="w-4 h-4" />
+              <span>Content</span>
+              <ChevronRight className="w-4 h-4" />
+              <span className="text-[var(--foreground)] font-medium">New Content</span>
             </div>
-            <div className="flex items-center gap-2">
-              <select
-                value={content.status}
-                onChange={e => setContent({ ...content, status: e.target.value as ContentStatus })}
-                className="px-3 py-1.5 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--text-secondary)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              >
-                <option value={ContentStatus.DRAFT}>Draft</option>
-                <option value={ContentStatus.PUBLISHED}>Published</option>
-                <option value={ContentStatus.ARCHIVED}>Archived</option>
-              </select>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center p-1 gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--background)]">
               <button
-                onClick={handleSubmit}
-                className="px-4 py-1.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2 text-sm font-medium"
+                onClick={() => setContent(prev => ({ ...prev, status: ContentStatus.DRAFT }))}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-[var(--foreground)]",
+                  content.status === ContentStatus.DRAFT
+                    ? "border-2 border-[var(--accent)]"
+                    : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
+                )}
               >
-                <Save className="w-4 h-4" />
-                Publish
+                Draft
+              </button>
+              <button
+                onClick={() => setContent(prev => ({ ...prev, status: ContentStatus.PUBLISHED }))}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-[var(--foreground)]",
+                  content.status === ContentStatus.PUBLISHED
+                    ? "border-2 border-[var(--accent)]"
+                    : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
+                )}
+              >
+                Published
+              </button>
+              <button
+                onClick={() => setContent(prev => ({ ...prev, status: ContentStatus.ARCHIVED }))}
+                className={cn(
+                  "px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-[var(--foreground)]",
+                  content.status === ContentStatus.ARCHIVED
+                    ? "border-2 border-[var(--accent)]"
+                    : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
+                )}
+              >
+                Archived
               </button>
             </div>
+            <button
+              onClick={() => handleSubmit()}
+              className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-opacity flex items-center gap-2 text-sm font-medium"
+            >
+              <Save className="w-4 h-4" />
+              Save
+            </button>
           </div>
         </div>
       </div>
@@ -277,15 +522,20 @@ export default function NewContentPage() {
                 type="text"
                 value={content.title}
                 onChange={e => setContent({ ...content, title: e.target.value })}
-                className="text-4xl font-bold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2 w-full mb-4"
+                className="text-4xl font-bold bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none w-full mb-4"
                 placeholder="Content Title"
               />
               <textarea
                 value={content.description}
                 onChange={e => setContent({ ...content, description: e.target.value })}
-                className="w-full text-xl text-[var(--text-secondary)] bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
+                className="w-full text-xl text-[var(--text-secondary)] bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none resize-none overflow-hidden"
                 placeholder="Content Description"
-                rows={3}
+                style={{ height: 'auto' }}
+                onInput={e => {
+                  const target = e.target as HTMLTextAreaElement;
+                  target.style.height = 'auto';
+                  target.style.height = target.scrollHeight + 'px';
+                }}
               />
             </div>
 
@@ -350,7 +600,24 @@ export default function NewContentPage() {
               <DndContext
                 sensors={sensors}
                 collisionDetection={closestCenter}
-                onDragEnd={handleDragEnd}
+                measuring={{
+                  droppable: {
+                    strategy: MeasuringStrategy.Always
+                  }
+                }}
+                onDragStart={() => {
+                  document.body.style.setProperty('cursor', 'grabbing');
+                }}
+                onDragEnd={(event) => {
+                  document.body.style.setProperty('cursor', '');
+                  const { active, over } = event;
+                  if (!over || active.id === over.id) return;
+
+                  const oldIndex = modules.findIndex(item => item.id === active.id);
+                  const newIndex = modules.findIndex(item => item.id === over.id);
+                  
+                  setModules(arrayMove(modules, oldIndex, newIndex));
+                }}
               >
                 <SortableContext
                   items={modules.map(module => module.id)}
@@ -358,52 +625,14 @@ export default function NewContentPage() {
                 >
                   <div className="space-y-3">
                     {modules.map((module) => (
-                      <button
+                      <SortableModuleItem
                         key={module.id}
-                        onClick={() => setSelectedModuleId(module.id)}
-                        className={cn(
-                          "group w-full flex rounded-lg border transition-colors",
-                          selectedModuleId === module.id
-                            ? "border-[var(--border-color)] bg-[var(--accent)]/5"
-                            : "border-[var(--border-color)] hover:border-[var(--accent)] hover:bg-[var(--accent)]/5 bg-[var(--card-bg)]"
-                        )}
-                      >
-                        <div className={cn(
-                          "w-16 cursor-grab flex items-center justify-center transition-colors rounded-l-lg border-r border-[var(--border-color)]",
-                          selectedModuleId === module.id
-                            ? "hover:bg-[var(--accent)]/10"
-                            : "hover:bg-[var(--hover-bg)]"
-                        )}>
-                          <Grip className="w-5 h-5 text-[var(--text-secondary)]" />
-                        </div>
-                        <div className="flex-1 flex items-center gap-4 p-4">
-                          <input
-                            type="text"
-                            value={module.title}
-                            onChange={e => {
-                              e.stopPropagation();
-                              updateModule(module.id, { title: e.target.value });
-                            }}
-                            onClick={e => e.stopPropagation()}
-                            className={cn(
-                              "flex-1 bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2 text-xl font-medium",
-                              selectedModuleId === module.id
-                                ? "text-[var(--foreground)]"
-                                : "text-[var(--foreground)]"
-                            )}
-                            placeholder="Module Title"
-                          />
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeModule(module.id);
-                            }}
-                            className="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <X className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </button>
+                        module={module}
+                        isSelected={selectedModuleId === module.id}
+                        onSelect={() => setSelectedModuleId(module.id)}
+                        onRemove={() => removeModule(module.id)}
+                        updateModule={updateModule}
+                      />
                     ))}
                   </div>
                 </SortableContext>
@@ -428,81 +657,45 @@ export default function NewContentPage() {
               </div>
 
               <div className="space-y-6">
-                {selectedModule.media.map((media, mediaIndex) => (
-                  <div
-                    key={media.id}
-                    className="group/media bg-[var(--card-bg)] rounded-lg border border-[var(--border-color)]"
-                  >
-                    <div className="p-6 flex items-center gap-4">
-                      <div className="p-2 cursor-grab opacity-0 group-hover/media:opacity-100 transition-opacity">
-                        <Grip className="w-5 h-5 text-[var(--text-secondary)]" />
-                      </div>
-                      <input
-                        type="text"
-                        value={media.title}
-                        onChange={e => {
-                          const newModule = { ...selectedModule };
-                          newModule.media[mediaIndex].title = e.target.value;
-                          updateModule(selectedModule.id, newModule);
-                        }}
-                        className="flex-1 text-xl font-medium bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
-                        placeholder="Media Title"
-                      />
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => {
-                            const newModule = { ...selectedModule };
-                            newModule.media[mediaIndex].items.push({
-                              type: MediaType.VIDEO,
-                              title: 'New Item',
-                              order: newModule.media[mediaIndex].items.length
-                            });
-                            updateModule(selectedModule.id, newModule);
-                          }}
-                          className="p-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors opacity-0 group-hover/media:opacity-100"
-                        >
-                          <Plus className="w-5 h-5 text-[var(--text-secondary)]" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            const newModule = { ...selectedModule };
-                            newModule.media.splice(mediaIndex, 1);
-                            updateModule(selectedModule.id, newModule);
-                          }}
-                          className="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors opacity-0 group-hover/media:opacity-100"
-                        >
-                          <X className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  measuring={{
+                    droppable: {
+                      strategy: MeasuringStrategy.Always
+                    }
+                  }}
+                  onDragStart={() => {
+                    document.body.style.setProperty('cursor', 'grabbing');
+                  }}
+                  onDragEnd={(event) => {
+                    document.body.style.setProperty('cursor', '');
+                    const { active, over } = event;
+                    if (!over || active.id === over.id) return;
 
-                    {media.items.length > 0 && (
-                      <div className="px-6 pb-6">
-                        <div className="space-y-4">
-                          {media.items.map((item, itemIndex) => (
-                            <MediaItemContainer
-                              key={itemIndex}
-                              item={item}
-                              onUpdate={(updates) => {
-                                const newModule = { ...selectedModule };
-                                newModule.media[mediaIndex].items[itemIndex] = {
-                                  ...item,
-                                  ...updates
-                                };
-                                updateModule(selectedModule.id, newModule);
-                              }}
-                              onRemove={() => {
-                                const newModule = { ...selectedModule };
-                                newModule.media[mediaIndex].items.splice(itemIndex, 1);
-                                updateModule(selectedModule.id, newModule);
-                              }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    const oldIndex = selectedModule.media.findIndex(m => m.id === active.id);
+                    const newIndex = selectedModule.media.findIndex(m => m.id === over.id);
+                    
+                    const newModule = { ...selectedModule };
+                    newModule.media = arrayMove(newModule.media, oldIndex, newIndex);
+                    updateModule(selectedModule.id, newModule);
+                  }}
+                >
+                  <SortableContext
+                    items={selectedModule.media.map(m => m.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {selectedModule.media.map((media, mediaIndex) => (
+                      <SortableMediaItem
+                        key={media.id}
+                        media={media}
+                        mediaIndex={mediaIndex}
+                        selectedModule={selectedModule}
+                        updateModule={updateModule}
+                      />
+                    ))}
+                  </SortableContext>
+                </DndContext>
               </div>
             </div>
           ) : (

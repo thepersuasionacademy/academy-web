@@ -538,7 +538,7 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
               type="text"
               value={content.title}
               onChange={e => setContent({ ...content, title: e.target.value })}
-              className="text-3xl md:text-2xl font-bold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
+              className="text-3xl md:text-2xl font-bold bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 focus:border-0 border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none"
               placeholder="Content Title"
             />
             <div className="flex items-center gap-2">
@@ -550,12 +550,12 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
               </button>
             </div>
           </div>
-          <textarea
+          <input
+            type="text"
             value={content.description}
             onChange={e => setContent({ ...content, description: e.target.value })}
-            className="w-full text-base md:text-sm text-[var(--text-secondary)] bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
+            className="w-full text-base md:text-sm text-[var(--text-secondary)] bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 focus:border-0 border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none"
             placeholder="Content Description"
-            rows={2}
           />
           <div className="flex flex-col gap-4 mt-4">
             <div className="flex items-center gap-4">
