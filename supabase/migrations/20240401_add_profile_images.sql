@@ -147,8 +147,8 @@ USING (bucket_id = 'profile-images');
 -- Create the new function with updated return type
 CREATE OR REPLACE FUNCTION public.get_user_names(p_user_id uuid)
 RETURNS TABLE (
-  first_name text,
-  last_name text,
+  first_name varchar(255),
+  last_name varchar(255),
   email varchar(255),
   profile_image_url text
 )
@@ -159,8 +159,8 @@ AS $$
 BEGIN
   RETURN QUERY
   SELECT 
-    COALESCE(up.first_name, 'Add your name') as first_name,
-    COALESCE(up.last_name, '') as last_name,
+    COALESCE(up.first_name, 'Add your name'::varchar(255)) as first_name,
+    COALESCE(up.last_name, ''::varchar(255)) as last_name,
     up.email,
     up.profile_image_url
   FROM public.user_profiles up

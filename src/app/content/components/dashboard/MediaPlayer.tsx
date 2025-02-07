@@ -29,7 +29,7 @@ export const MediaPlayer = ({
   // Get library ID from environment variable
   const libraryId = process.env.NEXT_PUBLIC_BUNNY_LIBRARY_ID || '376351';
   const playerUrl = videoId ? 
-    `https://iframe.mediadelivery.net/embed/376351/${videoId}?autoplay=true` : 
+    `https://iframe.mediadelivery.net/embed/376351/${videoId}?autoplay=false` : 
     null;
 
   console.log('Video Player URL:', playerUrl);

@@ -4,42 +4,49 @@ import { cookies } from 'next/headers'
 
 export async function GET(request: Request) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
+    const cookieStore = cookies()
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+
     const selectedCategory = request.headers.get('x-selected-category')
-    
     if (!selectedCategory) {
-      return NextResponse.json(
-        { error: 'Category is required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'No category selected' }, { status: 400 })
     }
 
-    // First get the collection ID from the title
+    // Get the collection ID for the selected category
     const { data: collection, error: collectionError } = await supabase
       .from('ai.collections')
       .select('id')
       .eq('title', selectedCategory)
       .single()
 
-    if (collectionError) throw collectionError
-    if (!collection) {
+    if (collectionError || !collection) {
+      console.error('Error fetching collection:', collectionError)
       return NextResponse.json(
         { error: 'Category not found' },
         { status: 404 }
       )
     }
 
-    // Get suites for this collection
-    const { data: suites, error } = await supabase
-      .rpc('get_suites_by_collection', { collection_id: collection.id })
+    // Get all suites for the collection
+    const { data: suites, error: suitesError } = await supabase
+      .from('ai.suites')
+      .select('id, title')
+      .eq('collection_id', collection.id)
+      .order('title')
 
-    if (error) throw error
+    if (suitesError) {
+      console.error('Error fetching suites:', suitesError)
+      return NextResponse.json(
+        { error: 'Failed to fetch suites' },
+        { status: 500 }
+      )
+    }
 
-    return NextResponse.json({ suites })
+    return NextResponse.json(suites)
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Unexpected error:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch suites' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

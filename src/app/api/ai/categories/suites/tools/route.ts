@@ -7,6 +7,8 @@ import {
     UpdateCommand,
     DeleteCommand
 } from '@aws-sdk/lib-dynamodb'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
 
 const client = new DynamoDBClient({
     region: process.env.AWS_REGION || 'us-east-1',
@@ -27,74 +29,51 @@ function formatToolId(toolId: string): string {
 
 export async function GET(request: Request) {
     try {
-        if (!process.env.DYNAMODB_TABLE_NAME) {
-            throw new Error('DYNAMODB_TABLE_NAME environment variable is not set')
+        const cookieStore = cookies()
+        const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+
+        const selectedSuite = request.headers.get('x-selected-suite')
+        if (!selectedSuite) {
+            return NextResponse.json({ error: 'No suite selected' }, { status: 400 })
         }
 
-        const selectedCategory = request.headers.get('x-selected-category')
-        const selectedSuite = request.headers.get('x-selected-suite')?.toLowerCase()
+        // Get the suite ID for the selected suite
+        const { data: suite, error: suiteError } = await supabase
+            .from('ai.suites')
+            .select('id')
+            .eq('title', selectedSuite)
+            .single()
 
-        if (!selectedCategory || !selectedSuite) {
-            return NextResponse.json({ 
-                error: 'Category and suite are required',
-                details: 'Both category and suite must be specified in headers'
-            }, { status: 400 })
+        if (suiteError || !suite) {
+            console.error('Error fetching suite:', suiteError)
+            return NextResponse.json(
+                { error: 'Suite not found' },
+                { status: 404 }
+            )
         }
 
-        console.log('Headers received:', { selectedCategory, selectedSuite })
+        // Get all tools for the suite
+        const { data: tools, error: toolsError } = await supabase
+            .from('ai.tools')
+            .select('id, title, description, credits_cost')
+            .eq('suite_id', suite.id)
+            .order('title')
 
-        const queryParams = {
-            TableName: process.env.DYNAMODB_TABLE_NAME,
-            KeyConditionExpression: 'PK = :pk AND begins_with(SK, :sk)',
-            ExpressionAttributeValues: {
-                ':pk': `AI#CATEGORY#${selectedCategory}`,
-                ':sk': `SUITE#${selectedSuite}#TOOL#`
-            }
+        if (toolsError) {
+            console.error('Error fetching tools:', toolsError)
+            return NextResponse.json(
+                { error: 'Failed to fetch tools' },
+                { status: 500 }
+            )
         }
 
-        console.log('DynamoDB Query:', {
-            TableName: process.env.DYNAMODB_TABLE_NAME,
-            PK: `AI#CATEGORY#${selectedCategory}`,
-            SK_prefix: `SUITE#${selectedSuite}#TOOL#`
-        })
-
-        const result = await docClient.send(new QueryCommand(queryParams))
-        console.log('DynamoDB result:', JSON.stringify(result, null, 2))
-
-        if (!result.Items || result.Items.length === 0) {
-            return NextResponse.json({ 
-                tools: [],
-                debug: {
-                    category: selectedCategory,
-                    suite: selectedSuite,
-                    query: queryParams
-                }
-            })
-        }
-
-        const tools = result.Items.map(item => ({
-            PK: item.PK,
-            SK: item.SK,
-            name: item.name,
-            description: item.description,
-            creditCost: item.creditCost,
-            promptTemplate: item.promptTemplate,
-            inputField1: item.inputField1,
-            inputField1Description: item.inputField1Description,
-            inputField2: item.inputField2 || undefined,
-            inputField2Description: item.inputField2Description || undefined,
-            inputField3: item.inputField3 || undefined,
-            inputField3Description: item.inputField3Description || undefined
-        }))
-
-        return NextResponse.json({ tools })
+        return NextResponse.json(tools)
     } catch (error) {
-        console.error('Error fetching tools:', error)
-        const errorMessage = error instanceof Error ? error.message : 'Failed to fetch tools'
-        return NextResponse.json({ 
-            error: errorMessage,
-            stack: error instanceof Error ? error.stack : undefined
-        }, { status: 500 })
+        console.error('Unexpected error:', error)
+        return NextResponse.json(
+            { error: 'Internal server error' },
+            { status: 500 }
+        )
     }
 }
 
