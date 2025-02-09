@@ -2,7 +2,19 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Content, Media as DBMedia, MediaItem, MediaType, VideoNameType, PDFType, ContentStatus } from '@/types/course';
+import { PostgrestError } from '@supabase/postgrest-js';
+import { 
+  Content, 
+  ContentStatus,
+  MediaType,
+  Module,
+  Media,
+  VideoContent,
+  TextContent,
+  AIContent,
+  PDFContent,
+  QuizContent
+} from '@/types/course';
 import { 
   Play, 
   X,
@@ -17,7 +29,9 @@ import {
   FolderPlus,
   Bot,
   FileQuestion,
-  File
+  File,
+  Search,
+  Check
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import {
@@ -37,69 +51,43 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { Collection, CollectionInsert } from '@/types/content';
+import {
+  GetContentCollectionsParams,
+  GetContentCollectionsResult,
+  CreateContentCollectionParams,
+  CreateContentCollectionResult
+} from '@/types/rpc';
 
 interface NewContentClientProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-interface Module {
-  id: string;
-  title: string;
-  description: string;
-  media: ModuleMedia[];
-  isExpanded?: boolean;
-}
-
-interface ModuleMedia {
-  id: string;
-  title: string;
-  description: string;
-  items: Partial<MediaItem>[];
-  isExpanded?: boolean;
-}
-
-interface Collection {
-  id: string;
-  name: string;
+interface ModuleWithMedia extends Module {
+  media: (Media & {
+    video?: VideoContent;
+    text?: TextContent;
+    ai?: AIContent;
+    pdf?: PDFContent;
+    quiz?: QuizContent;
+  })[];
 }
 
 interface SortableMediaItemProps {
-  mediaItem: Partial<MediaItem>;
-  index: number;
-  editingMedia: number | null;
-  onEdit: (index: number) => void;
-  onRemove: (index: number) => void;
-  onUpdate: (index: number, updates: Partial<MediaItem>) => void;
-  totalItems: number;
+  media: Media & {
+    video?: VideoContent;
+    text?: TextContent;
+    ai?: AIContent;
+    pdf?: PDFContent;
+    quiz?: QuizContent;
+  };
+  mediaIndex: number;
+  selectedModule: ModuleWithMedia;
+  updateModule: (moduleId: string, updates: Partial<ModuleWithMedia>) => void;
 }
 
-const MediaTypeIcon = ({ type }: { type: MediaType }) => {
-  switch (type) {
-    case MediaType.VIDEO:
-      return <Video className="w-5 h-5 text-[var(--text-secondary)]" />;
-    case MediaType.TEXT:
-      return <FileText className="w-5 h-5 text-[var(--text-secondary)]" />;
-    case MediaType.AI:
-      return <Bot className="w-5 h-5 text-[var(--text-secondary)]" />;
-    case MediaType.PDF:
-      return <File className="w-5 h-5 text-[var(--text-secondary)]" />;
-    case MediaType.QUIZ:
-      return <FileQuestion className="w-5 h-5 text-[var(--text-secondary)]" />;
-    default:
-      return <FileText className="w-5 h-5 text-[var(--text-secondary)]" />;
-  }
-};
-
-function SortableMediaItem({ 
-  mediaItem, 
-  index, 
-  editingMedia,
-  onEdit,
-  onRemove,
-  onUpdate,
-  totalItems
-}: SortableMediaItemProps) {
+function SortableMediaItem({ media, mediaIndex, selectedModule, updateModule }: SortableMediaItemProps) {
   const {
     attributes,
     listeners,
@@ -107,196 +95,353 @@ function SortableMediaItem({
     transform,
     transition,
     isDragging
-  } = useSortable({ id: `media-${index}` });
+  } = useSortable({ 
+    id: media.id,
+    data: {
+      type: 'media',
+      media
+    }
+  });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
+  const style = transform ? {
+    transform: CSS.Translate.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1
+    ...(isDragging ? {
+      position: 'relative' as const,
+      zIndex: 50,
+    } : {})
+  } : undefined;
+
+  const getMediaType = () => {
+    if (media.video) return MediaType.VIDEO;
+    if (media.text) return MediaType.TEXT;
+    if (media.ai) return MediaType.AI;
+    if (media.pdf) return MediaType.PDF;
+    if (media.quiz) return MediaType.QUIZ;
+    return null;
+  };
+
+  const handleTypeChange = (type: MediaType) => {
+    const newModule = { ...selectedModule };
+    const newMedia = { ...newModule.media[mediaIndex] };
+    
+    // Clear all content types
+    delete newMedia.video;
+    delete newMedia.text;
+    delete newMedia.ai;
+    delete newMedia.pdf;
+    delete newMedia.quiz;
+
+    // Set the new type with default values
+    switch (type) {
+      case MediaType.VIDEO:
+        newMedia.video = {
+          id: crypto.randomUUID(),
+          media_id: newMedia.id,
+          content_id: selectedModule.content_id,
+          title: newMedia.title,
+          video_id: '',
+          order: mediaIndex,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        break;
+      case MediaType.TEXT:
+        newMedia.text = {
+          id: crypto.randomUUID(),
+          media_id: newMedia.id,
+          content_id: selectedModule.content_id,
+          title: newMedia.title,
+          content_text: '',
+          order: mediaIndex,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        break;
+      case MediaType.AI:
+        newMedia.ai = {
+          id: crypto.randomUUID(),
+          media_id: newMedia.id,
+          content_id: selectedModule.content_id,
+          title: newMedia.title,
+          tool_id: '',
+          order: mediaIndex,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        break;
+      case MediaType.PDF:
+        newMedia.pdf = {
+          id: crypto.randomUUID(),
+          media_id: newMedia.id,
+          content_id: selectedModule.content_id,
+          title: newMedia.title,
+          pdf_url: '',
+          order: mediaIndex,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        break;
+      case MediaType.QUIZ:
+        newMedia.quiz = {
+          id: crypto.randomUUID(),
+          media_id: newMedia.id,
+          content_id: selectedModule.content_id,
+          title: newMedia.title,
+          quiz_data: {},
+          order: mediaIndex,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        break;
+    }
+
+    newModule.media[mediaIndex] = newMedia;
+    updateModule(selectedModule.id, newModule);
   };
 
   return (
-    <div ref={setNodeRef} style={style}>
-      <div className="group border rounded-lg border-[var(--border-color)] bg-[var(--card-bg)]">
-        <div 
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "group/media bg-[var(--card-bg)] rounded-lg border border-[var(--border-color)]",
+        isDragging && "shadow-lg opacity-90"
+      )}
+    >
+      <div className="flex">
+        <div
           {...attributes}
           {...listeners}
-          className="flex w-full cursor-grab"
+          className="w-6 flex-shrink-0 cursor-grab opacity-0 group-hover/media:opacity-100 transition-opacity flex items-center justify-center border-r border-[var(--border-color)]"
         >
-          <div className="w-16 flex items-center justify-center hover:bg-[var(--hover-bg)] transition-colors rounded-l-lg border-r border-[var(--border-color)]">
-            <Grip className="w-4 h-4 text-[var(--text-secondary)]" />
-          </div>
-          <div className="flex-1">
-            <button
-              onClick={() => onEdit(index)}
-              className={cn(
-                "w-full flex items-center justify-between py-4 transition-colors duration-200 hover:bg-[var(--hover-bg)] px-3",
-                editingMedia === index && "bg-[var(--hover-bg)]"
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <MediaTypeIcon type={mediaItem.type as MediaType} />
-                {editingMedia === index ? (
-                  <input
-                    type="text"
-                    value={mediaItem.title}
-                    onChange={e => onUpdate(index, { title: e.target.value })}
-                    className="font-medium text-lg bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
-                    placeholder="Media Title"
-                    onClick={e => e.stopPropagation()}
-                  />
-                ) : (
-                  <span className="font-medium text-lg">
-                    {mediaItem.title || `Media ${index + 1}`}
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemove(index);
-                  }}
-                  className="p-1 rounded-lg hover:bg-red-500/10 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-                {editingMedia === index ? (
-                  <ChevronUp className="w-4 h-4 text-[var(--text-secondary)]" />
-                ) : (
-                  <ChevronDown className="w-4 h-4 text-[var(--text-secondary)]" />
-                )}
-              </div>
-            </button>
-          </div>
+          <Grip className="w-4 h-4 text-[var(--text-secondary)]" />
         </div>
+        <div className="flex-1">
+          <div className="p-6">
+            <div className="flex items-center gap-4">
+              <input
+                type="text"
+                value={media.title}
+                onChange={e => {
+                  const newModule = { ...selectedModule };
+                  newModule.media[mediaIndex].title = e.target.value;
+                  updateModule(selectedModule.id, newModule);
+                }}
+                className="flex-1 text-xl font-medium bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
+                placeholder="Media Title"
+              />
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => {
+                    const newModule = { ...selectedModule };
+                    newModule.media.splice(mediaIndex, 1);
+                    updateModule(selectedModule.id, newModule);
+                  }}
+                  className="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors opacity-0 group-hover/media:opacity-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
 
-        {/* Expanded Media Editor */}
-        {editingMedia === index && (
-          <div className="px-12 pb-4 space-y-4">
-            <div>
+          <div className="px-6 pb-6">
+            <div className="space-y-4">
               <select
-                value={mediaItem.type}
-                onChange={e => onUpdate(index, { 
-                  type: e.target.value as MediaType,
-                  // Reset type-specific fields
-                  video_id: undefined,
-                  video_name: undefined,
-                  content_text: undefined,
-                  tool_id: undefined,
-                  pdf_url: undefined,
-                  pdf_type: undefined,
-                  custom_pdf_type: undefined,
-                  quiz_data: undefined
-                })}
+                value={getMediaType() || ''}
+                onChange={e => handleTypeChange(e.target.value as MediaType)}
                 className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               >
+                <option value="">Select Type</option>
                 <option value={MediaType.VIDEO}>Video</option>
                 <option value={MediaType.TEXT}>Text</option>
                 <option value={MediaType.AI}>AI</option>
                 <option value={MediaType.PDF}>PDF</option>
                 <option value={MediaType.QUIZ}>Quiz</option>
               </select>
-            </div>
 
-            {mediaItem.type === MediaType.VIDEO && (
-              <>
+              {media.video && (
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    value={media.video.video_id}
+                    onChange={e => {
+                      const newModule = { ...selectedModule };
+                      if (newModule.media[mediaIndex].video) {
+                        newModule.media[mediaIndex].video!.video_id = e.target.value;
+                      }
+                      updateModule(selectedModule.id, newModule);
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    placeholder="Video ID"
+                  />
+                </div>
+              )}
+
+              {media.text && (
+                <textarea
+                  value={media.text.content_text}
+                  onChange={e => {
+                    const newModule = { ...selectedModule };
+                    if (newModule.media[mediaIndex].text) {
+                      newModule.media[mediaIndex].text!.content_text = e.target.value;
+                    }
+                    updateModule(selectedModule.id, newModule);
+                  }}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                  rows={4}
+                  placeholder="Text Content"
+                />
+              )}
+
+              {media.ai && (
                 <select
-                  value={mediaItem.video_name}
-                  onChange={e => onUpdate(index, { video_name: e.target.value as VideoNameType })}
+                  value={media.ai.tool_id}
+                  onChange={e => {
+                    const newModule = { ...selectedModule };
+                    if (newModule.media[mediaIndex].ai) {
+                      newModule.media[mediaIndex].ai!.tool_id = e.target.value;
+                    }
+                    updateModule(selectedModule.id, newModule);
+                  }}
                   className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                 >
-                  <option value={VideoNameType.VIDEO}>Video</option>
-                  <option value={VideoNameType.LESSON}>Lesson</option>
-                  <option value={VideoNameType.IMPRINTING_SESSION}>Imprinting Session</option>
+                  <option value="">Select AI Tool</option>
+                  {/* Add AI tools options here */}
                 </select>
+              )}
+
+              {media.pdf && (
                 <input
                   type="text"
-                  value={mediaItem.video_id}
-                  onChange={e => onUpdate(index, { video_id: e.target.value })}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                  placeholder="Video ID"
-                />
-              </>
-            )}
-
-            {mediaItem.type === MediaType.TEXT && (
-              <textarea
-                value={mediaItem.content_text}
-                onChange={e => onUpdate(index, { content_text: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                rows={4}
-                placeholder="Text Content"
-              />
-            )}
-
-            {mediaItem.type === MediaType.AI && (
-              <select
-                value={mediaItem.tool_id}
-                onChange={e => onUpdate(index, { tool_id: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-              >
-                <option value="">Select AI Tool</option>
-                {/* Add AI tools options here */}
-              </select>
-            )}
-
-            {mediaItem.type === MediaType.PDF && (
-              <>
-                <input
-                  type="text"
-                  value={mediaItem.pdf_url}
-                  onChange={e => onUpdate(index, { pdf_url: e.target.value })}
+                  value={media.pdf.pdf_url}
+                  onChange={e => {
+                    const newModule = { ...selectedModule };
+                    if (newModule.media[mediaIndex].pdf) {
+                      newModule.media[mediaIndex].pdf!.pdf_url = e.target.value;
+                    }
+                    updateModule(selectedModule.id, newModule);
+                  }}
                   className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   placeholder="PDF URL"
                 />
-                <select
-                  value={mediaItem.pdf_type}
-                  onChange={e => onUpdate(index, { 
-                    pdf_type: e.target.value as PDFType,
-                    custom_pdf_type: e.target.value === PDFType.CUSTOM ? mediaItem.custom_pdf_type : undefined
-                  })}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                >
-                  <option value={PDFType.TRANSCRIPT}>Transcript</option>
-                  <option value={PDFType.NOTES}>Notes</option>
-                  <option value={PDFType.CUSTOM}>Custom</option>
-                </select>
-                {mediaItem.pdf_type === PDFType.CUSTOM && (
-                  <input
-                    type="text"
-                    value={mediaItem.custom_pdf_type}
-                    onChange={e => onUpdate(index, { custom_pdf_type: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                    placeholder="Custom PDF Type"
-                  />
-                )}
-              </>
-            )}
+              )}
 
-            {mediaItem.type === MediaType.QUIZ && (
-              <textarea
-                value={mediaItem.quiz_data ? JSON.stringify(mediaItem.quiz_data, null, 2) : ''}
-                onChange={e => {
-                  try {
-                    const quizData = JSON.parse(e.target.value);
-                    onUpdate(index, { quiz_data: quizData });
-                  } catch (error) {
-                    // Handle invalid JSON
-                  }
-                }}
-                className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                rows={4}
-                placeholder="Quiz Data (JSON)"
-              />
-            )}
+              {media.quiz && (
+                <textarea
+                  value={JSON.stringify(media.quiz.quiz_data, null, 2)}
+                  onChange={e => {
+                    try {
+                      const quizData = JSON.parse(e.target.value);
+                      const newModule = { ...selectedModule };
+                      if (newModule.media[mediaIndex].quiz) {
+                        newModule.media[mediaIndex].quiz!.quiz_data = quizData;
+                      }
+                      updateModule(selectedModule.id, newModule);
+                    } catch (error) {
+                      // Handle invalid JSON
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                  rows={4}
+                  placeholder="Quiz Data (JSON)"
+                />
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </div>
-      {index < totalItems - 1 && (
-        <div className="h-px bg-[var(--border-color)]" />
-      )}
     </div>
+  );
+}
+
+function SortableModuleItem({ 
+  module, 
+  isSelected, 
+  onSelect, 
+  onRemove,
+  updateModule 
+}: {
+  module: ModuleWithMedia;
+  isSelected: boolean;
+  onSelect: () => void;
+  onRemove: () => void;
+  updateModule: (moduleId: string, updates: Partial<ModuleWithMedia>) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ 
+    id: module.id,
+    data: {
+      type: 'module',
+      module
+    }
+  });
+
+  const style = transform ? {
+    transform: CSS.Translate.toString(transform),
+    transition,
+    ...(isDragging ? {
+      position: 'relative' as const,
+      zIndex: 50,
+    } : {})
+  } : undefined;
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      onClick={onSelect}
+      className={cn(
+        "group w-full flex rounded-lg border transition-colors",
+        isSelected
+          ? "border-[var(--accent)] bg-[var(--accent)]/5"
+          : "border-[var(--border-color)] hover:border-[var(--accent)] bg-transparent",
+        isDragging && "shadow-lg opacity-90"
+      )}
+    >
+      <div
+        {...attributes}
+        {...listeners}
+        className={cn(
+          "w-6 flex-shrink-0 cursor-grab opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center border-r",
+          isSelected ? "border-[var(--accent)]" : "border-[var(--border-color)]"
+        )}
+        onClick={e => e.stopPropagation()}
+      >
+        <Grip className="w-4 h-4 text-[var(--text-secondary)]" />
+      </div>
+      <div className="flex-1 flex items-center gap-4 p-4">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            value={module.title}
+            onChange={e => {
+              e.stopPropagation();
+              updateModule(module.id, { title: e.target.value });
+            }}
+            onClick={e => e.stopPropagation()}
+            className="w-full bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none text-xl font-medium"
+            placeholder="Module Title"
+          />
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="p-2 rounded-lg hover:bg-red-500/10 text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+    </button>
   );
 }
 
@@ -305,14 +450,16 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
   const [content, setContent] = useState<Partial<Content>>({
     title: '',
     description: '',
-    status: ContentStatus.DRAFT as ContentStatus
+    status: ContentStatus.DRAFT
   });
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [selectedCollection, setSelectedCollection] = useState<string>('');
   const [newCollectionName, setNewCollectionName] = useState('');
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
-  const [collections, setCollections] = useState<Collection[]>([]);
-  const [modules, setModules] = useState<Module[]>([]);
-  const [editingMedia, setEditingMedia] = useState<number | null>(null);
+  const [modules, setModules] = useState<ModuleWithMedia[]>([]);
+  const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showCollectionDropdown, setShowCollectionDropdown] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -342,125 +489,238 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
   }, []);
 
   const fetchCollections = async () => {
-    const { data, error } = await supabase
-      .from('collections')
-      .select('id, name');
-    
-    if (data) {
-      setCollections(data);
+    try {
+      console.log('Fetching collections...');
+      
+      // First, check if we're authenticated
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      console.log('Auth state:', {
+        isAuthenticated: !!session,
+        userId: session?.user?.id,
+        authError
+      });
+
+      if (!session) {
+        console.error('Not authenticated');
+        alert('You must be logged in to access collections');
+        return;
+      }
+
+      const { data, error } = await supabase
+        .rpc('get_content_collections');
+
+      if (error) {
+        console.error('Error fetching collections:', error);
+        alert(`Failed to fetch collections: ${error.message}`);
+        return;
+      }
+      
+      if (data) {
+        console.log('Successfully fetched collections:', data);
+        setCollections(data);
+      } else {
+        console.log('No collections data returned');
+        setCollections([]);
+      }
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('Unexpected error in fetchCollections:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+        error
+      });
+      alert('An unexpected error occurred while fetching collections');
     }
   };
 
-  const addModule = () => {
-    const newModule: Module = {
-      id: crypto.randomUUID(),
-      title: 'New Module',
-      description: '',
-      media: [],
-      isExpanded: true
-    };
-    setModules([...modules, newModule]);
+  const filteredCollections = collections.filter(collection =>
+    collection.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleSearchFocus = () => {
+    setShowCollectionDropdown(true);
+    fetchCollections(); // Refresh collections when focusing
   };
 
-  const updateModule = (moduleId: string, updates: Partial<Module>) => {
-    setModules(prev => prev.map(module => 
-      module.id === moduleId ? { ...module, ...updates } : module
-    ));
-  };
-
-  const removeModule = (moduleId: string) => {
-    setModules(prev => prev.filter(module => module.id !== moduleId));
-  };
-
-  const addMedia = (moduleId: string) => {
-    setModules(prev => prev.map(module => {
-      if (module.id === moduleId) {
-        return {
-          ...module,
-          media: [
-            ...module.media,
-            {
-              id: crypto.randomUUID(),
-              title: 'New Media',
-              description: '',
-              items: [],
-              isExpanded: true
-            } as ModuleMedia
-          ]
-        };
-      }
-      return module;
-    }));
-  };
-
-  const addMediaItem = (moduleId: string, mediaId: string) => {
-    setModules(prev => prev.map(module => {
-      if (module.id === moduleId) {
-        return {
-          ...module,
-          media: module.media.map(media => {
-            if (media.id === mediaId) {
-              return {
-                ...media,
-                items: [
-                  ...media.items,
-                  {
-                    type: MediaType.VIDEO,
-                    title: 'New Media Item',
-                    order: media.items.length
-                  }
-                ]
-              };
-            }
-            return media;
-          })
-        };
-      }
-      return module;
-    }));
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+    setShowCollectionDropdown(true);
   };
 
   const handleCreateCollection = async () => {
-    if (!newCollectionName.trim()) return;
+    if (!searchQuery.trim()) {
+      alert('Please enter a collection name');
+      return;
+    }
 
-    const { data, error } = await supabase
-      .from('collections')
-      .insert([{ name: newCollectionName }])
-      .select()
-      .single();
+    try {
+      // First, check if we're authenticated
+      const { data: { session }, error: authError } = await supabase.auth.getSession();
+      console.log('Auth state for create collection:', {
+        isAuthenticated: !!session,
+        userId: session?.user?.id,
+        authError
+      });
 
-    if (data) {
-      setCollections([...collections, data]);
-      setSelectedCollection(data.id);
-      setNewCollectionName('');
-      setIsCreatingCollection(false);
+      if (!session) {
+        console.error('Not authenticated');
+        alert('You must be logged in to create collections');
+        return;
+      }
+
+      console.log('Creating collection with name:', searchQuery);
+
+      const { data, error } = await supabase
+        .rpc('create_content_collection', {
+          p_name: searchQuery,
+          p_description: null
+        });
+
+      if (error) {
+        console.error('Error creating collection:', error);
+        alert(`Failed to create collection: ${error.message}`);
+        return;
+      }
+
+      if (data) {
+        console.log('Collection created successfully:', data);
+        setCollections(prev => [...prev, data]);
+        setSelectedCollection(data.id);
+        setSearchQuery('');
+        setShowCollectionDropdown(false);
+      }
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('Unexpected error creating collection:', {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+        error
+      });
+      alert('An unexpected error occurred while creating the collection');
     }
   };
+
+  // Add this useEffect to handle clicking outside the dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.collection-search-container')) {
+        setShowCollectionDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  // Replace the collection selection UI with this new version
+  const renderCollectionSearch = () => (
+    <div className="collection-search-container relative">
+      <div className="flex items-center gap-2 p-3 rounded-lg border border-[var(--border-color)] bg-[var(--card-bg)]">
+        <Search className="w-5 h-5 text-[var(--text-secondary)]" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={handleSearchChange}
+          onFocus={handleSearchFocus}
+          placeholder="Search or create collections..."
+          className="flex-1 bg-transparent border-none focus:outline-none text-[var(--foreground)] text-lg"
+        />
+      </div>
+
+      {showCollectionDropdown && (
+        <div className="absolute w-full mt-2 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--card-bg)] shadow-lg z-10">
+          {filteredCollections.map(collection => (
+            <button
+              key={collection.id}
+              onClick={() => {
+                setSelectedCollection(collection.id);
+                setSearchQuery(collection.name);
+                setShowCollectionDropdown(false);
+              }}
+              className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--hover-bg)] transition-colors text-lg"
+            >
+              <span>{collection.name}</span>
+              {selectedCollection === collection.id && (
+                <Check className="w-5 h-5 text-green-500" />
+              )}
+            </button>
+          ))}
+          
+          {searchQuery && !filteredCollections.some(c => 
+            c.name.toLowerCase() === searchQuery.toLowerCase()
+          ) && (
+            <button
+              onClick={handleCreateCollection}
+              className="w-full px-4 py-3 flex items-center gap-2 text-[var(--accent)] hover:bg-[var(--hover-bg)] transition-colors text-lg"
+            >
+              <Plus className="w-5 h-5" />
+              Create &quot;{searchQuery}&quot;
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     
     if (!over || active.id === over.id) return;
 
-    setModules(items => {
-      const oldIndex = items.findIndex(item => item.id === active.id);
-      const newIndex = items.findIndex(item => item.id === over.id);
-      
-      return arrayMove(items, oldIndex, newIndex);
-    });
+    const activeData = active.data.current;
+    const overData = over.data.current;
+
+    if (activeData?.type === 'module') {
+      setModules(items => {
+        const oldIndex = items.findIndex(item => item.id === active.id);
+        const newIndex = items.findIndex(item => item.id === over.id);
+        return arrayMove(items, oldIndex, newIndex);
+      });
+    } else if (activeData?.type === 'media' && selectedModuleId) {
+      const selectedModule = modules.find(m => m.id === selectedModuleId);
+      if (selectedModule) {
+        const newModule = { ...selectedModule };
+        const oldIndex = newModule.media.findIndex(m => m.id === active.id);
+        const newIndex = newModule.media.findIndex(m => m.id === over.id);
+        newModule.media = arrayMove(newModule.media, oldIndex, newIndex);
+        setModules(prev => prev.map(m => m.id === selectedModuleId ? newModule : m));
+      }
+    }
   };
 
   const handleSubmit = async () => {
     try {
+      // Validate required fields
+      if (!content.title?.trim()) {
+        alert('Please enter a content title');
+        return;
+      }
+
       if (!selectedCollection) {
         alert('Please select or create a collection');
         return;
       }
 
+      if (!modules.length) {
+        alert('Please add at least one module');
+        return;
+      }
+
       // Insert content
       const { data: contentData, error: contentError } = await supabase
-        .from('content')
-        .insert([{ ...content, collection_id: selectedCollection }])
+        .from('content.content')
+        .insert([{
+          collection_id: selectedCollection,
+          title: content.title,
+          description: content.description || '',
+          status: content.status,
+          thumbnail_url: content.thumbnail_url
+        }])
         .select()
         .single();
 
@@ -469,11 +729,10 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
       // Insert modules
       for (const [moduleIndex, module] of modules.entries()) {
         const { data: moduleData, error: moduleError } = await supabase
-          .from('modules')
+          .from('content.modules')
           .insert([{
             content_id: contentData.id,
             title: module.title,
-            description: module.description,
             order: moduleIndex
           }])
           .select()
@@ -484,11 +743,11 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
         // Insert media for this module
         for (const [mediaIndex, media] of module.media.entries()) {
           const { data: mediaData, error: mediaError } = await supabase
-            .from('media')
+            .from('content.media')
             .insert([{
               module_id: moduleData.id,
+              content_id: contentData.id,
               title: media.title,
-              description: media.description,
               order: mediaIndex
             }])
             .select()
@@ -496,26 +755,130 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
 
           if (mediaError) throw mediaError;
 
-          // Insert media items for this media
-          const mediaItems = media.items.map((item, index) => ({
-            ...item,
-            media_id: mediaData.id,
-            order: index
-          }));
+          // Insert the specific media content based on type
+          if (media.video) {
+            const { error: videoError } = await supabase
+              .from('content.videos')
+              .insert([{
+                media_id: mediaData.id,
+                content_id: contentData.id,
+                title: media.video.title,
+                video_id: media.video.video_id,
+                order: mediaIndex
+              }]);
+          }
 
-          const { error: itemsError } = await supabase
-            .from('media_items')
-            .insert(mediaItems);
+          if (media.text) {
+            const { error: textError } = await supabase
+              .from('content.text_content')
+              .insert([{
+                media_id: mediaData.id,
+                content_id: contentData.id,
+                title: media.text.title,
+                content_text: media.text.content_text,
+                order: mediaIndex
+              }]);
+          }
 
-          if (itemsError) throw itemsError;
+          if (media.ai) {
+            const { error: aiError } = await supabase
+              .from('content.ai_content')
+              .insert([{
+                media_id: mediaData.id,
+                content_id: contentData.id,
+                title: media.ai.title,
+                tool_id: media.ai.tool_id,
+                order: mediaIndex
+              }]);
+          }
+
+          if (media.pdf) {
+            const { error: pdfError } = await supabase
+              .from('content.pdf_content')
+              .insert([{
+                media_id: mediaData.id,
+                content_id: contentData.id,
+                title: media.pdf.title,
+                pdf_url: media.pdf.pdf_url,
+                order: mediaIndex
+              }]);
+          }
+
+          if (media.quiz) {
+            const { error: quizError } = await supabase
+              .from('content.quiz_content')
+              .insert([{
+                media_id: mediaData.id,
+                content_id: contentData.id,
+                title: media.quiz.title,
+                quiz_data: media.quiz.quiz_data,
+                order: mediaIndex
+              }]);
+          }
         }
       }
 
+      // Create initial stats
+      const { error: statsError } = await supabase
+        .from('content.content_stats')
+        .insert([{
+          content_id: contentData.id,
+          enrolled_count: 0
+        }]);
+
+      if (statsError) throw statsError;
+
       onClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating content:', error);
-      alert('Failed to create content. Please try again.');
+      alert(error.message || 'Failed to create content. Please try again.');
     }
+  };
+
+  const addModule = () => {
+    const newModule: ModuleWithMedia = {
+      id: crypto.randomUUID(),
+      content_id: '', // This will be set when saving
+      title: 'New Module',
+      order: modules.length,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      media: []
+    };
+    setModules([...modules, newModule]);
+  };
+
+  const updateModule = (moduleId: string, updates: Partial<ModuleWithMedia>) => {
+    setModules(prev => prev.map(module => 
+      module.id === moduleId ? { ...module, ...updates } : module
+    ));
+  };
+
+  const addMedia = (moduleId: string) => {
+    setModules(prev => prev.map(module => {
+      if (module.id === moduleId) {
+        const newMedia: Media & {
+          video?: VideoContent;
+          text?: TextContent;
+          ai?: AIContent;
+          pdf?: PDFContent;
+          quiz?: QuizContent;
+        } = {
+          id: crypto.randomUUID(),
+          module_id: module.id,
+          content_id: module.content_id,
+          title: 'New Media',
+          order: module.media.length,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        return {
+          ...module,
+          media: [...module.media, newMedia]
+        };
+      }
+      return module;
+    }));
   };
 
   if (!isOpen) return null;
@@ -558,6 +921,8 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
             placeholder="Content Description"
           />
           <div className="flex flex-col gap-4 mt-4">
+            {renderCollectionSearch()}
+
             <div className="flex items-center gap-4">
               <select
                 value={content.status}
@@ -569,59 +934,12 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
                 <option value={ContentStatus.ARCHIVED}>Archived</option>
               </select>
               <button
-                onClick={addModule}
+                onClick={() => addModule()}
                 className="flex items-center gap-2 px-3 py-1 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-all"
               >
                 <Plus className="w-4 h-4" />
                 Add Module
               </button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              {isCreatingCollection ? (
-                <div className="flex-1 flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={newCollectionName}
-                    onChange={e => setNewCollectionName(e.target.value)}
-                    placeholder="New Collection Name"
-                    className="flex-1 px-3 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                  />
-                  <button
-                    onClick={handleCreateCollection}
-                    className="px-3 py-1 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
-                  >
-                    Create
-                  </button>
-                  <button
-                    onClick={() => setIsCreatingCollection(false)}
-                    className="px-3 py-1 rounded-lg border border-[var(--border-color)] hover:border-[var(--accent)] transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <select
-                    value={selectedCollection}
-                    onChange={e => setSelectedCollection(e.target.value)}
-                    className="flex-1 px-3 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                  >
-                    <option value="">Select Collection</option>
-                    {collections.map(collection => (
-                      <option key={collection.id} value={collection.id}>
-                        {collection.name}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => setIsCreatingCollection(true)}
-                    className="p-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors text-[var(--text-secondary)]"
-                  >
-                    <FolderPlus className="w-5 h-5" />
-                  </button>
-                </>
-              )}
             </div>
           </div>
         </div>
@@ -636,69 +954,61 @@ export default function NewContentClient({ isOpen, onClose }: NewContentClientPr
               items={modules.map(module => module.id)}
               strategy={verticalListSortingStrategy}
             >
-              {modules.map((module, moduleIndex) => (
-                <div
-                  key={module.id}
-                  className="border border-[var(--border-color)] rounded-lg bg-[var(--card-bg)] mb-4"
-                >
-                  <div className="p-4 flex items-center justify-between">
-                    <div className="flex-1">
-                      <input
-                        type="text"
-                        value={module.title}
-                        onChange={e => updateModule(module.id, { title: e.target.value })}
-                        className="text-lg font-medium bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
-                        placeholder="Module Title"
-                      />
-                      <input
-                        type="text"
-                        value={module.description}
-                        onChange={e => updateModule(module.id, { description: e.target.value })}
-                        className="text-sm text-[var(--text-secondary)] bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
-                        placeholder="Module Description"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => addMedia(module.id)}
-                        className="p-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors"
-                      >
-                        <Plus className="w-4 h-4 text-[var(--text-secondary)]" />
-                      </button>
-                      <button
-                        onClick={() => removeModule(module.id)}
-                        className="p-2 rounded-lg hover:bg-[var(--hover-bg)] text-red-500 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="border-t border-[var(--border-color)]">
-                    {module.media.map((media, mediaIndex) => (
-                      <SortableMediaItem
-                        key={`${module.id}-media-${mediaIndex}`}
-                        mediaItem={media.items[0] || {}}
-                        index={mediaIndex}
-                        editingMedia={editingMedia}
-                        onEdit={(index) => setEditingMedia(index)}
-                        onRemove={(index) => {
-                          const newModule = { ...module };
-                          newModule.media[mediaIndex].items = newModule.media[mediaIndex].items.filter((_, i) => i !== index);
-                          updateModule(module.id, newModule);
-                        }}
-                        onUpdate={(index, updates) => {
-                          const newModule = { ...module };
-                          newModule.media[mediaIndex].items[index] = { ...newModule.media[mediaIndex].items[index], ...updates };
-                          updateModule(module.id, newModule);
-                        }}
-                        totalItems={media.items.length}
-                      />
-                    ))}
-                  </div>
-                </div>
-              ))}
+              <div className="space-y-4">
+                {modules.map((module) => (
+                  <SortableModuleItem
+                    key={module.id}
+                    module={module}
+                    isSelected={selectedModuleId === module.id}
+                    onSelect={() => setSelectedModuleId(module.id)}
+                    onRemove={() => {
+                      setModules(prev => prev.filter(m => m.id !== module.id));
+                      if (selectedModuleId === module.id) {
+                        setSelectedModuleId(null);
+                      }
+                    }}
+                    updateModule={updateModule}
+                  />
+                ))}
+              </div>
             </SortableContext>
           </DndContext>
+
+          {selectedModuleId && (
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-medium">Media Items</h3>
+                <button
+                  onClick={() => addMedia(selectedModuleId)}
+                  className="px-3 py-1 rounded-lg bg-[var(--accent)]/10 text-[var(--accent)] hover:bg-[var(--accent)]/20 transition-all flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Media
+                </button>
+              </div>
+
+              <SortableContext
+                items={modules
+                  .find(m => m.id === selectedModuleId)
+                  ?.media.map(m => m.id) || []}
+                strategy={verticalListSortingStrategy}
+              >
+                <div className="space-y-4">
+                  {modules
+                    .find(m => m.id === selectedModuleId)
+                    ?.media.map((media, mediaIndex) => (
+                      <SortableMediaItem
+                        key={media.id}
+                        media={media}
+                        mediaIndex={mediaIndex}
+                        selectedModule={modules.find(m => m.id === selectedModuleId)!}
+                        updateModule={updateModule}
+                      />
+                    ))}
+                </div>
+              </SortableContext>
+            </div>
+          )}
         </div>
 
         {/* Save Button */}

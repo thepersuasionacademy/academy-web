@@ -52,6 +52,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { MediaItemContainer } from '../components/media-items';
+import { toast, Toaster } from 'sonner';
 
 interface Module {
   id: string;
@@ -210,6 +211,8 @@ function SortableModuleItem({
   onRemove: () => void;
   updateModule: (moduleId: string, updates: Partial<Module>) => void;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const {
     attributes,
     listeners,
@@ -234,13 +237,23 @@ function SortableModuleItem({
     } : {})
   } : undefined;
 
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
   return (
-    <button
+    <div
       ref={setNodeRef}
       style={style}
       onClick={onSelect}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        setIsEditing(true);
+      }}
       className={cn(
-        "group w-full flex rounded-lg border transition-colors",
+        "group w-full flex rounded-lg border transition-colors cursor-pointer",
         isSelected
           ? "border-[var(--accent)] bg-[var(--accent)]/5"
           : "border-[var(--border-color)] hover:border-[var(--accent)] bg-transparent",
@@ -261,15 +274,26 @@ function SortableModuleItem({
       <div className="flex-1 flex items-center gap-4 p-4">
         <div className="flex-1 relative">
           <input
+            ref={inputRef}
             type="text"
             value={module.title}
             onChange={e => {
               e.stopPropagation();
               updateModule(module.id, { title: e.target.value });
             }}
-            onClick={e => e.stopPropagation()}
-            className="w-full bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none text-xl font-medium"
+            onBlur={() => setIsEditing(false)}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                setIsEditing(false);
+              }
+              e.stopPropagation();
+            }}
+            className={cn(
+              "w-full bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none text-xl font-medium pointer-events-none",
+              isEditing && "bg-[var(--hover-bg)] px-2 rounded-md pointer-events-auto"
+            )}
             placeholder="Module Title"
+            readOnly={!isEditing}
           />
         </div>
         <button
@@ -282,7 +306,7 @@ function SortableModuleItem({
           <X className="w-5 h-5" />
         </button>
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -291,6 +315,7 @@ export default function NewContentPage() {
   const supabase = createClientComponentClient();
   const typeRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLDivElement>(null);
+  const collectionRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(true);
   const [content, setContent] = useState<Partial<Content>>({
     title: '',
@@ -314,34 +339,153 @@ export default function NewContentPage() {
 
   const handleSubmit = async () => {
     try {
-      if (!selectedCollection) {
-        alert('Please select or create a collection');
+      // Validate required fields
+      if (!content.title?.trim()) {
+        toast.error('Please enter a content title');
         return;
       }
 
-      // ... Keep the existing submit logic ...
+      if (!selectedCollection) {
+        toast.error('Please select or create a collection');
+        return;
+      }
 
+      if (!modules.length) {
+        toast.error('Please add at least one module');
+        return;
+      }
+
+      // Show loading toast
+      const loadingToast = toast.loading('Creating content...');
+
+      // Prepare the content input
+      const contentInput = {
+        collection_id: selectedCollection,
+        title: content.title.trim(),
+        description: content.description?.trim() || null,
+        status: content.status?.toLowerCase() || 'draft',
+        thumbnail_url: content.thumbnail_url || null,
+        modules: modules.map((module, moduleIndex) => ({
+          title: module.title.trim(),
+          description: module.description?.trim() || null,
+          order: moduleIndex,
+          media: module.media.map((media, mediaIndex) => ({
+            title: media.title.trim(),
+            description: media.description?.trim() || null,
+            order: mediaIndex,
+            items: media.items.map((item, itemIndex) => ({
+              type: item.type,
+              title: item.title?.trim() || null,
+              video_id: item.video_id || null,
+              video_name: item.video_name || null,
+              content_text: item.content_text?.trim() || null,
+              tool_id: item.tool_id || null,
+              pdf_url: item.pdf_url || null,
+              pdf_type: item.pdf_type || null,
+              custom_pdf_type: item.custom_pdf_type || null,
+              quiz_data: item.quiz_data || {},
+              order: itemIndex
+            }))
+          }))
+        }))
+      };
+
+      // Call the RPC function
+      const { data, error } = await supabase
+        .rpc('create_content', {
+          p_content: contentInput
+        });
+
+      if (error) {
+        console.error('Error creating content:', error);
+        toast.error(`Failed to create content: ${error.message}`);
+        toast.dismiss(loadingToast);
+        return;
+      }
+
+      // Success! Dismiss loading toast and show success
+      toast.dismiss(loadingToast);
+      toast.success('Content created successfully!');
+
+      // Redirect back to content list
       router.push('/admin/content');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating content:', error);
-      alert('Failed to create content. Please try again.');
+      toast.error(error.message || 'Failed to create content. Please try again.');
+    }
+  };
+
+  const fetchCollections = async () => {
+    try {
+      const { data, error } = await supabase
+        .rpc('get_content_collections');
+      
+      if (error) {
+        console.error('Error fetching collections:', error);
+        toast.error(`Failed to fetch collections: ${error.message}`);
+        return;
+      }
+    
+      if (data) {
+        // Sort collections by name for better usability
+        const sortedCollections = data.sort((a: Collection, b: Collection) => 
+          a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+        );
+        setCollections(sortedCollections);
+      } else {
+        setCollections([]);
+      }
+    } catch (error: any) {
+      console.error('Error fetching collections:', error);
+      toast.error('Failed to fetch collections');
     }
   };
 
   const handleCreateCollection = async () => {
-    if (!newCollectionName.trim()) return;
+    if (!newCollectionName.trim()) {
+      alert('Please enter a collection name');
+      return;
+    }
 
-    const { data, error } = await supabase
-      .from('collections')
-      .insert([{ name: newCollectionName }])
-      .select()
-      .single();
+    try {
+      console.log('Creating collection with name:', newCollectionName);
 
-    if (data) {
-      setCollections([...collections, data]);
-      setSelectedCollection(data.id);
-      setNewCollectionName('');
-      setIsCreatingCollection(false);
+      const { data, error } = await supabase
+        .rpc('create_content_collection', {
+          p_name: newCollectionName,
+          p_description: null
+        });
+
+      console.log('Create collection response:', {
+        error,
+        data
+      });
+
+      if (error) {
+        console.error('Error creating collection:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        alert(error.message || 'Failed to create collection');
+        return;
+      }
+
+      if (data) {
+        console.log('Collection created successfully:', data);
+        setCollections(prev => [...prev, data]);
+        setSelectedCollection(data.id);
+        setNewCollectionName('');
+        setIsCreatingCollection(false);
+      }
+    } catch (error: any) {
+      console.error('Unexpected error creating collection:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      alert('An unexpected error occurred while creating the collection');
     }
   };
 
@@ -402,8 +546,22 @@ export default function NewContentPage() {
 
   const selectedModule = modules.find(m => m.id === selectedModuleId);
 
+  const filteredCollections = collections
+    .filter(collection =>
+      collection.name.toLowerCase().includes(newCollectionName.toLowerCase())
+    )
+    .slice(0, 5);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      // Handle collection dropdown
+      if (isCreatingCollection || newCollectionName) {
+        if (collectionRef.current && !collectionRef.current.contains(event.target as Node)) {
+          setIsCreatingCollection(false);
+          setNewCollectionName('');
+        }
+      }
+
       // Handle type selector dropdown
       if (selectedModule?.media.some(media => 
         media.items.some(item => item.showTypeSelector)
@@ -443,10 +601,11 @@ export default function NewContentPage() {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [selectedModule]);
+  }, [selectedModule, isCreatingCollection, newCollectionName]);
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
+      <Toaster richColors position="top-center" />
       {/* Header */}
       <div className="sticky top-0 z-10 border-b border-[var(--border-color)] bg-[var(--background)]/80 backdrop-blur-sm">
         <div className="flex items-center justify-between h-16 px-4">
@@ -526,7 +685,7 @@ export default function NewContentPage() {
                 placeholder="Content Title"
               />
               <textarea
-                value={content.description}
+                value={content.description || ''}
                 onChange={e => setContent({ ...content, description: e.target.value })}
                 className="w-full text-xl text-[var(--text-secondary)] bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none resize-none overflow-hidden"
                 placeholder="Content Description"
@@ -540,31 +699,40 @@ export default function NewContentPage() {
             </div>
 
             {/* Collections */}
-            <div className="relative">
-              <div className="flex items-center gap-2 p-3 rounded-lg border border-[var(--border-color)] bg-[var(--card-bg)]">
-                <Search className="w-5 h-5 text-[var(--text-secondary)]" />
-                <input
-                  type="text"
-                  value={newCollectionName}
-                  onChange={e => setNewCollectionName(e.target.value)}
-                  placeholder="Search or create collections..."
-                  className="flex-1 bg-transparent border-none focus:outline-none text-[var(--foreground)] text-lg"
-                />
-                <button
-                  onClick={() => setIsCreatingCollection(true)}
-                  className="p-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors text-[var(--text-secondary)]"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-              </div>
+            <div ref={collectionRef} className="relative py-10 border-y border-[var(--border-color)]">
+              <div className="text-2xl font-bold text-[var(--text-secondary)] mb-4">Collection</div>
+              <input
+                type="text"
+                value={selectedCollection ? collections.find(c => c.id === selectedCollection)?.name || '' : newCollectionName}
+                onChange={e => {
+                  setNewCollectionName(e.target.value);
+                  setIsCreatingCollection(true);
+                  // Fetch collections when typing
+                  fetchCollections();
+                }}
+                onFocus={() => {
+                  fetchCollections();
+                  setIsCreatingCollection(true);
+                  // Clear selected collection when focusing to allow new search
+                  setSelectedCollection('');
+                }}
+                placeholder="Select Collection"
+                className="w-full text-xl text-[var(--text-secondary)] bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none"
+              />
               {(isCreatingCollection || newCollectionName) && (
                 <div className="absolute w-full mt-2 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--card-bg)] shadow-lg z-10">
                   {collections
-                    .filter(c => c.name.toLowerCase().includes(newCollectionName.toLowerCase()))
+                    .filter(collection => 
+                      collection.name.toLowerCase().includes(newCollectionName.toLowerCase())
+                    )
                     .map(collection => (
                       <button
                         key={collection.id}
-                        onClick={() => setSelectedCollection(collection.id)}
+                        onClick={() => {
+                          setSelectedCollection(collection.id);
+                          setNewCollectionName('');
+                          setIsCreatingCollection(false);
+                        }}
                         className="w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--hover-bg)] transition-colors text-lg"
                       >
                         <span>{collection.name}</span>
@@ -573,7 +741,9 @@ export default function NewContentPage() {
                         )}
                       </button>
                     ))}
-                  {newCollectionName && !collections.some(c => c.name.toLowerCase() === newCollectionName.toLowerCase()) && (
+                  {newCollectionName && !collections.some(c => 
+                    c.name.toLowerCase() === newCollectionName.toLowerCase()
+                  ) && (
                     <button
                       onClick={handleCreateCollection}
                       className="w-full px-4 py-3 flex items-center gap-2 text-[var(--accent)] hover:bg-[var(--hover-bg)] transition-colors text-lg"
@@ -588,8 +758,8 @@ export default function NewContentPage() {
 
             {/* Modules List */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between px-2">
-                <h2 className="text-lg font-medium text-[var(--text-secondary)]">Modules</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-[var(--text-secondary)]">Modules</h2>
                 <button
                   onClick={addModule}
                   className="p-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors text-[var(--text-secondary)]"

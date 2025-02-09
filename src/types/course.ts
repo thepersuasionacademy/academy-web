@@ -37,60 +37,125 @@ export enum PDFType {
     CUSTOM = 'CUSTOM'
 }
 
+export interface MediaItem {
+    id?: string;
+    media_id?: string;
+    content_id?: string;
+    type: MediaType;
+    title?: string | null;
+    description?: string | null;
+    order?: number;
+    created_at?: string;
+    updated_at?: string;
+    // Video specific fields
+    video_id?: string | null;
+    video_name?: VideoNameType | null;
+    // Text specific fields
+    content_text?: string | null;
+    // AI specific fields
+    tool_id?: string | null;
+    // PDF specific fields
+    pdf_url?: string | null;
+    pdf_type?: PDFType | null;
+    custom_pdf_type?: string | null;
+    // Quiz specific fields
+    quiz_data?: Record<string, any> | null;
+    // UI state fields (not in DB)
+    showTypeSelector?: boolean;
+    showNameSuggestions?: boolean;
+}
+
 export interface Content {
-    id: string;
+    id?: string;
     collection_id: string;
     title: string;
-    description: string;
+    description?: string | null;
     status: ContentStatus;
-    thumbnail?: string;
-    created_at: string;
-    updated_at: string;
+    thumbnail_url?: string | null;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface Module {
-    id: string;
-    content_id: string;
+    id?: string;
+    content_id?: string;
     title: string;
-    description: string;
-    order: number;
-    created_at: string;
-    updated_at: string;
+    description?: string | null;
+    order?: number;
+    created_at?: string;
+    updated_at?: string;
 }
 
 export interface Media {
-    id: string;
-    module_id: string;
+    id?: string;
+    module_id?: string;
+    content_id?: string;
     title: string;
-    description: string;
+    description?: string | null;
+    order?: number;
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface VideoContent {
+    id: string;
+    media_id: string;
+    content_id: string;
+    title: string;
+    video_id: string;
     order: number;
     created_at: string;
     updated_at: string;
 }
 
-export interface MediaItem {
+export interface TextContent {
     id: string;
     media_id: string;
-    type: MediaType;
+    content_id: string;
     title: string;
-    description?: string;
+    content_text: string;
     order: number;
-    // Video specific fields
-    video_id?: string;
-    video_name?: string;
-    showPreview?: boolean;
-    showNameSuggestions?: boolean;
-    showTypeSelector?: boolean;
-    // Text specific fields
-    content_text?: string;
-    // AI specific fields
-    tool_id?: string;
-    // PDF specific fields
-    pdf_url?: string;
-    pdf_type?: PDFType;
-    custom_pdf_type?: string;
-    // Quiz specific fields
-    quiz_data?: any;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface AIContent {
+    id: string;
+    media_id: string;
+    content_id: string;
+    title: string;
+    tool_id: string;
+    order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface PDFContent {
+    id: string;
+    media_id: string;
+    content_id: string;
+    title: string;
+    pdf_url: string;
+    order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface QuizContent {
+    id: string;
+    media_id: string;
+    content_id: string;
+    title: string;
+    quiz_data: any;
+    order: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface ContentStats {
+    id: string;
+    content_id: string;
+    enrolled_count: number;
     created_at: string;
     updated_at: string;
 }
@@ -98,7 +163,11 @@ export interface MediaItem {
 export interface ContentWithModules extends Content {
     modules: (Module & {
         media: (Media & {
-            items: MediaItem[];
+            video?: VideoContent;
+            text?: TextContent;
+            ai?: AIContent;
+            pdf?: PDFContent;
+            quiz?: QuizContent;
         })[];
     })[];
 } 
