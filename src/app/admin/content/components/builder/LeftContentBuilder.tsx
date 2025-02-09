@@ -2,7 +2,26 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Content, Media as DBMedia, MediaItem, MediaType, VideoNameType, PDFType, ContentStatus } from '@/types/content';
+import { 
+  Content, 
+  MediaType, 
+  ContentStatus, 
+  MediaItem,
+  Module,
+  Media,
+  VideoItem,
+  TextItem,
+  AIItem,
+  PDFItem,
+  QuizItem,
+  ExtendedContent,
+  MediaItemUpdates,
+  Collection,
+  VideoNameType
+} from '@/types/content';
+import { AITool, AIInput, AIPrompt } from '@/lib/supabase/ai';
+import { cn } from "@/lib/utils";
+import { toast } from 'sonner';
 import { 
   Play, 
   X,
@@ -29,7 +48,6 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { marked } from 'marked';
-import { cn } from "@/lib/utils";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -51,36 +69,22 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { MediaItemContainer } from '../components/media-items';
-import { toast, Toaster } from 'sonner';
-import type { VideoItem, TextItem, AIItem, PDFItem, QuizItem } from '@/types/content';
+import { MediaItemContainer } from '@/app/admin/content/components/media-items';
+import { Toaster } from 'sonner';
 
-interface Module {
-  id: string;
-  title: string;
-  description: string;
-  media: ModuleMedia[];
-  isExpanded?: boolean;
+interface ExtendedModule extends Omit<Module, 'media'> {
+  media: Array<ExtendedMedia>;
 }
 
-interface ModuleMedia {
-  id: string;
-  title: string;
-  description: string;
-  items: Partial<MediaItem>[];
-  isExpanded?: boolean;
-}
-
-interface Collection {
-  id: string;
-  name: string;
+interface ExtendedMedia extends Omit<Media, 'items'> {
+  items: MediaItem[];
 }
 
 interface SortableMediaItemProps {
-  media: ModuleMedia;
+  media: ExtendedMedia;
   mediaIndex: number;
-  selectedModule: Module;
-  updateModule: (moduleId: string, updates: Partial<Module>) => void;
+  selectedModule: ExtendedModule;
+  updateModule: (moduleId: string, updates: Partial<ExtendedModule>) => void;
 }
 
 function SortableMediaItem({ media, mediaIndex, selectedModule, updateModule }: SortableMediaItemProps) {
@@ -133,8 +137,11 @@ function SortableMediaItem({ media, mediaIndex, selectedModule, updateModule }: 
                 value={media.title}
                 onChange={e => {
                   const newModule = { ...selectedModule };
-                  newModule.media[mediaIndex].title = e.target.value;
-                  updateModule(selectedModule.id, newModule);
+                  const mediaToUpdate = newModule.media[mediaIndex];
+                  if (mediaToUpdate) {
+                    mediaToUpdate.title = e.target.value;
+                    updateModule(selectedModule.id, newModule);
+                  }
                 }}
                 className="flex-1 text-xl font-medium bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)] rounded px-2"
                 placeholder="Media Title"
@@ -143,11 +150,15 @@ function SortableMediaItem({ media, mediaIndex, selectedModule, updateModule }: 
                 <button
                   onClick={() => {
                     const newModule = { ...selectedModule };
-                    newModule.media[mediaIndex].items.push({
+                    const newItem: MediaItem = {
+                      id: crypto.randomUUID(),
                       type: MediaType.VIDEO,
                       title: 'New Item',
-                      order: newModule.media[mediaIndex].items.length
-                    });
+                      order: newModule.media[mediaIndex].items.length,
+                      video_id: null,
+                      video_name: null
+                    };
+                    newModule.media[mediaIndex].items.push(newItem);
                     updateModule(selectedModule.id, newModule);
                   }}
                   className="p-2 rounded-lg hover:bg-[var(--hover-bg)] transition-colors opacity-0 group-hover/media:opacity-100"
@@ -175,7 +186,7 @@ function SortableMediaItem({ media, mediaIndex, selectedModule, updateModule }: 
                   <MediaItemContainer
                     key={itemIndex}
                     item={item}
-                    onUpdate={(updates) => {
+                    onUpdate={(updates: MediaItemUpdates) => {
                       const newModule = { ...selectedModule };
                       newModule.media[mediaIndex].items[itemIndex] = {
                         ...item,
@@ -311,87 +322,35 @@ function SortableModuleItem({
   );
 }
 
-const updateMediaItem = (item: Partial<MediaItem>): Partial<MediaItem> => {
-  switch (item.type) {
-    case 'VIDEO':
-      return {
-        ...item,
-        video_id: (item as Partial<VideoItem>).video_id || null,
-        video_name: (item as Partial<VideoItem>).video_name || null
-      } as Partial<VideoItem>;
-    case 'TEXT':
-      return {
-        ...item,
-        content_text: (item as Partial<TextItem>).content_text || null
-      } as Partial<TextItem>;
-    case 'AI':
-      return {
-        ...item,
-        tool_id: (item as Partial<AIItem>).tool_id || null
-      } as Partial<AIItem>;
-    case 'PDF':
-      return {
-        ...item,
-        pdf_url: (item as Partial<PDFItem>).pdf_url || null,
-        pdf_type: (item as Partial<PDFItem>).pdf_type || null,
-        custom_pdf_type: (item as Partial<PDFItem>).custom_pdf_type || null
-      } as Partial<PDFItem>;
-    case 'QUIZ':
-      return {
-        ...item,
-        quiz_data: (item as Partial<QuizItem>).quiz_data || {}
-      } as Partial<QuizItem>;
-    default:
-      return item;
-  }
-};
+interface LeftContentBuilderProps {
+  content: ExtendedContent;
+  onSave: (content: ExtendedContent) => Promise<void>;
+  onClose: () => void;
+}
 
-const handleMediaItemUpdate = (moduleIndex: number, mediaIndex: number, itemIndex: number, updates: Partial<MediaItem>) => {
-  setContent(prev => {
-    const newContent = { ...prev };
-    const module = newContent.modules[moduleIndex];
-    if (!module) return prev;
-
-    const media = module.media[mediaIndex];
-    if (!media) return prev;
-
-    const items = [...media.items];
-    const currentItem = items[itemIndex];
-    if (!currentItem) return prev;
-
-    items[itemIndex] = {
-      ...currentItem,
-      ...updateMediaItem(updates)
-    };
-
-    module.media[mediaIndex] = {
-      ...media,
-      items
-    };
-
-    return newContent;
-  });
-};
-
-export default function NewContentPage() {
+export default function LeftContentBuilder({ content: initialContent, onSave, onClose }: LeftContentBuilderProps) {
   const router = useRouter();
   const supabase = createClientComponentClient();
   const typeRef = useRef<HTMLDivElement>(null);
   const nameRef = useRef<HTMLDivElement>(null);
   const collectionRef = useRef<HTMLDivElement>(null);
   const [isEditing, setIsEditing] = useState(true);
-  const [content, setContent] = useState<Partial<Content>>({
-    title: '',
-    description: '',
-    status: 'draft' as ContentStatus
+  const [content, setContent] = useState<ExtendedContent>({
+    ...initialContent,
+    modules: initialContent.modules || [],
+    collection: initialContent.collection || null,
+    stats: initialContent.stats || {
+      enrolled_count: 0,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
   });
-  const [selectedCollection, setSelectedCollection] = useState<string>('');
+  const [selectedCollection, setSelectedCollection] = useState<string>(content.collection_id);
   const [newCollectionName, setNewCollectionName] = useState('');
   const [isCreatingCollection, setIsCreatingCollection] = useState(false);
   const [collections, setCollections] = useState<Collection[]>([]);
-  const [modules, setModules] = useState<Module[]>([]);
-  const [editingMedia, setEditingMedia] = useState<number | null>(null);
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+  const [aiTools, setAITools] = useState<AITool[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -399,6 +358,11 @@ export default function NewContentPage() {
       coordinateGetter: sortableKeyboardCoordinates,
     })
   );
+
+  // Fetch collections on mount
+  useEffect(() => {
+    fetchCollections();
+  }, []);
 
   const handleSubmit = async () => {
     try {
@@ -413,68 +377,23 @@ export default function NewContentPage() {
         return;
       }
 
-      if (!modules.length) {
+      if (!content.modules.length) {
         toast.error('Please add at least one module');
         return;
       }
 
       // Show loading toast
-      const loadingToast = toast.loading('Creating content...');
+      const loadingToast = toast.loading('Updating content...');
 
-      // Prepare the content input
-      const contentInput = {
-        collection_id: selectedCollection,
-        title: content.title.trim(),
-        description: content.description?.trim() || null,
-        status: content.status?.toLowerCase() || 'draft',
-        thumbnail_url: content.thumbnail_url || null,
-        modules: modules.map((module, moduleIndex) => ({
-          title: module.title.trim(),
-          description: module.description?.trim() || null,
-          order: moduleIndex,
-          media: module.media.map((media, mediaIndex) => ({
-            title: media.title.trim(),
-            description: media.description?.trim() || null,
-            order: mediaIndex,
-            items: media.items.map((item, itemIndex) => ({
-              type: item.type,
-              title: item.title?.trim() || null,
-              video_id: item.video_id || null,
-              video_name: item.video_name || null,
-              content_text: item.content_text?.trim() || null,
-              tool_id: item.tool_id || null,
-              pdf_url: item.pdf_url || null,
-              pdf_type: item.pdf_type || null,
-              custom_pdf_type: item.custom_pdf_type || null,
-              quiz_data: item.quiz_data || {},
-              order: itemIndex
-            }))
-          }))
-        }))
-      };
-
-      // Call the RPC function
-      const { data, error } = await supabase
-        .rpc('create_content', {
-          p_content: contentInput
-        });
-
-      if (error) {
-        console.error('Error creating content:', error);
-        toast.error(`Failed to create content: ${error.message}`);
-        toast.dismiss(loadingToast);
-        return;
-      }
+      // Call the onSave callback with the updated content
+      await onSave(content);
 
       // Success! Dismiss loading toast and show success
       toast.dismiss(loadingToast);
-      toast.success('Content created successfully!');
-
-      // Redirect back to content list
-      router.push('/admin/content');
+      toast.success('Content updated successfully!');
     } catch (error: any) {
-      console.error('Error creating content:', error);
-      toast.error(error.message || 'Failed to create content. Please try again.');
+      console.error('Error updating content:', error);
+      toast.error(`Failed to update content: ${error.message}`);
     }
   };
 
@@ -552,45 +471,126 @@ export default function NewContentPage() {
     }
   };
 
-  const addModule = () => {
-    const newModule: Module = {
+  function createEmptyMediaItem(type: MediaType): MediaItem {
+    const baseItem = {
       id: crypto.randomUUID(),
-      title: 'New Module',
-      description: '',
-      media: [],
-      isExpanded: true
+      title: '',
+      order: 0
     };
-    setModules([...modules, newModule]);
+
+    switch (type) {
+      case MediaType.VIDEO:
+        return {
+          ...baseItem,
+          type: MediaType.VIDEO,
+          video_id: null,
+          video_name: null
+        } as VideoItem;
+      case MediaType.TEXT:
+        return {
+          ...baseItem,
+          type: MediaType.TEXT,
+          content_text: null
+        } as TextItem;
+      case MediaType.AI:
+        return {
+          ...baseItem,
+          type: MediaType.AI,
+          tool_id: null,
+          tool: null
+        } as AIItem;
+      case MediaType.PDF:
+        return {
+          ...baseItem,
+          type: MediaType.PDF,
+          pdf_url: null,
+          pdf_type: null,
+          custom_pdf_type: null
+        } as PDFItem;
+      case MediaType.QUIZ:
+        return {
+          ...baseItem,
+          type: MediaType.QUIZ,
+          quiz_data: {}
+        } as QuizItem;
+      default:
+        throw new Error(`Invalid media item type: ${type}`);
+    }
+  }
+
+  function createEmptyMedia(order: number = 0, moduleId: string, contentId: string): ExtendedMedia {
+    return {
+      id: crypto.randomUUID(),
+      title: '',
+      description: null,
+      order,
+      module_id: moduleId,
+      content_id: contentId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      items: []
+    };
+  }
+
+  function createEmptyModule(order: number = 0, contentId: string): ExtendedModule {
+    return {
+      id: crypto.randomUUID(),
+      title: '',
+      description: null,
+      order,
+      content_id: contentId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      media: []
+    };
+  }
+
+  const addModule = () => {
+    setContent(prevContent => ({
+      ...prevContent,
+      modules: [...prevContent.modules, createEmptyModule(prevContent.modules.length, prevContent.id)]
+    }));
   };
 
-  const updateModule = (moduleId: string, updates: Partial<Module>) => {
-    setModules(prev => prev.map(module => 
-      module.id === moduleId ? { ...module, ...updates } : module
-    ));
+  const updateModule = (moduleId: string, updates: Partial<ExtendedModule>) => {
+    setContent(prevContent => ({
+      ...prevContent,
+      modules: prevContent.modules.map(module =>
+        module.id === moduleId ? { ...module, ...updates } : module
+      )
+    }));
+  };
+
+  const handleMediaItemUpdate = (moduleIndex: number, mediaIndex: number, itemIndex: number, updates: Partial<MediaItem>) => {
+    setContent(prevContent => {
+      const newContent = { ...prevContent };
+      const module = newContent.modules[moduleIndex];
+      if (!module) return prevContent;
+
+      const media = module.media[mediaIndex];
+      if (!media) return prevContent;
+
+      const items = [...media.items];
+      const currentItem = items[itemIndex];
+      if (!currentItem) return prevContent;
+
+      // Create a new item with the correct type based on the current item's type
+      const updatedItem = {
+        ...currentItem,
+        ...updates,
+        type: currentItem.type // Preserve the original type
+      } as MediaItem;
+
+      items[itemIndex] = updatedItem;
+      media.items = items;
+      return newContent;
+    });
   };
 
   const removeModule = (moduleId: string) => {
-    setModules(prev => prev.filter(module => module.id !== moduleId));
-  };
-
-  const addMedia = (moduleId: string) => {
-    setModules(prev => prev.map(module => {
-      if (module.id === moduleId) {
-        return {
-          ...module,
-          media: [
-            ...module.media,
-            {
-              id: crypto.randomUUID(),
-              title: 'New Media',
-              description: '',
-              items: [],
-              isExpanded: true
-            } as ModuleMedia
-          ]
-        };
-      }
-      return module;
+    setContent(prevContent => ({
+      ...prevContent,
+      modules: prevContent.modules.filter(module => module.id !== moduleId)
     }));
   };
 
@@ -599,15 +599,18 @@ export default function NewContentPage() {
     
     if (!over || active.id === over.id) return;
 
-    setModules(items => {
-      const oldIndex = items.findIndex(item => item.id === active.id);
-      const newIndex = items.findIndex(item => item.id === over.id);
+    setContent(items => {
+      const oldIndex = items.modules.findIndex(item => item.id === active.id);
+      const newIndex = items.modules.findIndex(item => item.id === over.id);
       
-      return arrayMove(items, oldIndex, newIndex);
+      return {
+        ...items,
+        modules: arrayMove(items.modules, oldIndex, newIndex)
+      };
     });
   };
 
-  const selectedModule = modules.find(m => m.id === selectedModuleId);
+  const selectedModule = content.modules.find(m => m.id === selectedModuleId);
 
   const filteredCollections = collections
     .filter(collection =>
@@ -666,6 +669,92 @@ export default function NewContentPage() {
     };
   }, [selectedModule, isCreatingCollection, newCollectionName]);
 
+  // Function to fetch AI tool details
+  const fetchAIToolDetails = async (toolId: string) => {
+    try {
+      const supabase = createClientComponentClient();
+      
+      // Fetch the tool with collection and suite titles
+      const { data: tools, error: toolError } = await supabase
+        .rpc('get_tool_with_names', { p_tool_id: toolId });
+
+      if (toolError) {
+        console.error('Error fetching AI tool:', toolError);
+        return null;
+      }
+
+      if (!tools || tools.length === 0) {
+        return null;
+      }
+
+      const tool = tools[0];
+
+      // Fetch the inputs
+      const { data: inputs, error: inputsError } = await supabase
+        .rpc('get_tool_inputs', { tool_id: toolId });
+
+      if (inputsError) {
+        console.error('Error fetching AI tool inputs:', inputsError);
+        return null;
+      }
+
+      // Fetch the prompts
+      const { data: prompts, error: promptsError } = await supabase
+        .rpc('get_tool_prompts', { tool_id: toolId });
+
+      if (promptsError) {
+        console.error('Error fetching AI tool prompts:', promptsError);
+        return null;
+      }
+
+      return {
+        ...tool,
+        inputs: inputs || [],
+        prompts: prompts || []
+      };
+    } catch (error) {
+      console.error('Error fetching AI tool details:', error);
+      return null;
+    }
+  };
+
+  // Fetch AI tool details for each AI media item on mount
+  useEffect(() => {
+    const fetchAllAITools = async () => {
+      const updatedModules = [...content.modules];
+      let hasUpdates = false;
+
+      for (let moduleIndex = 0; moduleIndex < updatedModules.length; moduleIndex++) {
+        const module = updatedModules[moduleIndex];
+        for (let mediaIndex = 0; mediaIndex < module.media.length; mediaIndex++) {
+          const media = module.media[mediaIndex];
+          for (let itemIndex = 0; itemIndex < media.items.length; itemIndex++) {
+            const item = media.items[itemIndex];
+            if (item.type === MediaType.AI && item.tool_id) {
+              const toolDetails = await fetchAIToolDetails(item.tool_id);
+              if (toolDetails) {
+                media.items[itemIndex] = {
+                  ...item,
+                  tool: toolDetails
+                };
+                hasUpdates = true;
+              }
+            }
+          }
+        }
+      }
+
+      if (hasUpdates) {
+        setContent(prevContent => ({
+          ...prevContent,
+          modules: updatedModules
+        }));
+      }
+    };
+
+    fetchAllAITools();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[var(--background)]">
       <Toaster richColors position="top-center" />
@@ -690,10 +779,10 @@ export default function NewContentPage() {
           <div className="flex items-center gap-4">
             <div className="flex items-center p-1 gap-1 rounded-lg border border-[var(--border-color)] bg-[var(--background)]">
               <button
-                onClick={() => setContent(prev => ({ ...prev, status: 'draft' }))}
+                onClick={() => setContent(prev => ({ ...prev, status: ContentStatus.DRAFT }))}
                 className={cn(
                   "px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-[var(--foreground)]",
-                  content.status === 'draft'
+                  content.status === ContentStatus.DRAFT
                     ? "border-2 border-[var(--accent)]"
                     : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
                 )}
@@ -701,10 +790,10 @@ export default function NewContentPage() {
                 Draft
               </button>
               <button
-                onClick={() => setContent(prev => ({ ...prev, status: 'published' }))}
+                onClick={() => setContent(prev => ({ ...prev, status: ContentStatus.PUBLISHED }))}
                 className={cn(
                   "px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-[var(--foreground)]",
-                  content.status === 'published'
+                  content.status === ContentStatus.PUBLISHED
                     ? "border-2 border-[var(--accent)]"
                     : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
                 )}
@@ -712,10 +801,10 @@ export default function NewContentPage() {
                 Published
               </button>
               <button
-                onClick={() => setContent(prev => ({ ...prev, status: 'archived' }))}
+                onClick={() => setContent(prev => ({ ...prev, status: ContentStatus.ARCHIVED }))}
                 className={cn(
                   "px-3 py-1.5 rounded-md text-sm font-medium transition-colors text-[var(--foreground)]",
-                  content.status === 'archived'
+                  content.status === ContentStatus.ARCHIVED
                     ? "border-2 border-[var(--accent)]"
                     : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
                 )}
@@ -846,18 +935,21 @@ export default function NewContentPage() {
                   const { active, over } = event;
                   if (!over || active.id === over.id) return;
 
-                  const oldIndex = modules.findIndex(item => item.id === active.id);
-                  const newIndex = modules.findIndex(item => item.id === over.id);
+                  const oldIndex = content.modules.findIndex(item => item.id === active.id);
+                  const newIndex = content.modules.findIndex(item => item.id === over.id);
                   
-                  setModules(arrayMove(modules, oldIndex, newIndex));
+                  setContent(prevContent => ({
+                    ...prevContent,
+                    modules: arrayMove(prevContent.modules, oldIndex, newIndex)
+                  }));
                 }}
               >
                 <SortableContext
-                  items={modules.map(module => module.id)}
+                  items={content.modules.map(module => module.id)}
                   strategy={verticalListSortingStrategy}
                 >
                   <div className="space-y-3">
-                    {modules.map((module) => (
+                    {content.modules.map((module) => (
                       <SortableModuleItem
                         key={module.id}
                         module={module}
@@ -881,7 +973,11 @@ export default function NewContentPage() {
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-2xl font-semibold">{selectedModule.title}</h2>
                 <button
-                  onClick={() => addMedia(selectedModule.id)}
+                  onClick={() => {
+                    const newModule = { ...selectedModule };
+                    newModule.media.push(createEmptyMedia(selectedModule.media.length, selectedModule.id, content.id));
+                    updateModule(selectedModule.id, newModule);
+                  }}
                   className="px-4 py-2 rounded-lg bg-[var(--accent)] text-white hover:opacity-90 transition-opacity flex items-center gap-2 text-base font-medium"
                 >
                   <Plus className="w-5 h-5" />
@@ -912,6 +1008,7 @@ export default function NewContentPage() {
                     const newModule = { ...selectedModule };
                     newModule.media = arrayMove(newModule.media, oldIndex, newIndex);
                     updateModule(selectedModule.id, newModule);
+                    handleMediaItemUpdate(selectedModule.id, newModule);
                   }}
                 >
                   <SortableContext
@@ -924,7 +1021,7 @@ export default function NewContentPage() {
                         media={media}
                         mediaIndex={mediaIndex}
                         selectedModule={selectedModule}
-                        updateModule={updateModule}
+                        updateModule={handleMediaItemUpdate}
                       />
                     ))}
                   </SortableContext>

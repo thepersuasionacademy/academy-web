@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { MediaType } from '@/types/course';
+import { MediaType } from '@/types/content';
 import { cn } from '@/lib/utils';
 import { MediaItemProps } from './types';
 import { MediaTypeIcon } from './MediaTypeIcon';

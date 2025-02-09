@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Eye, X } from 'lucide-react';
-import { VideoNameType } from '@/types/course';
+import { VideoNameType } from '@/types/content';
 import { cn } from '@/lib/utils';
 import { MediaItemProps } from './types';
 
@@ -39,14 +39,27 @@ export function VideoItem({ item, onUpdate, onRemove }: MediaItemProps) {
     };
   }, []);
 
+  // Local state for input values
+  const [localTitle, setLocalTitle] = useState(item.title || '');
+  const [localVideoId, setLocalVideoId] = useState(item.video_id || '');
+
+  // Update local state when props change
+  useEffect(() => {
+    setLocalTitle(item.title || '');
+    setLocalVideoId(item.video_id || '');
+  }, [item.title, item.video_id]);
+
   return (
     <div className="flex flex-col">
       <div className="flex items-center justify-between">
         <div className="flex-1 relative" ref={dropdownRef}>
           <input
             type="text"
-            value={item.title || ''}
-            onChange={e => onUpdate({ title: e.target.value })}
+            value={localTitle}
+            onChange={e => {
+              setLocalTitle(e.target.value);
+              onUpdate({ title: e.target.value || null });
+            }}
             onFocus={() => setShowTitleSuggestions(true)}
             placeholder="New Video Content"
             className="w-full px-4 py-3 text-2xl font-medium bg-transparent focus:outline-none text-[var(--foreground)]"
@@ -60,6 +73,7 @@ export function VideoItem({ item, onUpdate, onRemove }: MediaItemProps) {
                   key={type}
                   onMouseDown={(e) => {
                     e.preventDefault(); // Prevent input blur
+                    setLocalTitle(label);
                     onUpdate({ 
                       title: label,
                       video_name: type 
@@ -102,24 +116,29 @@ export function VideoItem({ item, onUpdate, onRemove }: MediaItemProps) {
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Video ID</label>
               <input
                 type="text"
-                value={item.video_id || ''}
-                onChange={e => onUpdate({ video_id: e.target.value })}
+                value={localVideoId}
+                onChange={e => {
+                  setLocalVideoId(e.target.value);
+                  onUpdate({ video_id: e.target.value || null });
+                }}
                 placeholder="Enter Video ID"
                 className="w-full px-3 py-2 text-lg rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               />
             </div>
 
-            {item.video_id && (
-              <div className="aspect-video w-full rounded-lg border border-[var(--border-color)] overflow-hidden bg-black">
-                <iframe 
-                  src={`https://iframe.mediadelivery.net/embed/376351/${item.video_id}?autoplay=false`}
-                  loading="lazy"
-                  className="w-full h-full"
-                  style={{ border: 'none' }}
-                  allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
-                  allowFullScreen
-                  title={item.title || 'Video Preview'}
-                />
+            {localVideoId && (
+              <div className="w-full max-w-3xl mx-auto">
+                <div className="aspect-video w-full rounded-lg border border-[var(--border-color)] overflow-hidden bg-black">
+                  <iframe 
+                    src={`https://iframe.mediadelivery.net/embed/376351/${localVideoId}?autoplay=false`}
+                    loading="lazy"
+                    className="w-full h-full"
+                    style={{ border: 'none' }}
+                    allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+                    allowFullScreen
+                    title={localTitle || 'Video Preview'}
+                  />
+                </div>
               </div>
             )}
           </div>

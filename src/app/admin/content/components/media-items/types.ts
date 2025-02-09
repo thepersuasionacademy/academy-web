@@ -1,4 +1,4 @@
-import { MediaItem, MediaType } from '@/types/course';
+import { MediaItem, MediaType } from '@/types/content';
 
 export interface MediaItemProps {
   item: Partial<MediaItem>;

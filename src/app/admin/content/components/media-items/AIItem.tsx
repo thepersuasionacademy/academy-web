@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Eye, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MediaItemProps } from './types';
@@ -7,8 +7,13 @@ import { useSuites } from '@/app/ai/hooks/useSuites';
 import { useTools } from '@/app/ai/hooks/useTools';
 import { AIToolModal } from '@/app/ai/components/AIToolModal';
 import type { AITool } from '@/lib/supabase/ai';
+import type { AIItem as AIItemType } from '@/types/content';
 
-export function AIItem({ item, onUpdate, onRemove }: MediaItemProps) {
+interface AIItemProps extends Omit<MediaItemProps, 'item'> {
+  item: Partial<AIItemType>;
+}
+
+export function AIItem({ item, onUpdate, onRemove }: AIItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
   const [selectedSuite, setSelectedSuite] = useState<string | undefined>(undefined);
@@ -21,6 +26,16 @@ export function AIItem({ item, onUpdate, onRemove }: MediaItemProps) {
   const { categories, isLoadingCategories } = useCategories();
   const { suites, isLoadingSuites } = useSuites(selectedCategory ?? null);
   const { tools, isLoadingTools } = useTools(selectedCategory ?? null, selectedSuite ?? null);
+
+  // Initialize values from item.tool when component mounts or item changes
+  useEffect(() => {
+    if (item.tool) {
+      const tool = item.tool;
+      setSelectedCategory(tool.collection_title ?? undefined);
+      setSelectedSuite(tool.suite_title ?? undefined);
+      setSelectedTool(tool.title ?? undefined);
+    }
+  }, [item.tool]);
 
   const handleCategorySelect = (name: string) => {
     setSelectedCategory(name);
@@ -46,7 +61,7 @@ export function AIItem({ item, onUpdate, onRemove }: MediaItemProps) {
   };
 
   // Find the selected tool object
-  const currentTool = tools.find(tool => tool.id === item.tool_id);
+  const currentTool = tools.find(tool => tool.id === item.tool_id) || item.tool;
 
   return (
     <div className="flex flex-col">

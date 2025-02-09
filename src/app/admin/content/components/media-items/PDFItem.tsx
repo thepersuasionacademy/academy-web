@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Eye, X } from 'lucide-react';
-import { PDFType } from '@/types/course';
+import { Eye, X, File } from 'lucide-react';
+import { PDFType } from '@/types/content';
 import { cn } from '@/lib/utils';
 import { MediaItemProps } from './types';
 
@@ -8,6 +8,18 @@ export function PDFItem({ item, onUpdate, onRemove }: MediaItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showTypeDropdown, setShowTypeDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Local state for input values
+  const [localTitle, setLocalTitle] = useState(item.title || '');
+  const [localPdfUrl, setLocalPdfUrl] = useState(item.pdf_url || '');
+  const [localCustomType, setLocalCustomType] = useState(item.custom_pdf_type || '');
+
+  // Update local state when props change
+  useEffect(() => {
+    setLocalTitle(item.title || '');
+    setLocalPdfUrl(item.pdf_url || '');
+    setLocalCustomType(item.custom_pdf_type || '');
+  }, [item.title, item.pdf_url, item.custom_pdf_type]);
 
   const pdfTypes = [
     { type: PDFType.TRANSCRIPT, label: 'Transcript' },
@@ -45,8 +57,11 @@ export function PDFItem({ item, onUpdate, onRemove }: MediaItemProps) {
         <div className="flex-1 relative" ref={dropdownRef}>
           <input
             type="text"
-            value={item.title || ''}
-            onChange={e => onUpdate({ title: e.target.value })}
+            value={localTitle}
+            onChange={e => {
+              setLocalTitle(e.target.value);
+              onUpdate({ title: e.target.value || null });
+            }}
             onFocus={() => setShowTypeDropdown(true)}
             placeholder="New PDF Content"
             className="w-full px-4 py-3 text-2xl font-medium bg-transparent focus:outline-none text-[var(--foreground)]"
@@ -60,6 +75,7 @@ export function PDFItem({ item, onUpdate, onRemove }: MediaItemProps) {
                   key={type}
                   onMouseDown={(e) => {
                     e.preventDefault(); // Prevent input blur
+                    setLocalTitle(label);
                     onUpdate({ 
                       title: label,
                       pdf_type: type 
@@ -102,8 +118,11 @@ export function PDFItem({ item, onUpdate, onRemove }: MediaItemProps) {
               <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">PDF URL</label>
               <input
                 type="text"
-                value={item.pdf_url || ''}
-                onChange={e => onUpdate({ pdf_url: e.target.value })}
+                value={localPdfUrl}
+                onChange={e => {
+                  setLocalPdfUrl(e.target.value);
+                  onUpdate({ pdf_url: e.target.value || null });
+                }}
                 placeholder="Enter PDF URL"
                 className="w-full px-3 py-2 text-lg rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
               />
@@ -114,23 +133,37 @@ export function PDFItem({ item, onUpdate, onRemove }: MediaItemProps) {
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1">Custom Type</label>
                 <input
                   type="text"
-                  value={item.custom_pdf_type || ''}
-                  onChange={e => onUpdate({ custom_pdf_type: e.target.value })}
+                  value={localCustomType}
+                  onChange={e => {
+                    setLocalCustomType(e.target.value);
+                    onUpdate({ custom_pdf_type: e.target.value || null });
+                  }}
                   placeholder="Enter custom PDF type"
                   className="w-full px-3 py-2 text-lg rounded-lg border border-[var(--border-color)] bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                 />
               </div>
             )}
 
-            {item.pdf_url && (
-              <div className="aspect-[8.5/11] w-full rounded-lg border border-[var(--border-color)] overflow-hidden bg-black">
-                <iframe 
-                  src={item.pdf_url}
-                  loading="lazy"
-                  className="w-full h-full"
-                  style={{ border: 'none' }}
-                  title={item.title || 'PDF Preview'}
-                />
+            {localPdfUrl && (
+              <div className="w-full max-w-3xl mx-auto">
+                <div className="aspect-[8.5/11] w-full rounded-lg border border-[var(--border-color)] overflow-hidden bg-black">
+                  <iframe 
+                    src={localPdfUrl}
+                    loading="lazy"
+                    className="w-full h-full"
+                    style={{ border: 'none' }}
+                    title={localTitle || 'PDF Preview'}
+                  />
+                </div>
+                <a 
+                  href={localPdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 flex items-center justify-center gap-2 p-2 rounded-lg border border-[var(--border-color)] hover:bg-[var(--hover-bg)] transition-colors text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+                >
+                  <File className="w-4 h-4" />
+                  <span>Open in New Tab</span>
+                </a>
               </div>
             )}
           </div>

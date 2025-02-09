@@ -555,4 +555,148 @@ GRANT ALL ON content.text_content TO postgres, authenticated;
 GRANT ALL ON content.ai_content TO postgres, authenticated;
 GRANT ALL ON content.pdf_content TO postgres, authenticated;
 GRANT ALL ON content.quiz_content TO postgres, authenticated;
-GRANT ALL ON content.content_stats TO postgres, authenticated; 
+GRANT ALL ON content.content_stats TO postgres, authenticated;
+
+-- Drop and recreate the get_content_by_id function with a different parameter style
+DROP FUNCTION IF EXISTS public.get_content_by_id(UUID);
+
+CREATE OR REPLACE FUNCTION public.get_content_by_id(content_id UUID)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, content, auth
+AS $$
+DECLARE
+    v_result jsonb;
+BEGIN
+    -- Check if user is authenticated
+    IF auth.uid() IS NULL THEN
+        RAISE EXCEPTION 'Not authenticated';
+    END IF;
+
+    -- Get content with collection and stats
+    WITH content_data AS (
+        SELECT 
+            c.id,
+            c.collection_id,
+            c.title,
+            c.description,
+            c.status,
+            c.thumbnail_url,
+            c.created_at,
+            c.updated_at,
+            jsonb_build_object(
+                'id', col.id,
+                'name', col.name,
+                'description', col.description
+            ) as collection,
+            COALESCE(
+                jsonb_build_object(
+                    'enrolled_count', cs.enrolled_count,
+                    'created_at', cs.created_at,
+                    'updated_at', cs.updated_at
+                ),
+                '{}'::jsonb
+            ) as stats
+        FROM content.content c
+        LEFT JOIN content.collections col ON col.id = c.collection_id
+        LEFT JOIN content.content_stats cs ON cs.content_id = c.id
+        WHERE c.id = content_id::uuid
+    ),
+    modules_data AS (
+        SELECT 
+            m.id as module_id,
+            m.title as module_title,
+            m.description as module_description,
+            m.order as module_order,
+            m.created_at as module_created_at,
+            m.updated_at as module_updated_at,
+            jsonb_agg(
+                jsonb_build_object(
+                    'id', med.id,
+                    'title', med.title,
+                    'description', med.description,
+                    'order', med.order,
+                    'created_at', med.created_at,
+                    'updated_at', med.updated_at,
+                    'video', (
+                        SELECT jsonb_build_object(
+                            'id', v.id,
+                            'video_id', v.video_id,
+                            'video_name', v.video_name
+                        )
+                        FROM content.videos v
+                        WHERE v.media_id = med.id
+                    ),
+                    'text', (
+                        SELECT jsonb_build_object(
+                            'id', t.id,
+                            'content_text', t.content_text
+                        )
+                        FROM content.text_content t
+                        WHERE t.media_id = med.id
+                    ),
+                    'ai', (
+                        SELECT jsonb_build_object(
+                            'id', a.id,
+                            'tool_id', a.tool_id
+                        )
+                        FROM content.ai_content a
+                        WHERE a.media_id = med.id
+                    ),
+                    'pdf', (
+                        SELECT jsonb_build_object(
+                            'id', p.id,
+                            'pdf_url', p.pdf_url,
+                            'pdf_type', p.pdf_type,
+                            'custom_pdf_type', p.custom_pdf_type
+                        )
+                        FROM content.pdf_content p
+                        WHERE p.media_id = med.id
+                    ),
+                    'quiz', (
+                        SELECT jsonb_build_object(
+                            'id', q.id,
+                            'quiz_data', q.quiz_data
+                        )
+                        FROM content.quiz_content q
+                        WHERE q.media_id = med.id
+                    )
+                ) ORDER BY med.order
+            ) as media
+        FROM content.modules m
+        LEFT JOIN content.media med ON med.module_id = m.id
+        WHERE m.content_id = content_id::uuid
+        GROUP BY m.id, m.title, m.description, m.order, m.created_at, m.updated_at
+        ORDER BY m.order
+    )
+    SELECT 
+        jsonb_build_object(
+            'content', (SELECT row_to_json(cd.*)::jsonb FROM content_data cd),
+            'modules', COALESCE((
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+                        'id', module_id,
+                        'title', module_title,
+                        'description', module_description,
+                        'order', module_order,
+                        'created_at', module_created_at,
+                        'updated_at', module_updated_at,
+                        'media', media
+                    )
+                    ORDER BY module_order
+                )
+                FROM modules_data
+            ), '[]'::jsonb)
+        )
+    INTO v_result;
+
+    RETURN v_result;
+END;
+$$;
+
+-- Grant execute permission to authenticated users
+GRANT EXECUTE ON FUNCTION public.get_content_by_id(UUID) TO authenticated;
+
+-- Add comment to help with PostgREST discovery
+COMMENT ON FUNCTION public.get_content_by_id(UUID) IS 'Gets content and all related data by content ID'; 

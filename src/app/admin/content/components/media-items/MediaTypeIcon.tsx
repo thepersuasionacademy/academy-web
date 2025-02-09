@@ -1,6 +1,6 @@
 import React from 'react';
 import { Video, FileText, Bot, File, FileQuestion } from 'lucide-react';
-import { MediaType } from '@/types/course';
+import { MediaType } from '@/types/content';
 import { MediaTypeIconProps } from './types';
 
 export function MediaTypeIcon({ type, className }: MediaTypeIconProps) {
