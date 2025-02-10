@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Content, MediaType } from '@/types/content';
-import { ExtendedContent } from '@/types/extended';
+import { ExtendedContent } from '@/types/content';
 import { useRouter } from 'next/navigation';
-import LeftContentBuilder from '../components/builder/LeftContentBuilder';
 import { toast } from 'sonner';
+import ContentBuilder from '../components/builder/ContentBuilder';
 
 interface ContentEditPageProps {
   params: Promise<{ slug: string }>;
@@ -63,8 +62,17 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
       console.log('Content loaded successfully:', contentData);
       
+      // Log the raw AI items
+      contentData.modules?.forEach((module: any) => {
+        module.media?.forEach((media: any) => {
+          if (media.ai) {
+            console.log('Raw AI item:', media.ai);
+          }
+        });
+      });
+
       // Transform the content data to match our ExtendedContent interface
-      const transformedContent = {
+      const transformedContent: ExtendedContent = {
         id: contentData.content.id,
         collection_id: contentData.content.collection_id,
         title: contentData.content.title || '',
@@ -76,7 +84,9 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
         collection: contentData.content.collection ? {
           id: contentData.content.collection.id,
           name: contentData.content.collection.name,
-          description: contentData.content.collection.description
+          description: contentData.content.collection.description,
+          created_at: contentData.content.collection.created_at,
+          updated_at: contentData.content.collection.updated_at
         } : null,
         stats: contentData.content.stats || {
           enrolled_count: 0,
@@ -88,6 +98,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           title: module.title || '',
           description: module.description || null,
           order: module.order,
+          content_id: module.content_id,
           created_at: module.created_at,
           updated_at: module.updated_at,
           media: (module.media || []).map((media: any) => ({
@@ -95,6 +106,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             title: media.title || '',
             description: media.description || null,
             order: media.order,
+            module_id: media.module_id,
+            content_id: media.content_id,
             created_at: media.created_at,
             updated_at: media.updated_at,
             items: [
@@ -154,34 +167,233 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
     }
   };
 
-  const handleClose = () => {
-    // Do nothing, we want to stay on the page
-  };
-
   const handleSave = async (updatedContent: ExtendedContent) => {
     const loadingToast = toast.loading('Saving changes...');
-
+    
     try {
-      // Call the save_content RPC function with all content data
+      console.log('Starting save process with content:', updatedContent);
+      
+      // Transform the content to match the database structure
+      const transformedContent = {
+        ...updatedContent,
+        modules: updatedContent.modules.map(module => ({
+          ...module,
+          media: module.media.map(media => {
+            // Find the items of each type
+            const videoItem = media.items.find(item => item.type === 'VIDEO');
+            const textItem = media.items.find(item => item.type === 'TEXT');
+            const aiItem = media.items.find(item => item.type === 'AI');
+            const pdfItem = media.items.find(item => item.type === 'PDF');
+            const quizItem = media.items.find(item => item.type === 'QUIZ');
+
+            return {
+              id: media.id,
+              title: media.title,
+              description: media.description,
+              order: media.order,
+              module_id: module.id,
+              content_id: updatedContent.id,
+              created_at: media.created_at,
+              updated_at: media.updated_at,
+              // Add each type of item as a separate property
+              video: videoItem ? {
+                id: videoItem.id,
+                title: videoItem.title,
+                video_id: videoItem.video_id,
+                video_name: videoItem.video_name,
+                order: videoItem.order
+              } : null,
+              text: textItem ? {
+                id: textItem.id,
+                title: textItem.title,
+                content_text: textItem.content_text,
+                order: textItem.order
+              } : null,
+              ai: aiItem ? {
+                id: aiItem.id,
+                title: aiItem.title,
+                tool_id: aiItem.tool_id,
+                order: aiItem.order
+              } : null,
+              pdf: pdfItem ? {
+                id: pdfItem.id,
+                title: pdfItem.title,
+                pdf_url: pdfItem.pdf_url,
+                pdf_type: pdfItem.pdf_type,
+                custom_pdf_type: pdfItem.custom_pdf_type,
+                order: pdfItem.order
+              } : null,
+              quiz: quizItem ? {
+                id: quizItem.id,
+                title: quizItem.title,
+                quiz_data: quizItem.quiz_data,
+                order: quizItem.order
+              } : null
+            };
+          })
+        }))
+      };
+
+      console.log('Transformed content for save:', transformedContent);
+      
+      // Call the save_content RPC function with transformed content data
       const { data, error } = await supabase
         .rpc('save_content', {
           p_content_id: slug,
-          p_content: updatedContent
+          p_content: transformedContent
         });
+
+      console.log('Save content RPC response:', { data, error });
 
       if (error) throw error;
 
-      // Reload the content to get the latest data
-      await loadContent();
-      
-      // Success! Dismiss loading toast and show success
-      toast.dismiss(loadingToast);
-      toast.success('Content updated successfully');
+      // Update the local state with the saved content
+      if (data) {
+        // Transform the returned data back to ExtendedContent format
+        const savedContent: ExtendedContent = {
+          id: data.content.id,
+          collection_id: data.content.collection_id,
+          title: data.content.title,
+          description: data.content.description,
+          status: data.content.status,
+          thumbnail_url: data.content.thumbnail_url,
+          created_at: data.content.created_at,
+          updated_at: data.content.updated_at,
+          collection: data.content.collection ? {
+            id: data.content.collection.id,
+            name: data.content.collection.name,
+            description: data.content.collection.description,
+            created_at: data.content.collection.created_at,
+            updated_at: data.content.collection.updated_at
+          } : null,
+          stats: data.content.stats,
+          modules: (data.modules || []).map((module: {
+            id: string;
+            title: string;
+            description: string | null;
+            order: number;
+            created_at: string;
+            updated_at: string;
+            media: Array<{
+              id: string;
+              title: string;
+              description: string | null;
+              order: number;
+              created_at: string;
+              updated_at: string;
+              video: {
+                id: string;
+                title: string;
+                video_id: string | null;
+                video_name: string | null;
+                order: number;
+              } | null;
+              text: {
+                id: string;
+                title: string;
+                content_text: string | null;
+                order: number;
+              } | null;
+              ai: {
+                id: string;
+                title: string;
+                tool_id: string | null;
+                order: number;
+              } | null;
+              pdf: {
+                id: string;
+                title: string;
+                pdf_url: string | null;
+                pdf_type: string | null;
+                custom_pdf_type: string | null;
+                order: number;
+              } | null;
+              quiz: {
+                id: string;
+                title: string;
+                quiz_data: Record<string, any>;
+                order: number;
+              } | null;
+            }>;
+          }) => ({
+            id: module.id,
+            title: module.title,
+            description: module.description,
+            order: module.order,
+            content_id: data.content.id,
+            created_at: module.created_at,
+            updated_at: module.updated_at,
+            media: (module.media || []).map((media) => ({
+              id: media.id,
+              title: media.title,
+              description: media.description,
+              order: media.order,
+              module_id: module.id,
+              content_id: data.content.id,
+              created_at: media.created_at,
+              updated_at: media.updated_at,
+              items: [
+                media.video && {
+                  id: media.video.id,
+                  type: 'VIDEO' as const,
+                  title: media.video.title,
+                  video_id: media.video.video_id,
+                  video_name: media.video.video_name,
+                  order: media.video.order
+                },
+                media.text && {
+                  id: media.text.id,
+                  type: 'TEXT' as const,
+                  title: media.text.title,
+                  content_text: media.text.content_text,
+                  order: media.text.order
+                },
+                media.ai && {
+                  id: media.ai.id,
+                  type: 'AI' as const,
+                  title: media.ai.title,
+                  tool_id: media.ai.tool_id,
+                  order: media.ai.order
+                },
+                media.pdf && {
+                  id: media.pdf.id,
+                  type: 'PDF' as const,
+                  title: media.pdf.title,
+                  pdf_url: media.pdf.pdf_url,
+                  pdf_type: media.pdf.pdf_type,
+                  custom_pdf_type: media.pdf.custom_pdf_type,
+                  order: media.pdf.order
+                },
+                media.quiz && {
+                  id: media.quiz.id,
+                  type: 'QUIZ' as const,
+                  title: media.quiz.title,
+                  quiz_data: media.quiz.quiz_data,
+                  order: media.quiz.order
+                }
+              ].filter(Boolean)
+            }))
+          }))
+        };
+
+        // Update the local state with the properly transformed content
+        setContent(savedContent);
+        toast.success('Changes saved successfully');
+      } else {
+        // If no data returned, reload content as fallback
+        await loadContent();
+        toast.success('Changes saved successfully');
+      }
     } catch (error: any) {
       console.error('Error saving content:', error);
-      toast.dismiss(loadingToast);
       toast.error(error.message || 'Failed to save changes');
+    } finally {
+      toast.dismiss(loadingToast);
     }
+  };
+
+  const handleClose = () => {
+    router.push('/admin/content');
   };
 
   if (isLoading) {
@@ -197,12 +409,10 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      <LeftContentBuilder
-        content={content}
-        onSave={handleSave}
-        onClose={handleClose}
-      />
-    </div>
+    <ContentBuilder
+      content={content}
+      onSave={handleSave}
+      onClose={handleClose}
+    />
   );
 } 

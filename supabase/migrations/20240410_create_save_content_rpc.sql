@@ -16,6 +16,8 @@ DECLARE
     v_module_index INTEGER;
     v_media_index INTEGER;
     v_item_index INTEGER;
+    v_module_ids UUID[];
+    v_media_ids UUID[];
 BEGIN
     -- Check if user is authenticated
     IF auth.uid() IS NULL THEN
@@ -37,90 +39,242 @@ BEGIN
             updated_at = NOW()
         WHERE id = p_content_id;
 
-        -- Update modules with array index as order
+        -- Create an array to store module IDs for deletion check
+        SELECT array_agg((value->>'id')::UUID)
+        INTO v_module_ids
+        FROM jsonb_array_elements(p_content->'modules');
+
+        -- First, delete all content-specific items for media that will be deleted
+        DELETE FROM content.videos v
+        USING content.media m
+        WHERE v.media_id = m.id
+        AND m.content_id = p_content_id
+        AND (m.module_id NOT IN (SELECT UNNEST(COALESCE(v_module_ids, '{}'::UUID[]))));
+
+        DELETE FROM content.text_content t
+        USING content.media m
+        WHERE t.media_id = m.id
+        AND m.content_id = p_content_id
+        AND (m.module_id NOT IN (SELECT UNNEST(COALESCE(v_module_ids, '{}'::UUID[]))));
+
+        DELETE FROM content.ai_content a
+        USING content.media m
+        WHERE a.media_id = m.id
+        AND m.content_id = p_content_id
+        AND (m.module_id NOT IN (SELECT UNNEST(COALESCE(v_module_ids, '{}'::UUID[]))));
+
+        DELETE FROM content.pdf_content p
+        USING content.media m
+        WHERE p.media_id = m.id
+        AND m.content_id = p_content_id
+        AND (m.module_id NOT IN (SELECT UNNEST(COALESCE(v_module_ids, '{}'::UUID[]))));
+
+        DELETE FROM content.quiz_content q
+        USING content.media m
+        WHERE q.media_id = m.id
+        AND m.content_id = p_content_id
+        AND (m.module_id NOT IN (SELECT UNNEST(COALESCE(v_module_ids, '{}'::UUID[]))));
+
+        -- Then delete media items for modules that will be deleted
+        DELETE FROM content.media
+        WHERE module_id NOT IN (SELECT UNNEST(COALESCE(v_module_ids, '{}'::UUID[])))
+        AND content_id = p_content_id;
+
+        -- Finally delete modules that are not in the update
+        DELETE FROM content.modules
+        WHERE content_id = p_content_id
+        AND id NOT IN (SELECT UNNEST(COALESCE(v_module_ids, '{}'::UUID[])));
+
+        -- Update or insert modules with array index as order
         FOR v_module, v_module_index IN 
             SELECT value, (row_number() OVER ())::INTEGER - 1
             FROM jsonb_array_elements(p_content->'modules')
         LOOP
             RAISE NOTICE 'Processing module: %, index/order: %', v_module->>'id', v_module_index;
 
-            UPDATE content.modules SET
-                title = v_module->>'title',
-                "order" = v_module_index,
-                updated_at = NOW()
-            WHERE id = (v_module->>'id')::UUID
-            AND content_id = p_content_id;
+            -- Insert or update module
+            INSERT INTO content.modules (
+                id, content_id, title, "order", created_at, updated_at
+            )
+            VALUES (
+                (v_module->>'id')::UUID,
+                p_content_id,
+                v_module->>'title',
+                v_module_index,
+                COALESCE((v_module->>'created_at')::TIMESTAMP WITH TIME ZONE, NOW()),
+                NOW()
+            )
+            ON CONFLICT (id) DO UPDATE SET
+                title = EXCLUDED.title,
+                "order" = EXCLUDED.order,
+                updated_at = NOW();
 
-            -- Update media with array index as order
+            -- Create an array to store media IDs for deletion check
+            SELECT array_agg((value->>'id')::UUID)
+            INTO v_media_ids
+            FROM jsonb_array_elements(v_module->'media');
+
+            -- Delete media items that are not in the update
+            DELETE FROM content.media
+            WHERE module_id = (v_module->>'id')::UUID
+            AND content_id = p_content_id
+            AND id NOT IN (SELECT UNNEST(COALESCE(v_media_ids, '{}'::UUID[])));
+
+            -- Update or insert media with array index as order
             FOR v_media, v_media_index IN 
                 SELECT value, (row_number() OVER ())::INTEGER - 1
                 FROM jsonb_array_elements(v_module->'media')
             LOOP
                 RAISE NOTICE 'Processing media: %, index/order: %', v_media->>'id', v_media_index;
 
-                UPDATE content.media SET
-                    title = v_media->>'title',
-                    "order" = v_media_index,
-                    updated_at = NOW()
-                WHERE id = (v_media->>'id')::UUID
-                AND module_id = (v_module->>'id')::UUID;
+                -- Insert or update media
+                INSERT INTO content.media (
+                    id, module_id, content_id, title, "order", created_at, updated_at
+                )
+                VALUES (
+                    (v_media->>'id')::UUID,
+                    (v_module->>'id')::UUID,
+                    p_content_id,
+                    v_media->>'title',
+                    v_media_index,
+                    COALESCE((v_media->>'created_at')::TIMESTAMP WITH TIME ZONE, NOW()),
+                    NOW()
+                )
+                ON CONFLICT (id) DO UPDATE SET
+                    title = EXCLUDED.title,
+                    "order" = EXCLUDED.order,
+                    updated_at = NOW();
 
-                -- Update media items with array index as order
-                FOR v_item, v_item_index IN 
-                    SELECT value, (row_number() OVER ())::INTEGER - 1
-                    FROM jsonb_array_elements(v_media->'items')
-                LOOP
-                    RAISE NOTICE 'Processing item: %, type: %, index/order: %', 
-                        v_item->>'id', v_item->>'type', v_item_index;
+                -- Delete existing items for this media that are not in the update (with content_id check via media join)
+                DELETE FROM content.videos v
+                USING content.media m
+                WHERE v.media_id = m.id
+                AND m.content_id = p_content_id
+                AND v.media_id = (v_media->>'id')::UUID 
+                AND (v_media->'video' IS NULL OR v.id != (v_media->'video'->>'id')::UUID);
 
-                    -- Update based on type
-                    CASE v_item->>'type'
-                        WHEN 'VIDEO' THEN
-                            UPDATE content.videos SET
-                                title = v_item->>'title',
-                                video_id = v_item->>'video_id',
-                                "order" = v_item_index,
-                                updated_at = NOW()
-                            WHERE id = (v_item->>'id')::UUID
-                            AND media_id = (v_media->>'id')::UUID;
+                DELETE FROM content.text_content t
+                USING content.media m
+                WHERE t.media_id = m.id
+                AND m.content_id = p_content_id
+                AND t.media_id = (v_media->>'id')::UUID 
+                AND (v_media->'text' IS NULL OR t.id != (v_media->'text'->>'id')::UUID);
 
-                        WHEN 'TEXT' THEN
-                            UPDATE content.text_content SET
-                                title = v_item->>'title',
-                                content_text = v_item->>'content_text',
-                                "order" = v_item_index,
-                                updated_at = NOW()
-                            WHERE id = (v_item->>'id')::UUID
-                            AND media_id = (v_media->>'id')::UUID;
+                DELETE FROM content.ai_content a
+                USING content.media m
+                WHERE a.media_id = m.id
+                AND m.content_id = p_content_id
+                AND a.media_id = (v_media->>'id')::UUID 
+                AND (v_media->'ai' IS NULL OR a.id != (v_media->'ai'->>'id')::UUID);
 
-                        WHEN 'AI' THEN
-                            UPDATE content.ai_content SET
-                                title = v_item->>'title',
-                                tool_id = (v_item->>'tool_id')::UUID,
-                                "order" = v_item_index,
-                                updated_at = NOW()
-                            WHERE id = (v_item->>'id')::UUID
-                            AND media_id = (v_media->>'id')::UUID;
+                DELETE FROM content.pdf_content p
+                USING content.media m
+                WHERE p.media_id = m.id
+                AND m.content_id = p_content_id
+                AND p.media_id = (v_media->>'id')::UUID 
+                AND (v_media->'pdf' IS NULL OR p.id != (v_media->'pdf'->>'id')::UUID);
 
-                        WHEN 'PDF' THEN
-                            UPDATE content.pdf_content SET
-                                title = v_item->>'title',
-                                pdf_url = v_item->>'pdf_url',
-                                "order" = v_item_index,
-                                updated_at = NOW()
-                            WHERE id = (v_item->>'id')::UUID
-                            AND media_id = (v_media->>'id')::UUID;
+                DELETE FROM content.quiz_content q
+                USING content.media m
+                WHERE q.media_id = m.id
+                AND m.content_id = p_content_id
+                AND q.media_id = (v_media->>'id')::UUID 
+                AND (v_media->'quiz' IS NULL OR q.id != (v_media->'quiz'->>'id')::UUID);
 
-                        WHEN 'QUIZ' THEN
-                            UPDATE content.quiz_content SET
-                                title = v_item->>'title',
-                                quiz_data = v_item->'quiz_data',
-                                "order" = v_item_index,
-                                updated_at = NOW()
-                            WHERE id = (v_item->>'id')::UUID
-                            AND media_id = (v_media->>'id')::UUID;
-                    END CASE;
-                END LOOP;
+                -- Process video item if present and has data
+                IF v_media->'video' IS NOT NULL AND v_media->'video'->>'title' IS NOT NULL THEN
+                    INSERT INTO content.videos (
+                        id, media_id, content_id, title, video_id, "order"
+                    )
+                    VALUES (
+                        COALESCE((v_media->'video'->>'id')::UUID, gen_random_uuid()),
+                        (v_media->>'id')::UUID,
+                        p_content_id,
+                        (v_media->'video'->>'title'),
+                        (v_media->'video'->>'video_id'),
+                        COALESCE((v_media->'video'->>'order')::INTEGER, 0)
+                    )
+                    ON CONFLICT (id) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        video_id = EXCLUDED.video_id,
+                        "order" = EXCLUDED.order;
+                END IF;
+
+                -- Process text item if present and has data
+                IF v_media->'text' IS NOT NULL AND (v_media->'text'->>'title' IS NOT NULL OR v_media->'text'->>'content_text' IS NOT NULL) THEN
+                    INSERT INTO content.text_content (
+                        id, media_id, content_id, title, content_text, "order"
+                    )
+                    VALUES (
+                        COALESCE((v_media->'text'->>'id')::UUID, gen_random_uuid()),
+                        (v_media->>'id')::UUID,
+                        p_content_id,
+                        COALESCE((v_media->'text'->>'title'), ''),
+                        COALESCE((v_media->'text'->>'content_text'), ''),
+                        COALESCE((v_media->'text'->>'order')::INTEGER, 0)
+                    )
+                    ON CONFLICT (id) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        content_text = EXCLUDED.content_text,
+                        "order" = EXCLUDED.order;
+                END IF;
+
+                -- Process AI item if present and has data
+                IF v_media->'ai' IS NOT NULL AND (v_media->'ai'->>'title' IS NOT NULL OR v_media->'ai'->>'tool_id' IS NOT NULL) THEN
+                    INSERT INTO content.ai_content (
+                        id, media_id, content_id, title, tool_id, "order"
+                    )
+                    VALUES (
+                        COALESCE((v_media->'ai'->>'id')::UUID, gen_random_uuid()),
+                        (v_media->>'id')::UUID,
+                        p_content_id,
+                        COALESCE((v_media->'ai'->>'title'), ''),
+                        COALESCE((v_media->'ai'->>'tool_id')::UUID, gen_random_uuid()),
+                        COALESCE((v_media->'ai'->>'order')::INTEGER, 0)
+                    )
+                    ON CONFLICT (id) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        tool_id = EXCLUDED.tool_id,
+                        "order" = EXCLUDED.order;
+                END IF;
+
+                -- Process PDF item if present and has data
+                IF v_media->'pdf' IS NOT NULL AND (v_media->'pdf'->>'title' IS NOT NULL OR v_media->'pdf'->>'pdf_url' IS NOT NULL) THEN
+                    INSERT INTO content.pdf_content (
+                        id, media_id, content_id, title, pdf_url, "order"
+                    )
+                    VALUES (
+                        COALESCE((v_media->'pdf'->>'id')::UUID, gen_random_uuid()),
+                        (v_media->>'id')::UUID,
+                        p_content_id,
+                        COALESCE((v_media->'pdf'->>'title'), ''),
+                        COALESCE((v_media->'pdf'->>'pdf_url'), ''),
+                        COALESCE((v_media->'pdf'->>'order')::INTEGER, 0)
+                    )
+                    ON CONFLICT (id) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        pdf_url = EXCLUDED.pdf_url,
+                        "order" = EXCLUDED.order;
+                END IF;
+
+                -- Process quiz item if present and has data
+                IF v_media->'quiz' IS NOT NULL AND (v_media->'quiz'->>'title' IS NOT NULL OR v_media->'quiz'->'quiz_data' IS NOT NULL) THEN
+                    INSERT INTO content.quiz_content (
+                        id, media_id, content_id, title, quiz_data, "order"
+                    )
+                    VALUES (
+                        COALESCE((v_media->'quiz'->>'id')::UUID, gen_random_uuid()),
+                        (v_media->>'id')::UUID,
+                        p_content_id,
+                        COALESCE((v_media->'quiz'->>'title'), ''),
+                        COALESCE((v_media->'quiz'->'quiz_data')::JSONB, '{}'::JSONB),
+                        COALESCE((v_media->'quiz'->>'order')::INTEGER, 0)
+                    )
+                    ON CONFLICT (id) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        quiz_data = EXCLUDED.quiz_data,
+                        "order" = EXCLUDED.order;
+                END IF;
             END LOOP;
         END LOOP;
 

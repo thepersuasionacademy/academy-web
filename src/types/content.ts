@@ -220,4 +220,15 @@ export interface ExtendedContent extends Content {
 // Partial types for updates
 export type MediaItemUpdates = Partial<MediaItem>;
 export type ModuleUpdates = Partial<Module>;
-export type ContentUpdates = Partial<Content>; 
+export type ContentUpdates = Partial<Content>;
+
+export interface AITool {
+  id: string;
+  title: string;
+  description: string;
+  credits_cost: number;
+  collection_title: string | null;
+  suite_title: string | null;
+  inputs: AIInput[];
+  prompts: AIPrompt[];
+} 
