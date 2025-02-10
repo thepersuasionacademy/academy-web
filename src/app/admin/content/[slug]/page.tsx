@@ -168,8 +168,6 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
   };
 
   const handleSave = async (updatedContent: ExtendedContent) => {
-    const loadingToast = toast.loading('Saving changes...');
-    
     try {
       console.log('Starting save process with content:', updatedContent);
       
@@ -378,17 +376,13 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
         // Update the local state with the properly transformed content
         setContent(savedContent);
-        toast.success('Changes saved successfully');
       } else {
         // If no data returned, reload content as fallback
         await loadContent();
-        toast.success('Changes saved successfully');
       }
     } catch (error: any) {
       console.error('Error saving content:', error);
-      toast.error(error.message || 'Failed to save changes');
-    } finally {
-      toast.dismiss(loadingToast);
+      throw error; // Re-throw the error to be handled by ContentBuilder
     }
   };
 

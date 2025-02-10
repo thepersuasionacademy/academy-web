@@ -28,6 +28,8 @@ import { toast } from 'sonner';
 import NewCourseClient from './new/components/NewCourseClient';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import Image from 'next/image';
+import DeleteConfirmationDialog from './components/DeleteConfirmationDialog';
+import NewContentDialog from './components/NewContentDialog';
 
 interface Content {
   id: string;
@@ -62,6 +64,9 @@ export default function ContentPage() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [content, setContent] = useState<Content[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [contentToDelete, setContentToDelete] = useState<Content | null>(null);
+  const [isNewContentDialogOpen, setIsNewContentDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchCollections();
@@ -157,13 +162,52 @@ export default function ContentPage() {
   };
 
   const handleDelete = async (contentId: string) => {
-    // Add delete functionality later
-    toast.error('Delete functionality not implemented yet');
+    const contentItem = content.find(item => item.id === contentId);
+    if (contentItem) {
+      setContentToDelete(contentItem);
+      setDeleteDialogOpen(true);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!contentToDelete) return;
+
+    try {
+      const loadingToast = toast.loading('Deleting content...');
+
+      // Call RPC function to delete content
+      const { error } = await supabase
+        .rpc('delete_content', {
+          p_content_id: contentToDelete.id
+        });
+
+      if (error) {
+        console.error('Error deleting content:', error);
+        toast.error(`Failed to delete content: ${error.message}`);
+        return;
+      }
+
+      // Remove the content from local state
+      setContent(prevContent => prevContent.filter(item => item.id !== contentToDelete.id));
+      
+      toast.dismiss(loadingToast);
+      toast.success('Content deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting content:', error);
+      toast.error('Failed to delete content');
+    } finally {
+      setDeleteDialogOpen(false);
+      setContentToDelete(null);
+    }
   };
 
   const handleArchive = async (contentId: string) => {
     // Add archive functionality later
     toast.error('Archive functionality not implemented yet');
+  };
+
+  const handleNewContentSuccess = (contentId: string) => {
+    router.push(`/admin/content/${contentId}`);
   };
 
   return (
@@ -181,13 +225,13 @@ export default function ContentPage() {
               </Link>
               <h1 className="text-2xl font-semibold text-[var(--foreground)]">Content</h1>
             </div>
-            <Link 
-              href="/admin/content/new"
+            <button 
+              onClick={() => setIsNewContentDialogOpen(true)}
               className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
             >
               <Plus className="w-5 h-5" />
               <span>New Content</span>
-            </Link>
+            </button>
           </div>
         </div>
       </div>
@@ -348,9 +392,21 @@ export default function ContentPage() {
         )}
       </div>
 
-      <NewCourseClient 
-        isOpen={isNewContentOpen}
-        onClose={() => setIsNewContentOpen(false)}
+      <NewContentDialog
+        isOpen={isNewContentDialogOpen}
+        onClose={() => setIsNewContentDialogOpen(false)}
+        onSuccess={handleNewContentSuccess}
+        collections={collections}
+      />
+
+      <DeleteConfirmationDialog
+        isOpen={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setContentToDelete(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        title={contentToDelete?.title || ''}
       />
     </div>
   );

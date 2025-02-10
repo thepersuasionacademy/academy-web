@@ -4,6 +4,7 @@ const imageDomains = [
   'wltjkhsmqhospeezdgga.supabase.co',  // Development Supabase domain
   'itolhrognjngmyycodzv.supabase.co',  // Development Supabase domain
   'wltjkhsmqhospeezdgga.supabase.co',  // Production Supabase domain
+  'thepersuasionacademycdn.b-cdn.net',
   // Add more domains as needed
 ];
 

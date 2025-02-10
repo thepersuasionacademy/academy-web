@@ -8,12 +8,14 @@ interface ContentHeaderProps {
   status: ContentStatus;
   onStatusChange: (status: ContentStatus) => void;
   onSave: () => void;
+  title: string;
 }
 
 export default function ContentHeader({
   status,
   onStatusChange,
-  onSave
+  onSave,
+  title
 }: ContentHeaderProps) {
   return (
     <div className="sticky top-0 z-10 border-b border-[var(--border-color)] bg-[var(--background)]/80 backdrop-blur-sm">
@@ -26,11 +28,23 @@ export default function ContentHeader({
             <ChevronLeft className="w-5 h-5 text-[var(--text-secondary)]" />
           </Link>
           <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-            <span>Admin</span>
+            <Link 
+              href="/admin"
+              className="hover:text-[var(--foreground)] transition-colors"
+            >
+              Admin
+            </Link>
             <ChevronRight className="w-4 h-4" />
-            <span>Content</span>
+            <Link 
+              href="/admin/content"
+              className="hover:text-[var(--foreground)] transition-colors"
+            >
+              Content
+            </Link>
             <ChevronRight className="w-4 h-4" />
-            <span className="text-[var(--foreground)] font-medium">New Content</span>
+            <span className="text-[var(--foreground)] font-medium">
+              {title || 'Untitled Content'}
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -72,7 +86,7 @@ export default function ContentHeader({
           <button
             onClick={(e) => {
               e.preventDefault();
-              console.log('Save button clicked');
+              e.stopPropagation();
               onSave();
             }}
             type="button"

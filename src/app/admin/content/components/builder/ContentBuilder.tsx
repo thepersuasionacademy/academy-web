@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { toast } from 'sonner';
+import { toast, Toaster } from 'sonner';
 import { Content, Collection, ContentStatus, ExtendedContent, Module, MediaItem, AITool, AIItem } from '@/types/content';
 import ContentHeader from './components/ContentHeader';
 import ContentInfo from './components/ContentInfo';
 import CollectionSelector from './components/CollectionSelector';
 import ModuleList from './components/ModuleList';
 import MediaList from './components/MediaList';
+import ThumbnailUpload from './components/ThumbnailUpload';
 
 type ExtendedModule = ExtendedContent['modules'][0] & {
   content_id: string;
@@ -217,117 +218,119 @@ export default function ContentBuilder({
   }
 
   const handleSubmit = async () => {
-    try {
-      console.log('ContentBuilder: Starting submit process');
-      
-      // Validate required fields
-      if (!content.title?.trim()) {
-        console.log('ContentBuilder: Missing title');
-        toast.error('Please enter a content title');
-        return;
-      }
-
-      if (!selectedCollection) {
-        console.log('ContentBuilder: Missing collection');
-        toast.error('Please select or create a collection');
-        return;
-      }
-
-      if (!content.modules.length) {
-        console.log('ContentBuilder: No modules');
-        toast.error('Please add at least one module');
-        return;
-      }
-
-      console.log('ContentBuilder: Validation passed, preparing to save content:', {
-        content,
-        selectedCollection
-      });
-
-      // Show loading toast
-      const loadingToast = toast.loading('Updating content...');
-
-      // Call the onSave callback with the updated content
-      const contentToSave = {
-        ...content,
-        collection_id: selectedCollection
-      };
-      console.log('ContentBuilder: Calling onSave with:', contentToSave);
-      
-      await onSave(contentToSave);
-
-      // Success! Dismiss loading toast and show success
-      toast.dismiss(loadingToast);
-      toast.success('Content updated successfully!');
-    } catch (error: any) {
-      console.error('ContentBuilder: Error updating content:', error);
-      toast.error(`Failed to update content: ${error.message}`);
+    // Validate required fields
+    if (!content.title?.trim()) {
+      toast.error('Please enter a content title');
+      return;
     }
+
+    if (!selectedCollection) {
+      toast.error('Please select or create a collection');
+      return;
+    }
+
+    if (!content.modules.length) {
+      toast.error('Please add at least one module');
+      return;
+    }
+
+    // Prepare the content to save
+    const contentToSave = {
+      ...content,
+      collection_id: selectedCollection
+    };
+    
+    // Use toast.promise with the correct configuration
+    await toast.promise(onSave(contentToSave), {
+      loading: 'Saving changes...',
+      success: 'Changes saved successfully!',
+      error: (err) => `Failed to save changes: ${err.message}`,
+      id: 'save-content',
+      duration: 2000,
+    });
   };
 
   const selectedModule = content.modules.find(m => m.id === selectedModuleId);
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
+      <Toaster 
+        position="top-center" 
+        expand={true} 
+        richColors 
+        theme="dark"
+        closeButton
+        className="bg-[var(--card-bg)] text-[var(--foreground)] border border-[var(--border-color)]"
+        duration={3000}
+      />
       <ContentHeader
         status={content.status}
         onStatusChange={(status) => setContent(prev => ({ ...prev, status }))}
         onSave={handleSubmit}
+        title={content.title || 'Untitled Content'}
       />
 
       <div className="flex h-[calc(100vh-4rem)]">
         {/* Left Panel - 30% */}
-        <div className="w-[30%] border-r border-[var(--border-color)] overflow-y-auto">
-          <div className="p-8 space-y-8">
-            <ContentInfo
-              title={content.title}
-              description={content.description}
-              onTitleChange={(title) => setContent(prev => ({ ...prev, title }))}
-              onDescriptionChange={(description) => setContent(prev => ({ ...prev, description }))}
+        <div className="w-[30%] border-r border-[var(--border-color)] flex flex-col">
+          <div className="w-full h-[200px]">
+            <ThumbnailUpload
+              thumbnailUrl={content.thumbnail_url}
+              onThumbnailChange={(url) => setContent(prev => ({ ...prev, thumbnail_url: url }))}
             />
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="p-4 space-y-4">
+              <ContentInfo
+                title={content.title}
+                description={content.description}
+                onTitleChange={(title) => setContent(prev => ({ ...prev, title }))}
+                onDescriptionChange={(description) => setContent(prev => ({ ...prev, description }))}
+              />
 
-            <CollectionSelector
-              selectedCollection={selectedCollection}
-              collections={collections}
-              newCollectionName={newCollectionName}
-              isCreatingCollection={isCreatingCollection}
-              onCollectionSelect={setSelectedCollection}
-              onNewCollectionNameChange={setNewCollectionName}
-              onCreateCollection={handleCreateCollection}
-              onCreateModeChange={setIsCreatingCollection}
-            />
+              <CollectionSelector
+                selectedCollection={selectedCollection}
+                collections={collections}
+                newCollectionName={newCollectionName}
+                isCreatingCollection={isCreatingCollection}
+                onCollectionSelect={setSelectedCollection}
+                onNewCollectionNameChange={setNewCollectionName}
+                onCreateCollection={handleCreateCollection}
+                onCreateModeChange={setIsCreatingCollection}
+              />
 
-            <ModuleList
-              modules={content.modules as ExtendedModule[]}
-              selectedModuleId={selectedModuleId}
-              onModuleSelect={setSelectedModuleId}
-              onModuleAdd={() => {
-                setContent(prev => ({
-                  ...prev,
-                  modules: [...prev.modules, createEmptyModule(prev.modules.length, prev.id)]
-                }));
-              }}
-              onModuleRemove={(moduleId) => {
-                setContent(prev => ({
-                  ...prev,
-                  modules: prev.modules.filter(module => module.id !== moduleId)
-                }));
-                if (selectedModuleId === moduleId) {
-                  setSelectedModuleId(null);
-                }
-              }}
-              onModulesReorder={(modules) => {
-                setContent(prev => ({ ...prev, modules }));
-              }}
-              updateModule={(moduleId, updates) => {
-                setContent(prev => ({
-                  ...prev,
-                  modules: prev.modules.map(module =>
-                    module.id === moduleId ? { ...module, ...updates } : module
-                  )
-                }));
-              }}
-            />
+              <ModuleList
+                modules={content.modules as ExtendedModule[]}
+                selectedModuleId={selectedModuleId}
+                onModuleSelect={setSelectedModuleId}
+                onModuleAdd={() => {
+                  setContent(prev => ({
+                    ...prev,
+                    modules: [...prev.modules, createEmptyModule(prev.modules.length, prev.id)]
+                  }));
+                }}
+                onModuleRemove={(moduleId) => {
+                  setContent(prev => ({
+                    ...prev,
+                    modules: prev.modules.filter(module => module.id !== moduleId)
+                  }));
+                  if (selectedModuleId === moduleId) {
+                    setSelectedModuleId(null);
+                  }
+                }}
+                onModulesReorder={(modules) => {
+                  setContent(prev => ({ ...prev, modules }));
+                }}
+                updateModule={(moduleId, updates) => {
+                  setContent(prev => ({
+                    ...prev,
+                    modules: prev.modules.map(module =>
+                      module.id === moduleId ? { ...module, ...updates } : module
+                    )
+                  }));
+                }}
+              />
+            </div>
           </div>
         </div>
 

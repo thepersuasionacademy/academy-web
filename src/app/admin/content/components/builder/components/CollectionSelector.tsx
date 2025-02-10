@@ -46,8 +46,8 @@ export default function CollectionSelector({
     .slice(0, 5);
 
   return (
-    <div ref={collectionRef} className="relative py-10 border-y border-[var(--border-color)]">
-      <div className="text-2xl font-bold text-[var(--text-secondary)] mb-4">Collection</div>
+    <div ref={collectionRef} className="relative border-y border-[var(--border-color)] py-5">
+      <div className="text-xl font-bold text-[var(--text-secondary)]">Collection</div>
       <input
         type="text"
         value={selectedCollection ? collections.find(c => c.id === selectedCollection)?.name || '' : newCollectionName}
@@ -60,7 +60,7 @@ export default function CollectionSelector({
           onCollectionSelect('');
         }}
         placeholder="Select Collection"
-        className="w-full text-xl text-[var(--text-secondary)] bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none"
+        className="w-full text-xl text-[var(--foreground)] bg-transparent outline-none focus:outline-none focus:ring-0 ring-0 border-0 focus:border-0 rounded-none focus:rounded-none px-0 select-none focus:shadow-none shadow-none py-2"
       />
       {(isCreatingCollection || newCollectionName) && (
         <div className="absolute w-full mt-2 py-1 rounded-lg border border-[var(--border-color)] bg-[var(--card-bg)] shadow-lg z-10">
