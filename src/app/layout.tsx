@@ -9,6 +9,7 @@ import ClientLayout from './ClientLayout';
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { Toaster } from 'sonner';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -49,6 +50,13 @@ export default function RootLayout({
           transition-colors duration-200`}
       >
         <ThemeProvider>
+          <Toaster 
+            position="top-center" 
+            expand={true} 
+            richColors 
+            theme="dark"
+            closeButton
+          />
           {error && (
             <div className="fixed top-4 right-4 z-50 bg-red-50 border border-red-200 text-red-600 px-4 py-2 rounded-md shadow-lg">
               {error}

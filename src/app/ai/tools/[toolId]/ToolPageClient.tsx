@@ -9,9 +9,10 @@ import type { AITool } from '@/lib/supabase/ai';
 
 interface ToolPageClientProps {
   toolId: string;
+  isEditMode?: boolean;
 }
 
-export default function ToolPageClient({ toolId }: ToolPageClientProps) {
+export default function ToolPageClient({ toolId, isEditMode = false }: ToolPageClientProps) {
   const { tool, inputs, prompts, isLoading, error } = useAITool(toolId);
   const { theme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
@@ -70,7 +71,8 @@ export default function ToolPageClient({ toolId }: ToolPageClientProps) {
           tool={tool} 
           inputs={inputs}
           prompts={prompts}
-          isLoading={isLoading} 
+          isLoading={isLoading}
+          isEditMode={isEditMode}
         />
       </div>
     </main>
