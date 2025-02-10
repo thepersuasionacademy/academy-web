@@ -13,20 +13,6 @@ CREATE TABLE IF NOT EXISTS links.collections (
     updated_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create view for collections
-CREATE OR REPLACE VIEW collections AS
-    SELECT * FROM links.collections;
-
--- Grant access to the view
-GRANT SELECT, INSERT, UPDATE, DELETE ON collections TO authenticated;
-
--- Create view for suites
-CREATE OR REPLACE VIEW suites AS
-    SELECT * FROM links.suites;
-
--- Grant access to the view
-GRANT SELECT, INSERT, UPDATE, DELETE ON suites TO authenticated;
-
 -- Create suites table
 CREATE TABLE IF NOT EXISTS links.suites (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -65,6 +51,18 @@ CREATE TABLE IF NOT EXISTS links.link_tags (
     created_at TIMESTAMPTZ DEFAULT timezone('utc'::text, now()) NOT NULL,
     PRIMARY KEY (link_id, tag_id)
 );
+
+-- Create view for collections
+CREATE OR REPLACE VIEW collections AS
+    SELECT * FROM links.collections;
+
+-- Create view for suites
+CREATE OR REPLACE VIEW suites AS
+    SELECT * FROM links.suites;
+
+-- Grant access to the views
+GRANT SELECT, INSERT, UPDATE, DELETE ON collections TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON suites TO authenticated;
 
 -- Enable RLS
 ALTER TABLE links.collections ENABLE ROW LEVEL SECURITY;

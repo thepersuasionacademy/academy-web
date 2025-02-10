@@ -15,7 +15,7 @@ import type { LinkCollection, LinkSuite, SavedLink } from './types';
 
 export default function LinksPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedType, setSelectedType] = useState<'all' | 'software' | 'resources' | 'offers'>('all');
+  const [selectedCollection, setSelectedCollection] = useState<string>('all');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [collections, setCollections] = useState<LinkCollection[]>([]);
   const [suites, setSuites] = useState<LinkSuite[]>([]);
@@ -25,14 +25,6 @@ export default function LinksPage() {
   const [isAddingLink, setIsAddingLink] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const supabase = createClientComponentClient();
-
-  // Link types
-  const linkTypes = [
-    { id: 'all', name: 'All Types' },
-    { id: 'software', name: 'Software' },
-    { id: 'resources', name: 'Resources' },
-    { id: 'offers', name: 'Offers' }
-  ];
 
   useEffect(() => {
     fetchData();
@@ -134,15 +126,19 @@ export default function LinksPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Filter links based on search and type
+  // Filter links based on search and collection
   const getFilteredLinks = (suiteLinks: SavedLink[]) => {
     return suiteLinks.filter(link => {
       const matchesSearch = 
         link.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         link.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         link.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-      const matchesType = selectedType === 'all' || link.type === selectedType;
-      return matchesSearch && matchesType;
+      
+      // If 'all' is selected or the suite belongs to the selected collection
+      const matchesCollection = selectedCollection === 'all' || 
+        suites.find(s => s.id === link.suite_id)?.collection_id === selectedCollection;
+      
+      return matchesSearch && matchesCollection;
     });
   };
 
@@ -188,7 +184,7 @@ export default function LinksPage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Search and Type Toggle */}
+        {/* Search and Collection Toggle */}
         <div className="flex flex-col gap-6 mb-8">
           {/* Search Bar */}
           <div className="relative">
@@ -202,22 +198,35 @@ export default function LinksPage() {
             />
           </div>
 
-          {/* Type Pills and Add Button */}
+          {/* Collection Pills and Add Button */}
           <div className="flex items-center justify-between">
             <div className="flex flex-wrap gap-3">
-              {linkTypes.map((type) => (
+              <button
+                key="all"
+                onClick={() => setSelectedCollection('all')}
+                className={cn(
+                  "px-5 py-2.5 rounded-full font-medium transition-all text-lg",
+                  "border",
+                  selectedCollection === 'all'
+                    ? "bg-[var(--accent)] text-white border-[var(--accent)]"
+                    : "border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--foreground)]"
+                )}
+              >
+                All Collections
+              </button>
+              {collections.map((collection) => (
                 <button
-                  key={type.id}
-                  onClick={() => setSelectedType(type.id as typeof selectedType)}
+                  key={collection.id}
+                  onClick={() => setSelectedCollection(collection.id)}
                   className={cn(
                     "px-5 py-2.5 rounded-full font-medium transition-all text-lg",
                     "border",
-                    selectedType === type.id
+                    selectedCollection === collection.id
                       ? "bg-[var(--accent)] text-white border-[var(--accent)]"
                       : "border-[var(--border-color)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--foreground)]"
                   )}
                 >
-                  {type.name}
+                  {collection.title}
                 </button>
               ))}
             </div>
