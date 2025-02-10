@@ -79,8 +79,16 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
   };
 
   const handleCreditsCostChange = (value: string) => {
-    const numValue = parseInt(value) || 0;
-    setLocalTool(prev => prev ? { ...prev, credits_cost: numValue } : null);
+    // Convert to number and ensure it's not negative
+    const numValue = Math.max(0, Number(value));
+    setLocalTool(prev => {
+      if (!prev) return null;
+      console.log('Updating credits cost to:', numValue);
+      return {
+        ...prev,
+        credits_cost: numValue
+      };
+    });
   };
 
   const fetchCredits = async () => {
@@ -147,56 +155,30 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
     try {
       const supabase = createClientComponentClient();
 
-      // Update tool details
-      const { error: toolError } = await supabase
-        .from('ai.tools')
-        .update({
-          title: localTool.title,
-          description: localTool.description,
-          credits_cost: localTool.credits_cost,
-          status: localTool.status,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', localTool.id);
+      // Ensure credits_cost is a valid number and not negative
+      const credits_cost = Math.max(0, Number(localTool.credits_cost || 0));
+      console.log('Saving credits cost:', credits_cost);
 
-      if (toolError) throw toolError;
-
-      // Delete all existing inputs and prompts
-      const { error: deleteInputsError } = await supabase
-        .from('ai.inputs')
-        .delete()
-        .eq('tool_id', localTool.id);
-
-      if (deleteInputsError) throw deleteInputsError;
-
-      const { error: deletePromptsError } = await supabase
-        .from('ai.prompts')
-        .delete()
-        .eq('tool_id', localTool.id);
-
-      if (deletePromptsError) throw deletePromptsError;
-
-      // Insert new inputs
-      const { error: insertInputsError } = await supabase
-        .from('ai.inputs')
-        .insert(localInputs.map((input, index) => ({
-          ...input,
-          input_order: index + 1,
-          tool_id: localTool.id
-        })));
-
-      if (insertInputsError) throw insertInputsError;
-
-      // Insert new prompts
-      const { error: insertPromptsError } = await supabase
-        .from('ai.prompts')
-        .insert(localPrompts.map((prompt, index) => ({
+      const saveData = {
+        p_credits_cost: credits_cost,
+        p_description: localTool.description || '',
+        p_inputs: localInputs,
+        p_prompts: localPrompts.map((prompt, index) => ({
           ...prompt,
-          input_order: index + 1,
-          tool_id: localTool.id
-        })));
+          prompt_order: index + 1
+        })),
+        p_status: localTool.status || 'draft',
+        p_title: localTool.title || '',
+        p_tool_id: localTool.id
+      };
 
-      if (insertPromptsError) throw insertPromptsError;
+      console.log('Saving tool with data:', saveData);
+
+      const { data, error } = await supabase.rpc('save_tool_changes', saveData);
+
+      console.log('Response:', { data, error });
+
+      if (error) throw error;
 
       toast.success('Changes saved successfully', {
         description: 'All updates have been saved to the database.'
@@ -316,8 +298,13 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
               <span className="text-xl font-medium text-[var(--text-secondary)]">Credits:</span>
               <input
                 type="number"
-                value={localTool?.credits_cost || 0}
+                value={localTool?.credits_cost ?? 0}
                 onChange={(e) => handleCreditsCostChange(e.target.value)}
+                onBlur={(e) => {
+                  // Ensure the display value matches the state on blur
+                  const value = Math.max(0, Number(e.target.value) || 0);
+                  handleCreditsCostChange(value.toString());
+                }}
                 min={0}
                 className="w-16 text-xl font-medium text-[var(--foreground)] bg-transparent border-none focus:outline-none focus:ring-0 text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
@@ -423,7 +410,7 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
 
   return (
     <GenerateSection 
-      tool={tool} 
+      tool={localTool} 
       inputs={localInputs} 
       prompts={localPrompts} 
       isLoading={isLoading} 
