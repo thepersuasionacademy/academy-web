@@ -120,9 +120,19 @@ export const MediaPlayer = ({
   // Get session on mount
   useEffect(() => {
     const getSession = async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      if (currentSession?.access_token) {
-        setSession(currentSession.access_token);
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession) {
+          // Encode the entire session object as a base64 string
+          const sessionStr = btoa(JSON.stringify({
+            access_token: currentSession.access_token,
+            refresh_token: currentSession.refresh_token,
+            expires_at: currentSession.expires_at
+          }));
+          setSession(sessionStr);
+        }
+      } catch (error) {
+        console.error('Error getting session:', error);
       }
     };
     getSession();
@@ -350,9 +360,10 @@ export const MediaPlayer = ({
 
       case 'ai':
         if (selectedMediaItem.ai) {
+          const sessionParam = session ? `?session=${encodeURIComponent(session)}` : '';
           return contentFrame(
             <iframe 
-              src={`${siteUrl}/ai/tools/${slugify(selectedMediaItem.ai.title)}${session ? `?session=${session}` : ''}`}
+              src={`${siteUrl}/ai/tools/${slugify(selectedMediaItem.ai.title)}${sessionParam}`}
               className="absolute inset-0 w-full h-full"
               style={{ border: 'none' }}
               allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
