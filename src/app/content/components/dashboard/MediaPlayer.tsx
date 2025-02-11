@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { slugify } from "@/lib/utils/slugify";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface MediaItem {
   id: string;
@@ -76,28 +77,66 @@ export const MediaPlayer = ({
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [activeMediaItem, setActiveMediaItem] = useState<MediaItem | null>(null);
   const [activeType, setActiveType] = useState<string | null>(null);
+  const [showFontSizeDropdown, setShowFontSizeDropdown] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [fontSize, setFontSize] = useState<number>(() => {
+    // Initialize from localStorage or default to 16
     const saved = localStorage.getItem('textLessonFontSize');
     return saved ? parseInt(saved) : 16;
   });
-  const [isExpanded, setIsExpanded] = useState(false);
+
+  const supabase = createClientComponentClient();
+  const [session, setSession] = useState<string | null>(null);
+
+  // Font size presets
+  const fontSizePresets = [12, 14, 16, 18, 20, 24, 32, 48, 64];
 
   // Save fontSize to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('textLessonFontSize', fontSize.toString());
   }, [fontSize]);
 
-  // Simple click outside handler
+  // Close dropdown and expansion when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.font-size-control')) {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      const fontSizeControl = target.closest('.font-size-control');
+      
+      // If clicking outside the font size control entirely, close both dropdown and expanded state
+      if (!fontSizeControl) {
+        setShowFontSizeDropdown(false);
         setIsExpanded(false);
+        return;
       }
+
+      // If clicking inside the control but not on specific interactive elements,
+      // don't close anything - let the button clicks handle their own state
     };
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Get session on mount
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession?.access_token) {
+        setSession(currentSession.access_token);
+      }
+    };
+    getSession();
+  }, []);
+
+  const increaseFontSize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFontSize(prev => Math.min(prev + 2, 64));
+  };
+  
+  const decreaseFontSize = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setFontSize(prev => Math.max(prev - 2, 12));
+  };
 
   useEffect(() => {
     setActiveMediaItem(selectedMediaItem);
@@ -228,29 +267,79 @@ export const MediaPlayer = ({
                   </ReactMarkdown>
                 </div>
               </div>
-              {/* Dead simple font size control */}
+              {/* Font size controls - subtle aA with hover/click states */}
               <div className="sticky bottom-8 right-8 ml-auto mr-8 w-fit">
-                <div className="font-size-control">
+                <div className={cn(
+                  "font-size-control group relative flex items-center gap-1 transition-all rounded-full",
+                  isExpanded ? "bg-[var(--hover-bg)] px-2" : ""
+                )}>
                   {isExpanded ? (
-                    <div className="flex items-center gap-2 bg-[var(--hover-bg)] rounded-full p-2">
-                      <button onClick={() => setFontSize(prev => Math.max(prev - 2, 12))} className="p-1">
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        onClick={decreaseFontSize}
+                        className="p-2 rounded-full hover:bg-[var(--background)] transition-colors"
+                        aria-label="Decrease font size"
+                      >
                         <Minus className="w-4 h-4" />
                       </button>
-                      <span className="w-12 text-center">{fontSize}px</span>
-                      <button onClick={() => setFontSize(prev => Math.min(prev + 2, 64))} className="p-1">
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowFontSizeDropdown(!showFontSizeDropdown);
+                          }}
+                          className="text-sm font-medium px-3 py-2 hover:text-[var(--accent)] transition-colors font-size-trigger"
+                        >
+                          {fontSize}px
+                        </button>
+                        {showFontSizeDropdown && (
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 py-2 w-12 bg-[var(--background)] rounded-lg shadow-lg border border-[var(--border-color)] font-size-dropdown">
+                            {fontSizePresets.map(size => (
+                              <button
+                                type="button"
+                                key={size}
+                                onClick={() => {
+                                  setFontSize(size);
+                                  setShowFontSizeDropdown(false);
+                                }}
+                                className={cn(
+                                  "w-full px-2 py-1 text-sm text-center hover:bg-[var(--hover-bg)] transition-colors",
+                                  fontSize === size && "text-[var(--accent)]"
+                                )}
+                              >
+                                {size}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={increaseFontSize}
+                        className="p-2 rounded-full hover:bg-[var(--background)] transition-colors"
+                        aria-label="Increase font size"
+                      >
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
                   ) : (
-                    <button 
-                      onClick={() => setIsExpanded(true)}
-                      className="p-2 rounded-full hover:bg-[var(--hover-bg)]"
-                    >
-                      <span className="flex items-baseline gap-0.5">
-                        <span className="text-xs">a</span>
-                        <span className="text-base">A</span>
-                      </span>
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsExpanded(true)}
+                        className="p-2 text-sm font-medium text-center opacity-50 group-hover:opacity-100 transition-all rounded-full group-hover:bg-[var(--hover-bg)] px-3"
+                      >
+                        <span className="inline-flex items-baseline gap-0.5">
+                          <span className="text-xs">a</span>
+                          <span className="text-base">A</span>
+                        </span>
+                      </button>
+                      <div className="absolute right-full mr-2 py-1.5 px-3 rounded-full bg-[var(--background)] border border-[var(--border-color)] shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+                        Font Size: {fontSize}px
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -263,7 +352,7 @@ export const MediaPlayer = ({
         if (selectedMediaItem.ai) {
           return contentFrame(
             <iframe 
-              src={`${siteUrl}/ai/tools/${slugify(selectedMediaItem.ai.title)}`}
+              src={`${siteUrl}/ai/tools/${slugify(selectedMediaItem.ai.title)}${session ? `?session=${session}` : ''}`}
               className="absolute inset-0 w-full h-full"
               style={{ border: 'none' }}
               allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
