@@ -1,4 +1,3 @@
-// Header.tsx
 'use client';
 
 import { CreditCard, User, Moon, Sun } from 'lucide-react';
@@ -69,7 +68,7 @@ export default function Header() {
   }, []);
 
   const headerClassName = cn(
-    "sticky top-0 z-50",
+    "z-50",
     "border-b border-[var(--border-color)]",
     "bg-[#fafafa] dark:bg-[var(--background)]",
     "transition-colors duration-300"
@@ -96,8 +95,7 @@ export default function Header() {
   const dropdownClassName = cn(
     "absolute right-0 top-full mt-2 w-64 rounded-md shadow-lg",
     "bg-[var(--card-bg)] border border-[var(--border-color)]",
-    "py-2 px-3",
-    "z-50"
+    "py-2 px-3"
   );
 
   return (

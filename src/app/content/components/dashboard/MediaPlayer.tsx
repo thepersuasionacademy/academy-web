@@ -77,7 +77,6 @@ export const MediaPlayer = ({
   onMediaSelect,
   selectedMediaItem,
 }: MediaPlayerProps) => {
-  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [activeMediaItem, setActiveMediaItem] = useState<MediaItem | null>(null);
   const [activeType, setActiveType] = useState<string | null>(null);
   const [showFontSizeDropdown, setShowFontSizeDropdown] = useState(false);
@@ -467,8 +466,8 @@ export const MediaPlayer = ({
                 "px-4 py-1.5 rounded-full text-sm font-medium transition-all hover:scale-105",
                 "border-2 text-[var(--text-secondary)] hover:text-[var(--foreground)]",
                 activeType === item.type
-                  ? "border-[var(--accent)] bg-[var(--hover-bg)]"
-                  : "border-transparent bg-[var(--hover-bg)]"
+                  ? "border-[var(--accent)] bg-[var(--accent)] text-white shadow-[0_2px_10px_-2px_var(--accent)] hover:shadow-[0_4px_15px_-3px_var(--accent)]"
+                  : "border-transparent bg-[var(--hover-bg)] shadow-md hover:shadow-lg"
               )}
             >
               {item.title}
@@ -483,29 +482,22 @@ export const MediaPlayer = ({
       {/* Description Section */}
       <div className="shrink-0 p-6 bg-[var(--background)] border-t border-[var(--border-color)]">
         <div className="max-w-[1280px]">
-          <h1 className="text-2xl font-semibold mb-2">{title}</h1>
-          <div 
-            className={cn(
-              "text-[var(--text-secondary)]",
-              !isDescriptionExpanded && "line-clamp-2"
-            )}
+          <h1 className={cn(
+            "text-2xl font-bold mb-2 relative",
+            "bg-clip-text text-transparent",
+            "bg-gradient-to-b from-[var(--foreground)] via-[var(--foreground)] to-[color-mix(in_srgb,var(--foreground),transparent_15%)]",
+            "[text-shadow:_1px_1px_0_rgba(0,0,0,0.1),_-0.5px_-0.5px_0_rgba(255,255,255,0.05)]",
+            "after:content-[attr(data-text)] after:absolute after:left-0 after:top-[0.5px]",
+            "after:z-[-1] after:text-[color-mix(in_srgb,var(--foreground),transparent_85%)]",
+            "after:[text-shadow:_2px_2px_2px_rgba(0,0,0,0.1)]"
+          )}
+          data-text={title}
           >
+            {title}
+          </h1>
+          <div className="text-[var(--text-secondary)]">
             {description}
           </div>
-          <button
-            onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
-            className="mt-2 flex items-center gap-1 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
-          >
-            {isDescriptionExpanded ? (
-              <>
-                Show less <ChevronUp className="w-4 h-4" />
-              </>
-            ) : (
-              <>
-                Show more <ChevronDown className="w-4 h-4" />
-              </>
-            )}
-          </button>
         </div>
       </div>
     </div>

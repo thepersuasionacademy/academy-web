@@ -174,9 +174,11 @@ export default function Page(): React.JSX.Element {
       <ScrollProgress />
       
       <main className="relative">
-        <div className="sticky top-0 z-10 backdrop-blur-md bg-[var(--background)]/80 border-b border-[var(--border-color)]">
-          <div className="px-[10px]">
-            <CategoryPills onCategoryChange={setActiveCategory} />
+      <div className="backdrop-blur-md bg-[var(--background)]/80 border-b border-[var(--border-color)]">
+          <div className="relative">
+            <div className="px-[10px]">
+              <CategoryPills onCategoryChange={setActiveCategory} />
+            </div>
           </div>
         </div>
 
@@ -203,7 +205,17 @@ export default function Page(): React.JSX.Element {
 
         {/* Overlay layer for SuiteView */}
         {selectedItem && selectedContent && (
-          <div className="fixed inset-0 z-50 flex overflow-hidden">
+          <div 
+            className="fixed inset-0 z-50 flex overflow-hidden"
+            onClick={(e) => {
+              if (!showMediaPlayer && e.target === e.currentTarget) {
+                setSelectedItem(null);
+                setSelectedContent(null);
+                setSelectedMediaItem(null);
+                setShowMediaPlayer(false);
+              }
+            }}
+          >
             {/* Left side - empty until media is selected */}
             <div className="flex-1">
               {selectedMediaItem && showMediaPlayer && (
@@ -224,7 +236,7 @@ export default function Page(): React.JSX.Element {
             </div>
 
             {/* SuiteView - always shown when content is selected */}
-            <div className="w-[400px] bg-[var(--card-bg)]">
+            <div className="w-[400px] overflow-hidden">
               <SuiteView
                 isOpen={true}
                 onClose={() => {
