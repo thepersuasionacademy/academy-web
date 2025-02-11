@@ -63,6 +63,8 @@ interface MediaPlayerProps {
   selectedMediaItem: MediaItem;
 }
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
 export const MediaPlayer = ({
   title,
   description,
@@ -85,8 +87,9 @@ export const MediaPlayer = ({
     return saved ? parseInt(saved) : 16;
   });
 
-  const supabase = createClientComponentClient();
   const [session, setSession] = useState<string | null>(null);
+  // Use the default client configuration which will pick up the environment variables
+  const supabase = createClientComponentClient();
 
   // Font size presets
   const fontSizePresets = [12, 14, 16, 18, 20, 24, 32, 48, 64];
@@ -122,14 +125,8 @@ export const MediaPlayer = ({
     const getSession = async () => {
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
-        if (currentSession) {
-          // Encode the entire session object as a base64 string
-          const sessionStr = btoa(JSON.stringify({
-            access_token: currentSession.access_token,
-            refresh_token: currentSession.refresh_token,
-            expires_at: currentSession.expires_at
-          }));
-          setSession(sessionStr);
+        if (currentSession?.access_token) {
+          setSession(currentSession.access_token);
         }
       } catch (error) {
         console.error('Error getting session:', error);
@@ -224,7 +221,6 @@ export const MediaPlayer = ({
 
   // Get library ID from environment variable
   const libraryId = process.env.NEXT_PUBLIC_BUNNY_LIBRARY_ID || '376351';
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
   const playerUrl = videoId ? 
     `https://iframe.mediadelivery.net/embed/376351/${videoId}?autoplay=false` : 
     null;
@@ -361,9 +357,11 @@ export const MediaPlayer = ({
       case 'ai':
         if (selectedMediaItem.ai) {
           const sessionParam = session ? `?session=${encodeURIComponent(session)}` : '';
+          const toolUrl = `${siteUrl}/ai/tools/${slugify(selectedMediaItem.ai.title)}${sessionParam}`;
+          console.log('Loading AI tool with URL:', toolUrl);
           return contentFrame(
             <iframe 
-              src={`${siteUrl}/ai/tools/${slugify(selectedMediaItem.ai.title)}${sessionParam}`}
+              src={toolUrl}
               className="absolute inset-0 w-full h-full"
               style={{ border: 'none' }}
               allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;"
