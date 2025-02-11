@@ -63,7 +63,8 @@ interface MediaPlayerProps {
   selectedMediaItem: MediaItem;
 }
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+// Get the site URL from window.location if NEXT_PUBLIC_SITE_URL is not set
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
 
 export const MediaPlayer = ({
   title,
@@ -125,8 +126,14 @@ export const MediaPlayer = ({
     const getSession = async () => {
       try {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
-        if (currentSession?.access_token) {
-          setSession(currentSession.access_token);
+        if (currentSession) {
+          // Encode the full session object
+          const sessionData = {
+            access_token: currentSession.access_token,
+            refresh_token: currentSession.refresh_token,
+            expires_at: currentSession.expires_at
+          };
+          setSession(btoa(JSON.stringify(sessionData)));
         }
       } catch (error) {
         console.error('Error getting session:', error);
