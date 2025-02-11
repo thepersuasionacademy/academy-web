@@ -19,12 +19,14 @@ export interface AISuite {
 
 export interface AITool {
   id: string;
-  title: string | null;
-  description: string | null;
+  title: string;
+  description: string;
   credits_cost: number;
-  status: AIToolStatus;
-  collection_title?: string | null;
-  suite_title?: string | null;
+  collection_title: string | null;
+  suite_title: string | null;
+  inputs: AIInput[];
+  status?: AIToolStatus;
+  prompts?: AIPrompt[]; // Only populated for super admins
 }
 
 export interface AIInput {
@@ -93,7 +95,7 @@ export async function getAITools(suiteId: string) {
   return tools;
 }
 
-// Function to get a specific tool with its inputs and prompts
+// Function to get a specific tool with its inputs
 export async function getAITool(toolId: string) {
   const supabase = createClientComponentClient();
   
@@ -122,19 +124,9 @@ export async function getAITool(toolId: string) {
     throw inputsError;
   }
 
-  // Fetch the prompts
-  const { data: prompts, error: promptsError } = await supabase
-    .rpc('get_tool_prompts', { tool_id: toolId });
-
-  if (promptsError) {
-    console.error('Error fetching AI tool prompts:', promptsError);
-    throw promptsError;
-  }
-
   return {
     tool,
-    inputs: inputs || [],
-    prompts: prompts || []
+    inputs: inputs || []
   };
 }
 

@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { AITool, AIInput, AIPrompt } from '@/lib/supabase/ai';
+import type { AITool, AIInput } from '@/lib/supabase/ai';
 import { ToolHeader } from './output/ToolHeader';
 import { InputFields } from './output/InputFields';
 import { useTheme } from '@/app/context/ThemeContext';
-import { ArrowRight, ArrowLeft, RotateCcw, Copy } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Copy } from 'lucide-react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { markdownComponents } from './output/MarkdownStyles';
@@ -20,8 +20,8 @@ interface CreditBalance {
 
 interface ToolRun {
   user_id?: string | null;
-  collection_name?: string | null;  // Matches database column
-  suite_name?: string | null;       // Matches database column
+  collection_name?: string | null;
+  suite_name?: string | null;
   tool_name?: string | null;
   credits_before: number;
   credits_cost: number;
@@ -32,17 +32,23 @@ interface ToolRun {
 interface GenerateSectionProps {
   tool: AITool | null;
   inputs: AIInput[];
-  prompts: AIPrompt[];
   isLoading: boolean;
   credits: CreditBalance;
   isLoadingCredits: boolean;
-  onCreditsUpdated?: () => void;  // Add callback prop
+  onCreditsUpdated?: () => void;
 }
 
 const MAX_RETRIES = 2;
 const TIMEOUT_MS = 58000; // 58 seconds (slightly less than Vercel's 60s to account for network latency)
 
-export default function GenerateSection({ tool, inputs, prompts, isLoading, credits, isLoadingCredits, onCreditsUpdated }: GenerateSectionProps) {
+export default function GenerateSection({ 
+  tool, 
+  inputs, 
+  isLoading, 
+  credits, 
+  isLoadingCredits, 
+  onCreditsUpdated 
+}: GenerateSectionProps) {
   const [inputValues, setInputValues] = useState<Record<string, string>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
@@ -197,12 +203,6 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading, cred
       // Store initial credit amount for logging
       const creditsBefore = credits.total;
 
-      // Prepare the prompts with input values
-      const preparedPrompts = prompts.map(prompt => ({
-        ...prompt,
-        content: replaceInputPlaceholders(prompt.input_description || '', inputValues)
-      }));
-
       // Create AbortController for timeout
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
@@ -216,8 +216,7 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading, cred
           },
           body: JSON.stringify({
             toolId: tool.id,
-            inputs: inputValues,
-            prompts: preparedPrompts
+            inputs: inputValues
           }),
           signal: controller.signal
         });
@@ -253,12 +252,6 @@ export default function GenerateSection({ tool, inputs, prompts, isLoading, cred
         setRetryCount(0); // Reset retry count on success
 
         // Log the tool run after successful response
-        console.log('Tool data before logging:', {
-          collection_title: tool.collection_title,
-          suite_title: tool.suite_title,
-          title: tool.title
-        });
-
         await logToolRun({
           collection_name: tool.collection_title || null,
           suite_name: tool.suite_title || null,

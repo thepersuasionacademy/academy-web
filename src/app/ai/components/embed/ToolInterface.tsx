@@ -7,6 +7,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { ArrowRight, Lock, Unlock, Trash2, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { isSuperAdmin } from '@/lib/supabase/ai';
 
 interface CreditBalance {
   total: number;
@@ -30,6 +31,8 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
   const [localPrompts, setLocalPrompts] = useState<AIPrompt[]>(prompts);
   const [localTool, setLocalTool] = useState<AITool | null>(tool);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
+  const [isLoadingPrompts, setIsLoadingPrompts] = useState(false);
 
   useEffect(() => {
     setLocalTool(tool);
@@ -42,6 +45,15 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
   useEffect(() => {
     setLocalPrompts(prompts);
   }, [prompts]);
+
+  useEffect(() => {
+    // Check if user is super admin
+    const checkSuperAdmin = async () => {
+      const isAdmin = await isSuperAdmin();
+      setIsSuperAdminUser(isAdmin);
+    };
+    checkSuperAdmin();
+  }, []);
 
   const handleToggleRequired = (inputId: string) => {
     setLocalInputs(current =>
@@ -194,6 +206,37 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
     }
   };
 
+  const fetchPrompts = async () => {
+    if (!tool?.id || !isSuperAdminUser) return;
+    
+    setIsLoadingPrompts(true);
+    try {
+      const supabase = createClientComponentClient();
+      const { data: promptsData, error: promptsError } = await supabase
+        .rpc('get_tool_prompts', { tool_id: tool.id });
+
+      if (promptsError) {
+        console.error('Error fetching prompts:', promptsError);
+        toast.error('Failed to load prompts');
+        return;
+      }
+
+      setLocalPrompts(promptsData || []);
+    } catch (err) {
+      console.error('Error in fetchPrompts:', err);
+      toast.error('Failed to load prompts');
+    } finally {
+      setIsLoadingPrompts(false);
+    }
+  };
+
+  const handleSectionChange = async (section: 'inputs' | 'prompts' | 'credits') => {
+    setActiveSection(section);
+    if (section === 'prompts' && isSuperAdminUser) {
+      await fetchPrompts();
+    }
+  };
+
   if (isEditMode) {
     return (
       <div className="flex justify-center">
@@ -270,7 +313,7 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
           <div className="flex items-center justify-between mb-8 border-b border-[var(--border-color)]">
             <div className="flex gap-8">
               <button
-                onClick={() => setActiveSection('inputs')}
+                onClick={() => handleSectionChange('inputs')}
                 className={cn(
                   "pb-3 text-xl font-medium transition-colors relative",
                   activeSection === 'inputs'
@@ -281,18 +324,20 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
               >
                 Inputs
               </button>
-              <button
-                onClick={() => setActiveSection('prompts')}
-                className={cn(
-                  "pb-3 text-xl font-medium transition-colors relative",
-                  activeSection === 'prompts'
-                    ? "text-[var(--foreground)]"
-                    : "text-[var(--text-secondary)] hover:text-[var(--foreground)]",
-                  activeSection === 'prompts' && "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[var(--accent)]"
-                )}
-              >
-                Prompts
-              </button>
+              {isSuperAdminUser && (
+                <button
+                  onClick={() => handleSectionChange('prompts')}
+                  className={cn(
+                    "pb-3 text-xl font-medium transition-colors relative",
+                    activeSection === 'prompts'
+                      ? "text-[var(--foreground)]"
+                      : "text-[var(--text-secondary)] hover:text-[var(--foreground)]",
+                    activeSection === 'prompts' && "after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-[var(--accent)]"
+                  )}
+                >
+                  Prompts
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2 pb-3">
               <span className="text-xl font-medium text-[var(--text-secondary)]">Credits:</span>
@@ -373,34 +418,42 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
             </div>
           )}
 
-          {activeSection === 'prompts' && (
+          {isSuperAdminUser && activeSection === 'prompts' && (
             <div className="space-y-12">
-              {localPrompts.map((prompt, index) => (
-                <div key={prompt.id}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-2xl text-[var(--foreground)]">Prompt {index + 1}</span>
-                    <div className="flex-1" />
-                    <button
-                      onClick={() => handleDeletePrompt(prompt.id)}
-                      className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <textarea
-                    value={prompt.prompt_text || ''}
-                    onChange={(e) => handlePromptChange(prompt.id, e.target.value)}
-                    className="text-base text-[var(--text-secondary)] mb-4 w-full bg-transparent border-b border-[var(--border-color)] focus:border-[var(--accent)] focus:outline-none focus:ring-0 resize-none py-4 min-h-[300px]"
-                    placeholder="Enter prompt template"
-                  />
+              {isLoadingPrompts ? (
+                <div className="flex justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--accent)]"></div>
                 </div>
-              ))}
-              <button
-                onClick={handleAddPrompt}
-                className="text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
-              >
-                + Add Prompt
-              </button>
+              ) : (
+                <>
+                  {localPrompts.map((prompt, index) => (
+                    <div key={prompt.id}>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="text-2xl text-[var(--foreground)]">Prompt {index + 1}</span>
+                        <div className="flex-1" />
+                        <button
+                          onClick={() => handleDeletePrompt(prompt.id)}
+                          className="p-1.5 rounded-lg text-[var(--text-secondary)] hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                      <textarea
+                        value={prompt.prompt_text || ''}
+                        onChange={(e) => handlePromptChange(prompt.id, e.target.value)}
+                        className="text-base text-[var(--text-secondary)] mb-4 w-full bg-transparent border-b border-[var(--border-color)] focus:border-[var(--accent)] focus:outline-none focus:ring-0 resize-none py-4 min-h-[300px]"
+                        placeholder="Enter prompt template"
+                      />
+                    </div>
+                  ))}
+                  <button
+                    onClick={handleAddPrompt}
+                    className="text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
+                  >
+                    + Add Prompt
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -412,7 +465,6 @@ export default function ToolInterface({ tool, inputs, prompts, isLoading, isEdit
     <GenerateSection 
       tool={localTool} 
       inputs={localInputs} 
-      prompts={localPrompts} 
       isLoading={isLoading} 
       credits={credits}
       isLoadingCredits={isLoadingCredits}

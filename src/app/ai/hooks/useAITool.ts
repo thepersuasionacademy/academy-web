@@ -1,11 +1,10 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useEffect, useState } from 'react';
-import type { AITool, AIInput, AIPrompt } from '@/lib/supabase/ai';
+import type { AITool, AIInput } from '@/lib/supabase/ai';
 
 interface UseAIToolResult {
   tool: AITool | null;
   inputs: AIInput[];
-  prompts: AIPrompt[];
   isLoading: boolean;
   error: Error | null;
 }
@@ -13,7 +12,6 @@ interface UseAIToolResult {
 export function useAITool(toolId: string): UseAIToolResult {
   const [tool, setTool] = useState<AITool | null>(null);
   const [inputs, setInputs] = useState<AIInput[]>([]);
-  const [prompts, setPrompts] = useState<AIPrompt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
@@ -42,15 +40,8 @@ export function useAITool(toolId: string): UseAIToolResult {
 
         if (inputsError) throw inputsError;
 
-        // Fetch prompts using RPC
-        const { data: promptsData, error: promptsError } = await supabase
-          .rpc('get_tool_prompts', { tool_id: toolId });
-
-        if (promptsError) throw promptsError;
-
         setTool(tool);
         setInputs(inputsData || []);
-        setPrompts(promptsData || []);
       } catch (err) {
         console.error('Error in useAITool:', err);
         setError(err instanceof Error ? err : new Error('Failed to fetch tool data'));
@@ -62,5 +53,5 @@ export function useAITool(toolId: string): UseAIToolResult {
     fetchTool();
   }, [toolId]);
 
-  return { tool, inputs, prompts, isLoading, error };
+  return { tool, inputs, isLoading, error };
 } 

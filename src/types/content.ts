@@ -65,7 +65,6 @@ export interface AIItem extends MediaItemBase {
     collection_title: string | null;
     suite_title: string | null;
     inputs: AIInput[];
-    prompts: AIPrompt[];
   } | null;
 }
 
@@ -160,7 +159,6 @@ export interface AIContent {
     collection_title: string | null;
     suite_title: string | null;
     inputs: AIInput[];
-    prompts: AIPrompt[];
   } | null;
   order: number;
   created_at: string;
@@ -230,5 +228,4 @@ export interface AITool {
   collection_title: string | null;
   suite_title: string | null;
   inputs: AIInput[];
-  prompts: AIPrompt[];
 } 

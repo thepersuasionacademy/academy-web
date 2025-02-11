@@ -13,7 +13,7 @@ interface ToolPageClientProps {
 }
 
 export default function ToolPageClient({ toolId, isEditMode = false }: ToolPageClientProps) {
-  const { tool, inputs, prompts, isLoading, error } = useAITool(toolId);
+  const { tool, inputs, isLoading, error } = useAITool(toolId);
   const { theme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -70,7 +70,7 @@ export default function ToolPageClient({ toolId, isEditMode = false }: ToolPageC
         <ToolInterface 
           tool={tool} 
           inputs={inputs}
-          prompts={prompts}
+          prompts={[]}
           isLoading={isLoading}
           isEditMode={isEditMode}
         />

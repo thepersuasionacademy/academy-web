@@ -1,16 +1,36 @@
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { AITool, AIInput, AIPrompt } from '@/lib/supabase/ai';
 import { generateClaudeCompletion } from '../models/claude/utils';
 
+// Initialize Supabase client with service role key for secure operations
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+);
+
 export async function POST(request: Request) {
   try {
+    // Use regular client for user authentication
     const supabase = createRouteHandlerClient({ cookies });
-    const { toolId, inputs, prompts: userPrompts } = await request.json();
+    const { toolId, inputs } = await request.json();
 
-    // Fetch the tool using RPC function
-    const { data: tools, error: toolError } = await supabase
+    // Verify user authentication
+    const { data: { session }, error: authError } = await supabase.auth.getSession();
+    if (authError || !session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Fetch the tool using service role client
+    const { data: tools, error: toolError } = await supabaseAdmin
       .rpc('get_tool_by_id', { tool_id: toolId });
 
     if (toolError || !tools || tools.length === 0) {
@@ -20,8 +40,8 @@ export async function POST(request: Request) {
 
     const tool = tools[0];
 
-    // Fetch the tool's inputs using RPC function
-    const { data: toolInputs, error: inputsError } = await supabase
+    // Fetch the tool's inputs using service role client
+    const { data: toolInputs, error: inputsError } = await supabaseAdmin
       .rpc('get_tool_inputs', { tool_id: toolId });
 
     if (inputsError) {
@@ -29,8 +49,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to fetch tool inputs' }, { status: 500 });
     }
 
-    // Fetch the tool's prompts using RPC function
-    const { data: toolPrompts, error: promptsError } = await supabase
+    // Fetch the tool's prompts using service role client - this is now secure
+    const { data: toolPrompts, error: promptsError } = await supabaseAdmin
       .rpc('get_tool_prompts', { tool_id: toolId });
 
     if (promptsError) {
@@ -72,8 +92,6 @@ export async function POST(request: Request) {
     if (!combinedPrompt) {
       return NextResponse.json({ error: 'No prompts found for this tool' }, { status: 400 });
     }
-
-    console.log('Combined prompt:', combinedPrompt); // Debug log
 
     // Call Claude directly using the utility function
     const content = await generateClaudeCompletion(combinedPrompt, claudeInputs);
