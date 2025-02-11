@@ -9,15 +9,15 @@ export interface Collection {
   type: string;
 }
 
-export interface Course {
+export interface Content {
   id: string;
   collection_id: string;
   title: string;
   description?: string;
-  thumbnail?: string;
+  status: 'draft' | 'published' | 'archived';
+  thumbnail_url?: string;
   created_at: string;
   updated_at: string;
-  status: string;
 }
 
 export type LessonType = 'text' | 'video';
@@ -25,7 +25,7 @@ export type LessonStatus = 'draft' | 'published';
 
 export interface Lesson {
   id: string;
-  course_id: string;
+  content_id: string;
   title: string;
   description?: string;
   lesson_type: LessonType;
@@ -38,10 +38,36 @@ export interface Lesson {
   tool_id?: string;
 }
 
+export interface Module {
+  id: string;
+  title: string;
+  description?: string;
+  order: number;
+  created_at: string;
+  updated_at: string;
+  media: any[]; // You can type this more specifically if needed
+}
+
+export interface ContentWithModules {
+  content: Content & {
+    collection: {
+      id: string;
+      name: string;
+      description: string;
+    };
+    stats: {
+      enrolled_count: number;
+      created_at: string;
+      updated_at: string;
+    };
+  };
+  modules: Module[];
+}
+
 export async function getCollections() {
   const supabase = createClientComponentClient();
   const { data: collections, error } = await supabase
-    .rpc('get_learning_collections');
+    .rpc('get_content_collections');
 
   if (error) {
     console.error('Error fetching collections:', error);
@@ -51,23 +77,23 @@ export async function getCollections() {
   return collections;
 }
 
-export async function getCourses(collectionId: string) {
+export async function getContent(collectionId: string) {
   const supabase = createClientComponentClient();
-  const { data: courses, error } = await supabase
-    .rpc('get_learning_courses', { collection_id_param: collectionId });
+  const { data: content, error } = await supabase
+    .rpc('get_content_by_collection', { p_collection_id: collectionId });
 
   if (error) {
-    console.error('Error fetching courses:', error);
+    console.error('Error fetching content:', error);
     throw error;
   }
 
-  return courses;
+  return content;
 }
 
-export async function getLessons(courseId: string) {
+export async function getLessons(contentId: string) {
   const supabase = createClientComponentClient();
   const { data: lessons, error } = await supabase
-    .rpc('get_learning_lessons', { course_id_param: courseId });
+    .rpc('get_content_cards', { p_content_id: contentId });
 
   if (error) {
     console.error('Error fetching lessons:', error);
@@ -75,4 +101,17 @@ export async function getLessons(courseId: string) {
   }
 
   return lessons;
+}
+
+export async function getContentById(contentId: string): Promise<ContentWithModules> {
+  const supabase = createClientComponentClient();
+  const { data, error } = await supabase
+    .rpc('get_content_by_id', { p_content_id: contentId });
+
+  if (error) {
+    console.error('Error fetching content:', error);
+    throw error;
+  }
+
+  return data;
 } 
