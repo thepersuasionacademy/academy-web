@@ -7,13 +7,16 @@ import {
   Settings,
   Plus,
   Users,
-  CreditCard
+  CreditCard,
+  Eye,
+  Pencil
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import Link from 'next/link';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { AITool, AICollection, AISuite, AIToolStatus } from '@/lib/supabase/ai';
 import { AIToolModal } from '@/app/ai/components/AIToolModal';
+import { isSuperAdmin } from '@/lib/supabase/ai';
 
 // Extend the base interfaces to include the nested relationships we need
 interface ExtendedAITool extends Omit<AITool, 'status'> {
@@ -43,7 +46,17 @@ export default function AIEngineClient({ params, searchParams }: AIEngineClientP
   const [collections, setCollections] = useState<ExtendedAICollection[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTool, setSelectedTool] = useState<AITool | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
   const supabase = createClientComponentClient();
+
+  useEffect(() => {
+    const checkSuperAdmin = async () => {
+      const isAdmin = await isSuperAdmin();
+      setIsSuperAdminUser(isAdmin);
+    };
+    checkSuperAdmin();
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -224,8 +237,7 @@ export default function AIEngineClient({ params, searchParams }: AIEngineClientP
                     {suite.tools.map(tool => (
                       <div
                         key={tool.id}
-                        onClick={() => setSelectedTool(tool)}
-                        className="bg-[var(--background)] rounded-lg p-5 border border-[var(--border-color)] hover:border-[var(--accent)] transition-colors cursor-pointer"
+                        className="bg-[var(--background)] rounded-lg p-5 border border-[var(--border-color)] hover:border-[var(--accent)] transition-colors"
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex-1">
@@ -242,15 +254,28 @@ export default function AIEngineClient({ params, searchParams }: AIEngineClientP
                               {tool.title}
                             </h4>
                           </div>
-                          <button 
-                            className="p-1.5 rounded-lg hover:bg-[var(--hover-bg)] transition-colors"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTool(tool);
-                            }}
-                          >
-                            <Settings className="w-5 h-5 text-[var(--text-secondary)]" />
-                          </button>
+                          <div className="flex gap-2">
+                            <button 
+                              className="p-1.5 rounded-lg hover:bg-[var(--hover-bg)] transition-colors text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+                              onClick={() => {
+                                setSelectedTool(tool);
+                                setIsEditMode(false);
+                              }}
+                            >
+                              <Eye className="w-5 h-5" />
+                            </button>
+                            {isSuperAdminUser && (
+                              <button 
+                                className="p-1.5 rounded-lg hover:bg-[var(--hover-bg)] transition-colors text-[var(--text-secondary)] hover:text-[var(--foreground)]"
+                                onClick={() => {
+                                  setSelectedTool(tool);
+                                  setIsEditMode(true);
+                                }}
+                              >
+                                <Pencil className="w-5 h-5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                         <p className="text-base text-[var(--text-secondary)] mb-4">
                           {tool.description}
@@ -295,7 +320,11 @@ export default function AIEngineClient({ params, searchParams }: AIEngineClientP
         <AIToolModal
           tool={selectedTool}
           isOpen={!!selectedTool}
-          onClose={() => setSelectedTool(null)}
+          onClose={() => {
+            setSelectedTool(null);
+            setIsEditMode(false);
+          }}
+          initialEditMode={isEditMode}
         />
       )}
     </div>

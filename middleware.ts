@@ -47,6 +47,26 @@ export async function middleware(req: NextRequest) {
     // Log session state
     console.log('Session exists:', !!session)
 
+    // Check if this is an admin route
+    if (req.nextUrl.pathname.startsWith('/admin')) {
+      if (!session) {
+        // If no session, redirect to login
+        return NextResponse.redirect(new URL('/auth/signin', req.url))
+      }
+
+      // Check if user is admin or super admin
+      const [{ data: isAdmin }, { data: isSuperAdmin }] = await Promise.all([
+        supabase.rpc('is_admin'),
+        supabase.rpc('is_super_admin')
+      ])
+
+      if (!isAdmin && !isSuperAdmin) {
+        // If not admin, redirect to home
+        return NextResponse.redirect(new URL('/', req.url))
+      }
+    }
+
+    // Handle other protected routes
     if (!session && req.nextUrl.pathname.startsWith('/protected-route')) {
       return NextResponse.redirect(new URL('/auth/signin', req.url))
     }

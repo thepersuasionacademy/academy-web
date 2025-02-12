@@ -1,6 +1,6 @@
 'use client';
 
-import { CreditCard, User, Moon, Sun } from 'lucide-react';
+import { CreditCard, User, Moon, Sun, LogOut } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from "@/lib/utils";
@@ -9,31 +9,87 @@ import { useTheme } from '../context/ThemeContext';
 import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-const categories = [
-  { name: 'Content', path: '/content' as Route },
-  { name: 'AI Engine', path: '/ai' as Route },
-  { name: 'Store', path: '/store' as Route },
-] as const;
-
 interface CreditBalance {
   total: number;
   subscription_credits: number;
   additional_credits: number;
 }
 
+interface Category {
+  name: string;
+  path: Route;
+}
+
+const baseCategories: Category[] = [
+  { name: 'Content', path: '/content' as Route },
+  { name: 'AI Engine', path: '/ai' as Route },
+];
+
 export default function Header() {
   const pathname = usePathname();
-  const currentCategory = categories.find(cat => pathname?.startsWith(cat.path));
   const [mounted, setMounted] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const [credits, setCredits] = useState<CreditBalance>({ total: 0, subscription_credits: 0, additional_credits: 0 });
   const [showCreditsDropdown, setShowCreditsDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [categories, setCategories] = useState<Category[]>(baseCategories);
+
+  // Combined effect for mount and initial data fetching
+  useEffect(() => {
+    const initializeHeader = async () => {
+      setMounted(true);
+      try {
+        const supabase = createClientComponentClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session?.user) {
+          // Fetch credits
+          const { data: creditsData, error: creditsError } = await supabase
+            .rpc('get_total_credits', {
+              user_id: session.user.id
+            });
+          
+          if (!creditsError && creditsData) {
+            setCredits(creditsData);
+          }
+
+          // Check admin status
+          const { data: isAdminResult, error: adminError } = await supabase
+            .rpc('is_admin');
+          
+          const { data: isSuperAdminResult, error: superAdminError } = await supabase
+            .rpc('is_super_admin');
+          
+          console.log('Admin check result:', isAdminResult);
+          console.log('Super admin check result:', isSuperAdminResult);
+          
+          if ((!adminError && isAdminResult) || (!superAdminError && isSuperAdminResult)) {
+            console.log('Setting admin status to true');
+            setIsAdmin(true);
+            setCategories([
+              ...baseCategories,
+              { name: 'Admin', path: '/admin' as Route }
+            ]);
+          }
+        }
+      } catch (err) {
+        console.error('Error initializing header:', err);
+      }
+    };
+
+    initializeHeader();
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowCreditsDropdown(false);
+      }
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setShowProfileDropdown(false);
       }
     };
 
@@ -41,31 +97,11 @@ export default function Header() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch credits on mount
-  useEffect(() => {
-    setMounted(true);
-    const fetchCredits = async () => {
-      try {
-        const supabase = createClientComponentClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          const { data, error } = await supabase
-            .rpc('get_total_credits', {
-              user_id: session.user.id
-            });
-          
-          if (!error && data) {
-            setCredits(data);
-          }
-        }
-      } catch (err) {
-        console.error('Unexpected error:', err);
-      }
-    };
-
-    fetchCredits();
-  }, []);
+  const handleLogout = async () => {
+    const supabase = createClientComponentClient();
+    await supabase.auth.signOut();
+    window.location.href = '/';
+  };
 
   const headerClassName = cn(
     "z-50",
@@ -95,7 +131,15 @@ export default function Header() {
   const dropdownClassName = cn(
     "absolute right-0 top-full mt-2 w-64 rounded-md shadow-lg",
     "bg-[var(--card-bg)] border border-[var(--border-color)]",
-    "py-2 px-3"
+    "py-2 px-3",
+    "z-[60]"
+  );
+
+  const profileDropdownClassName = cn(
+    "absolute right-0 top-full mt-2 w-36 rounded-md shadow-lg",
+    "bg-[var(--card-bg)] border border-[var(--border-color)]",
+    "py-2 px-2",
+    "z-[60]"
   );
 
   return (
@@ -171,9 +215,35 @@ export default function Header() {
               )}
             </button>
           )}
-          <button className={iconClassName}>
-            <User className="h-5 w-5" />
-          </button>
+          <div className="relative" ref={profileDropdownRef}>
+            <button 
+              className={`flex items-center ${iconClassName}`}
+              onClick={() => setShowProfileDropdown(!showProfileDropdown)}
+            >
+              <User className="h-5 w-5" />
+            </button>
+            
+            {showProfileDropdown && (
+              <div className={profileDropdownClassName}>
+                <div className="space-y-1">
+                  <Link
+                    href="/profile"
+                    className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-[var(--hover-bg)] transition-colors cursor-pointer"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    <span>My Profile</span>
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center w-full px-3 py-2 text-sm rounded-md hover:bg-[var(--hover-bg)] transition-colors cursor-pointer text-red-500 hover:text-red-600"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    <span>Logout</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>

@@ -11,10 +11,11 @@ interface AIToolModalProps {
   tool: AITool;
   isOpen: boolean;
   onClose: () => void;
+  initialEditMode?: boolean;
 }
 
-export function AIToolModal({ tool, isOpen, onClose }: AIToolModalProps) {
-  const [isEditMode, setIsEditMode] = useState(false);
+export function AIToolModal({ tool, isOpen, onClose, initialEditMode = false }: AIToolModalProps) {
+  const [isEditMode, setIsEditMode] = useState(initialEditMode);
   const [isSuperAdminUser, setIsSuperAdminUser] = useState(false);
 
   useEffect(() => {
@@ -24,6 +25,10 @@ export function AIToolModal({ tool, isOpen, onClose }: AIToolModalProps) {
     };
     checkSuperAdmin();
   }, []);
+
+  useEffect(() => {
+    setIsEditMode(initialEditMode);
+  }, [initialEditMode]);
 
   const lockScroll = useCallback(() => {
     document.body.style.overflow = 'hidden'
