@@ -12,14 +12,19 @@ import {
   Lock,
   Eye,
   EyeOff,
-  ChevronLeft
+  ChevronLeft,
+  Plus
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { AICreditsDetail } from './components/AICreditsDetail';
 import { PaymentDetail } from './components/PaymentDetail';
+import { ContentDetail } from './components/ContentDetail';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { AIItem, PaymentItem } from './components/types';
 import { Toast } from './components/Toast';
+import { OrganizationView } from './components/OrganizationView';
+import { AddAccessModal } from './components/AddAccessModal';
+import { AccessStructureView } from './components/AccessStructureView';
 
 interface ToolRun {
   id: string;
@@ -82,6 +87,73 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
+
+  // Add isAdmin state
+  const [isAdmin, setIsAdmin] = useState(false);
+  type TabType = 'credits' | 'content';
+  const [activeTab, setActiveTab] = useState<TabType>('credits');
+  const [showAccessModal, setShowAccessModal] = useState(false);
+
+  // Add new state for selected organization
+  const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+
+  // Add to the state declarations at the top of the component
+  const [selectedAccessType, setSelectedAccessType] = useState<'collection' | 'content' | null>(null);
+  const [selectedAccessId, setSelectedAccessId] = useState<string | null>(null);
+
+  const renderTabContent = (tab: TabType, item: AIItem) => {
+    if (tab === 'credits') {
+      return (
+        <AICreditsDetail 
+          item={item}
+          formatTimestamp={formatTimestamp}
+          onCopy={handleCopyResponse}
+          showCopied={showCopied}
+        />
+      );
+    }
+    return (
+      <ContentDetail 
+        item={item}
+        formatTimestamp={formatTimestamp}
+        onCopy={handleCopyResponse}
+        showCopied={showCopied}
+        isAdmin={isAdmin}
+        showAccessModal={showAccessModal}
+        setShowAccessModal={setShowAccessModal}
+      />
+    );
+  };
+
+  // Check if user is admin using RPC
+  useEffect(() => {
+    async function checkAdminStatus() {
+      try {
+        // Check both admin and super admin status
+        const [{ data: isAdminResult, error: adminError }, { data: isSuperAdminResult, error: superAdminError }] = await Promise.all([
+          supabase.rpc('is_admin'),
+          supabase.rpc('is_super_admin')
+        ]);
+
+        if (adminError) {
+          console.error('Error checking admin status:', adminError);
+          return;
+        }
+
+        if (superAdminError) {
+          console.error('Error checking super admin status:', superAdminError);
+          return;
+        }
+
+        console.log('Admin status check:', { isAdmin: isAdminResult, isSuperAdmin: isSuperAdminResult });
+        setIsAdmin(!!(isAdminResult || isSuperAdminResult));
+      } catch (error) {
+        console.error('Error in checkAdminStatus:', error);
+      }
+    }
+
+    checkAdminStatus();
+  }, [supabase]);
 
   // Fetch user data
   useEffect(() => {
@@ -297,7 +369,6 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
     fetchData();
   }, [supabase, userId]);
 
-  const [activeTab, setActiveTab] = useState<'credits' | 'billing'>('credits');
   const [selectedItem, setSelectedItem] = useState<AIItem | null>(null);
   const [showCopied, setShowCopied] = useState(false);
 
@@ -745,6 +816,16 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
               AI Credits
             </button>
             <button 
+              onClick={() => setActiveTab('content')}
+              className={cn(
+                "px-6 py-3 rounded-md text-lg font-medium transition-all",
+                activeTab === 'content' 
+                  ? "bg-[var(--accent)] text-white" 
+                  : "hover:bg-[var(--hover-bg)]"
+              )}>
+              Content
+            </button>
+            <button 
               onClick={handleBillingPortal}
               className="px-6 py-3 rounded-md text-lg font-medium transition-all hover:bg-[var(--hover-bg)]">
               Billing
@@ -752,122 +833,278 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-12 gap-8">
-          {/* Left Column - Recent History */}
-          <div className="col-span-5">
-            <div className="space-y-4">
-              <h3 className="text-xl font-medium text-[var(--text-secondary)] mb-6">Recent History</h3>
-              {currentItems.length > 0 ? (
-                <div className="space-y-4">
-                  {getCurrentItems().map((item) => {
-                    const metadata = getItemMetadata(item);
-                    return (
-                      <div
-                        key={item.id}
-                        onClick={() => setSelectedItem(item)}
-                        className={cn(
-                          "p-4 rounded-lg",
-                          "border border-[var(--border-color)]",
-                          "cursor-pointer",
-                          "transition-all",
-                          selectedItem?.id === item.id 
-                            ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
-                            : 'hover:border-[var(--accent)]'
-                        )}
-                      >
-                        <div className="space-y-2">
-                          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                            <span>{metadata.category}</span>
-                            <ChevronRight className="w-3 h-3" />
-                            <span>{metadata.suite}</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg text-[var(--foreground)]">{metadata.name}</span>
-                            <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
+        {activeTab === 'credits' && (
+          <div className="grid grid-cols-12 gap-8">
+            {/* Left Column - Recent History */}
+            <div className="col-span-5">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-medium text-[var(--text-secondary)]">Recent History</h3>
+                </div>
+                {currentItems.length > 0 ? (
+                  <div className="space-y-4">
+                    {getCurrentItems().map((item) => {
+                      const metadata = getItemMetadata(item);
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => setSelectedItem(item)}
+                          className={cn(
+                            "p-4 rounded-lg",
+                            "border border-[var(--border-color)]",
+                            "cursor-pointer",
+                            "transition-all",
+                            selectedItem?.id === item.id 
+                              ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
+                              : 'hover:border-[var(--accent)]'
+                          )}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                              <span>{metadata.category}</span>
+                              <ChevronRight className="w-3 h-3" />
+                              <span>{metadata.suite}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-lg text-[var(--foreground)]">{metadata.name}</span>
+                              <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
 
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 mt-6">
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                        className={cn(
-                          "p-1 rounded-md transition-colors",
-                          currentPage === 1 
-                            ? "text-[var(--text-secondary)] cursor-not-allowed"
-                            : "hover:bg-[var(--hover-bg)]"
-                        )}
-                      >
-                        <ChevronLeft className="w-5 h-5" />
-                      </button>
-
-                      {getPageNumbers().map((page, index) => (
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 mt-6">
                         <button
-                          key={index}
-                          onClick={() => typeof page === 'number' && setCurrentPage(page)}
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
                           className={cn(
-                            "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
-                            typeof page === 'number' && page === currentPage
-                              ? "bg-[var(--accent)] text-white"
-                              : page === '...'
-                              ? "text-[var(--text-secondary)] cursor-default"
+                            "p-1 rounded-md transition-colors",
+                            currentPage === 1 
+                              ? "text-[var(--text-secondary)] cursor-not-allowed"
                               : "hover:bg-[var(--hover-bg)]"
                           )}
                         >
-                          {page}
+                          <ChevronLeft className="w-5 h-5" />
                         </button>
-                      ))}
 
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
-                        className={cn(
-                          "p-1 rounded-md transition-colors",
-                          currentPage === totalPages
-                            ? "text-[var(--text-secondary)] cursor-not-allowed"
-                            : "hover:bg-[var(--hover-bg)]"
-                        )}
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    </div>
-                  )}
+                        {getPageNumbers().map((page, index) => (
+                          <button
+                            key={index}
+                            onClick={() => typeof page === 'number' && setCurrentPage(page)}
+                            className={cn(
+                              "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                              typeof page === 'number' && page === currentPage
+                                ? "bg-[var(--accent)] text-white"
+                                : page === '...'
+                                ? "text-[var(--text-secondary)] cursor-default"
+                                : "hover:bg-[var(--hover-bg)]"
+                            )}
+                          >
+                            {page}
+                          </button>
+                        ))}
+
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className={cn(
+                            "p-1 rounded-md transition-colors",
+                            currentPage === totalPages
+                              ? "text-[var(--text-secondary)] cursor-not-allowed"
+                              : "hover:bg-[var(--hover-bg)]"
+                          )}
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-[var(--text-secondary)]">
+                    No AI credits history available
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column - Details */}
+            <div className="col-span-7">
+              {selectedItem ? (
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-8">
+                    {(() => {
+                      console.log('Rendering detail view, activeTab:', activeTab, 'isAdmin:', isAdmin);
+                      return selectedItem ? renderTabContent(activeTab, selectedItem) : null;
+                    })()}
+                  </div>
                 </div>
+              ) : showAccessModal && selectedAccessType && selectedAccessId ? (
+                <AccessStructureView
+                  selectedType={selectedAccessType}
+                  selectedId={selectedAccessId}
+                />
               ) : (
-                <div className="text-center py-8 text-[var(--text-secondary)]">
-                  No AI credits history available
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-8">
+                  <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-[var(--text-secondary)] text-lg">
+                    <p>Select an item to view details</p>
+                  </div>
                 </div>
               )}
             </div>
           </div>
+        )}
 
-          {/* Right Column - Details */}
-          <div className="col-span-7">
-            {selectedItem ? (
-              <div className="space-y-6">
-                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-8">
-                  <AICreditsDetail 
-                    item={selectedItem}
-                    formatTimestamp={formatTimestamp}
-                    onCopy={handleCopyResponse}
-                    showCopied={showCopied}
+        {activeTab === 'content' && (
+          <div className="grid grid-cols-12 gap-8">
+            {/* Left Column - Recent History */}
+            <div className="col-span-5">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-medium text-[var(--text-secondary)]">Recent History</h3>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setShowAccessModal(true)}
+                      className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Add Access</span>
+                    </button>
+                  )}
+                </div>
+                {isAdmin && showAccessModal && (
+                  <AddAccessModal
+                    onSubmit={(type, id) => {
+                      console.log('Selected:', { type, id });
+                      if (type === 'collection' || type === 'content') {
+                        setSelectedAccessType(type);
+                        setSelectedAccessId(id);
+                      }
+                    }}
+                    onCancel={() => {
+                      setShowAccessModal(false);
+                      setSelectedAccessType(null);
+                      setSelectedAccessId(null);
+                    }}
                   />
-                </div>
+                )}
+                {currentItems.length > 0 ? (
+                  <div className="space-y-4">
+                    {getCurrentItems().map((item) => {
+                      const metadata = getItemMetadata(item);
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => setSelectedItem(item)}
+                          className={cn(
+                            "p-4 rounded-lg",
+                            "border border-[var(--border-color)]",
+                            "cursor-pointer",
+                            "transition-all",
+                            selectedItem?.id === item.id 
+                              ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
+                              : 'hover:border-[var(--accent)]'
+                          )}
+                        >
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                              <span>{metadata.category}</span>
+                              <ChevronRight className="w-3 h-3" />
+                              <span>{metadata.suite}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-lg text-[var(--foreground)]">{metadata.name}</span>
+                              <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 mt-6">
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                          disabled={currentPage === 1}
+                          className={cn(
+                            "p-1 rounded-md transition-colors",
+                            currentPage === 1 
+                              ? "text-[var(--text-secondary)] cursor-not-allowed"
+                              : "hover:bg-[var(--hover-bg)]"
+                          )}
+                        >
+                          <ChevronLeft className="w-5 h-5" />
+                        </button>
+
+                        {getPageNumbers().map((page, index) => (
+                          <button
+                            key={index}
+                            onClick={() => typeof page === 'number' && setCurrentPage(page)}
+                            className={cn(
+                              "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                              typeof page === 'number' && page === currentPage
+                                ? "bg-[var(--accent)] text-white"
+                                : page === '...'
+                                ? "text-[var(--text-secondary)] cursor-default"
+                                : "hover:bg-[var(--hover-bg)]"
+                            )}
+                          >
+                            {page}
+                          </button>
+                        ))}
+
+                        <button
+                          onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                          disabled={currentPage === totalPages}
+                          className={cn(
+                            "p-1 rounded-md transition-colors",
+                            currentPage === totalPages
+                              ? "text-[var(--text-secondary)] cursor-not-allowed"
+                              : "hover:bg-[var(--hover-bg)]"
+                          )}
+                        >
+                          <ChevronRight className="w-5 h-5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-8 text-[var(--text-secondary)]">
+                    No content history available
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-8">
-                <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-[var(--text-secondary)] text-lg">
-                  <p>Select an item to view details</p>
+            </div>
+
+            {/* Right Column - Details */}
+            <div className="col-span-7">
+              {selectedItem ? (
+                <div className="space-y-6">
+                  <div className="rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-8">
+                    {(() => {
+                      console.log('Rendering detail view, activeTab:', activeTab, 'isAdmin:', isAdmin);
+                      return selectedItem ? renderTabContent(activeTab, selectedItem) : null;
+                    })()}
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : showAccessModal && selectedAccessType && selectedAccessId ? (
+                <AccessStructureView
+                  selectedType={selectedAccessType}
+                  selectedId={selectedAccessId}
+                />
+              ) : (
+                <div className="rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-8">
+                  <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-[var(--text-secondary)] text-lg">
+                    <p>Select an item to view details</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {toast && toast.position === 'bottom-right' && (
