@@ -11,7 +11,8 @@ import {
   Camera,
   Lock,
   Eye,
-  EyeOff
+  EyeOff,
+  ChevronLeft
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { AICreditsDetail } from './components/AICreditsDetail';
@@ -48,9 +49,8 @@ export default function ProfileDashboard() {
   const [tempEmail, setTempEmail] = useState('');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Tool runs and payments state
+  // Tool runs state
   const [aiItems, setAiItems] = useState<AIItem[]>([]);
-  const [paymentItems, setPaymentItems] = useState<PaymentItem[]>([]);
 
   // Image state
   const [profileImage, setProfileImage] = useState<string | null>(null);
@@ -73,6 +73,10 @@ export default function ProfileDashboard() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Fetch user data
   useEffect(() => {
@@ -232,67 +236,49 @@ export default function ProfileDashboard() {
 
   // Fetch tool runs on component mount
   useEffect(() => {
-    async function fetchToolRuns() {
+    async function fetchData() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.user) return;
 
+        console.log('Fetching tool runs for user:', session.user.id);
         const { data: toolRuns, error } = await supabase
           .rpc('get_user_tool_runs', {
             p_user_id: session.user.id,
-            p_limit: 10  // Fetch last 10 runs
+            p_limit: 10
           });
 
         if (error) {
           console.error('Error fetching tool runs:', error);
-          return;
+          throw error;
         }
 
-        // Transform the data to match our AIItem interface
-        const transformedRuns: AIItem[] = (toolRuns as ToolRun[]).map(run => ({
+        console.log('Tool runs data:', toolRuns);
+
+        const formattedAIItems: AIItem[] = toolRuns.map((run: ToolRun) => ({
           id: run.id,
-          tool_name: run.tool_name,
-          collection_name: run.collection_name,
-          suite_name: run.suite_name,
+          toolName: run.tool_name,
+          collectionName: run.collection_name,
+          suiteName: run.suite_name,
           timestamp: run.created_at,
-          credits_cost: run.credits_cost,
-          credits_before: run.credits_before,
-          credits_after: run.credits_after,
-          ai_response: run.ai_response
+          creditsCost: run.credits_cost,
+          creditsBefore: run.credits_before,
+          creditsAfter: run.credits_after,
+          aiResponse: run.ai_response
         }));
 
-        setAiItems(transformedRuns);
+        console.log('Formatted AI items:', formattedAIItems);
+        setAiItems(formattedAIItems);
       } catch (error) {
-        console.error('Error in fetchToolRuns:', error);
+        console.error('Error fetching data:', error);
       }
     }
 
-    fetchToolRuns();
+    fetchData();
   }, [supabase]);
 
-  // Payments test data (keeping this for now)
-  const defaultPaymentItems: PaymentItem[] = [
-    {
-      id: '1',
-      name: "Pro Plan Subscription",
-      category: "Subscriptions",
-      suite: "Pro Plan",
-      timestamp: "2024-03-01T00:00:00Z",
-      amount: 49.99,
-      status: 'paid',
-      receipt: "receipt-123",
-      paymentType: 'subscription',
-      nextBillingDate: "2024-04-01T00:00:00Z",
-      billingCycle: 'monthly'
-    }
-  ];
-
-  useEffect(() => {
-    setPaymentItems(defaultPaymentItems);
-  }, []);
-
-  const [activeTab, setActiveTab] = useState<'credits' | 'payments'>('credits');
-  const [selectedItem, setSelectedItem] = useState<AIItem | PaymentItem | null>(null);
+  const [activeTab, setActiveTab] = useState<'credits' | 'billing'>('credits');
+  const [selectedItem, setSelectedItem] = useState<AIItem | null>(null);
   const [showCopied, setShowCopied] = useState(false);
 
   // Format timestamp to readable date and time
@@ -313,7 +299,40 @@ export default function ProfileDashboard() {
   };
 
   // Get current items based on active tab
-  const currentItems = activeTab === 'credits' ? aiItems : paymentItems;
+  const currentItems = aiItems;
+  console.log('Current items:', currentItems);
+
+  // Get current items for display
+  const getCurrentItems = () => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const items = currentItems.slice(startIndex, endIndex);
+    console.log('Items for current page:', items);
+    return items;
+  };
+
+  // Get total pages
+  const totalPages = Math.ceil(currentItems.length / itemsPerPage);
+
+  // Generate page numbers to display
+  const getPageNumbers = () => {
+    const delta = 1; // Number of pages to show on each side of current page
+    const pages = [];
+    
+    for (let i = 1; i <= totalPages; i++) {
+      if (
+        i === 1 || // First page
+        i === totalPages || // Last page
+        (i >= currentPage - delta && i <= currentPage + delta) // Pages around current
+      ) {
+        pages.push(i);
+      } else if (pages[pages.length - 1] !== '...') {
+        pages.push('...');
+      }
+    }
+    
+    return pages;
+  };
 
   const handleCopyResponse = (response: string) => {
     navigator.clipboard.writeText(response);
@@ -323,22 +342,26 @@ export default function ProfileDashboard() {
 
   // Helper function to determine if an item is an AIItem
   const isAIItem = (item: AIItem | PaymentItem): item is AIItem => {
-    return 'tool_name' in item;
+    return 'toolName' in item;
   };
 
-  // Helper function to get category and suite for display
-  const getItemMetadata = (item: AIItem | PaymentItem) => {
-    if (isAIItem(item)) {
-      return {
-        category: item.collection_name || '',
-        suite: item.suite_name || '',
-        name: item.tool_name
-      };
-    }
+  // Helper function to get item details
+  const getItemDetails = (item: AIItem) => {
     return {
-      category: item.category,
-      suite: item.suite,
-      name: item.name
+      category: item.collectionName || '',
+      suite: item.suiteName || '',
+      name: item.toolName
+    };
+  };
+
+  // Helper function to get metadata for display
+  const getItemMetadata = (item: AIItem) => {
+    const details = getItemDetails(item);
+    return {
+      category: details.category,
+      suite: details.suite,
+      name: details.name,
+      type: 'AI Tool Run'
     };
   };
 
@@ -420,6 +443,29 @@ export default function ProfileDashboard() {
       if (event.target) {
         event.target.value = ''; // Reset file input
       }
+    }
+  };
+
+  const handleBillingPortal = async () => {
+    try {
+      const response = await fetch('/api/payments/billing-portal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error);
+      }
+
+      // Redirect to the billing portal URL in the same tab
+      window.location.href = data.url;
+    } catch (error) {
+      console.error('Error accessing billing portal:', error);
+      showToast(error instanceof Error ? error.message : 'Failed to access billing portal', 'error');
     }
   };
 
@@ -670,7 +716,7 @@ export default function ProfileDashboard() {
       </div>
 
       {/* Main content */}
-      <div className="max-w-6xl mx-auto mt-8 px-6">
+      <div className="max-w-6xl mx-auto mt-8 px-6 pb-16">
         {/* Centered tab buttons */}
         <div className="flex justify-center mb-8">
           <div className="inline-flex items-center gap-2 p-1 rounded-lg bg-[var(--card-bg)] border border-[var(--border-color)]">
@@ -685,14 +731,9 @@ export default function ProfileDashboard() {
               AI Credits
             </button>
             <button 
-              onClick={() => setActiveTab('payments')}
-              className={cn(
-                "px-6 py-3 rounded-md text-lg font-medium transition-all",
-                activeTab === 'payments' 
-                  ? "bg-[var(--accent)] text-white" 
-                  : "hover:bg-[var(--hover-bg)]"
-              )}>
-              Payments
+              onClick={handleBillingPortal}
+              className="px-6 py-3 rounded-md text-lg font-medium transition-all hover:bg-[var(--hover-bg)]">
+              Billing
             </button>
           </div>
         </div>
@@ -702,42 +743,92 @@ export default function ProfileDashboard() {
           <div className="col-span-5">
             <div className="space-y-4">
               <h3 className="text-xl font-medium text-[var(--text-secondary)] mb-6">Recent History</h3>
-              {currentItems.map((item) => {
-                const metadata = getItemMetadata(item);
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() => setSelectedItem(item)}
-                    className={cn(
-                      "p-4 rounded-lg",
-                      "border border-[var(--border-color)]",
-                      "cursor-pointer",
-                      "transition-all",
-                      selectedItem?.id === item.id 
-                        ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
-                        : 'hover:border-[var(--accent)]'
-                    )}
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                        <span>{metadata.category}</span>
-                        <ChevronRight className="w-3 h-3" />
-                        <span>{metadata.suite}</span>
+              {currentItems.length > 0 ? (
+                <div className="space-y-4">
+                  {getCurrentItems().map((item) => {
+                    const metadata = getItemMetadata(item);
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedItem(item)}
+                        className={cn(
+                          "p-4 rounded-lg",
+                          "border border-[var(--border-color)]",
+                          "cursor-pointer",
+                          "transition-all",
+                          selectedItem?.id === item.id 
+                            ? 'border-[var(--accent)] bg-[var(--accent)]/5' 
+                            : 'hover:border-[var(--accent)]'
+                        )}
+                      >
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                            <span>{metadata.category}</span>
+                            <ChevronRight className="w-3 h-3" />
+                            <span>{metadata.suite}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-lg text-[var(--foreground)]">{metadata.name}</span>
+                            <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-lg text-[var(--foreground)]">{metadata.name}</span>
-                        <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                        <Clock className="w-3 h-3" />
-                        <span>{formatTimestamp(item.timestamp).date}</span>
-                        <span>•</span>
-                        <span>{formatTimestamp(item.timestamp).time}</span>
-                      </div>
+                    );
+                  })}
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-2 mt-6">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className={cn(
+                          "p-1 rounded-md transition-colors",
+                          currentPage === 1 
+                            ? "text-[var(--text-secondary)] cursor-not-allowed"
+                            : "hover:bg-[var(--hover-bg)]"
+                        )}
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
+
+                      {getPageNumbers().map((page, index) => (
+                        <button
+                          key={index}
+                          onClick={() => typeof page === 'number' && setCurrentPage(page)}
+                          className={cn(
+                            "w-8 h-8 rounded-md flex items-center justify-center transition-colors",
+                            typeof page === 'number' && page === currentPage
+                              ? "bg-[var(--accent)] text-white"
+                              : page === '...'
+                              ? "text-[var(--text-secondary)] cursor-default"
+                              : "hover:bg-[var(--hover-bg)]"
+                          )}
+                        >
+                          {page}
+                        </button>
+                      ))}
+
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className={cn(
+                          "p-1 rounded-md transition-colors",
+                          currentPage === totalPages
+                            ? "text-[var(--text-secondary)] cursor-not-allowed"
+                            : "hover:bg-[var(--hover-bg)]"
+                        )}
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
                     </div>
-                  </div>
-                );
-              })}
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-[var(--text-secondary)]">
+                  No AI credits history available
+                </div>
+              )}
             </div>
           </div>
 
@@ -746,24 +837,19 @@ export default function ProfileDashboard() {
             {selectedItem ? (
               <div className="space-y-6">
                 <div className="rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-8">
-                  {isAIItem(selectedItem) ? (
-                    <AICreditsDetail 
-                      item={selectedItem}
-                      formatTimestamp={formatTimestamp}
-                      onCopy={handleCopyResponse}
-                      showCopied={showCopied}
-                    />
-                  ) : (
-                    <PaymentDetail 
-                      item={selectedItem}
-                      formatTimestamp={formatTimestamp}
-                    />
-                  )}
+                  <AICreditsDetail 
+                    item={selectedItem}
+                    formatTimestamp={formatTimestamp}
+                    onCopy={handleCopyResponse}
+                    showCopied={showCopied}
+                  />
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-[var(--text-secondary)] text-lg">
-                <p>Select an item to view details</p>
+              <div className="rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-8">
+                <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-[var(--text-secondary)] text-lg">
+                  <p>Select an item to view details</p>
+                </div>
               </div>
             )}
           </div>

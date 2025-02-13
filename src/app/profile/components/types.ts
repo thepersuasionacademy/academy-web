@@ -9,31 +9,26 @@ export interface User {
 
 export interface AIItem {
     id: string;
-    tool_name: string;
-    collection_name: string | null;
-    suite_name: string | null;
+    toolName: string;
+    collectionName: string | null;
+    suiteName: string | null;
     timestamp: string;
-    credits_cost: number;
-    credits_before: number;
-    credits_after: number;
-    ai_response: string;
+    creditsCost: number;
+    creditsBefore: number;
+    creditsAfter: number;
+    aiResponse: string;
 }
 
 export interface PaymentItem {
     id: string;
-    name: string;
-    category: string;
-    suite: string;
     timestamp: string;
     amount: number;
-    status: 'paid' | 'pending' | 'failed';
-    receipt: string;
-    paymentType: 'one-time' | 'subscription' | 'payment-plan';
+    status: string;
+    paymentType: string;
+    name: string;
+    billingCycle?: string;
+    isAutoRenew?: boolean;
     nextBillingDate?: string;
-    billingCycle?: 'monthly' | 'yearly';
-    installments?: {
-        completed: number;
-        total: number;
-        nextPaymentDate: string;
-    };
+    endDate?: string;
+    receipt?: string;
 }

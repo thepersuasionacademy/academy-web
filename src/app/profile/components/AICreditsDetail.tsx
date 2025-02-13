@@ -18,12 +18,12 @@ export function AICreditsDetail({ item, formatTimestamp, onCopy, showCopied }: A
       {/* Title and Description */}
       <div className="space-y-2 mb-6">
         <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <span>{item.collection_name}</span>
+          <span>{item.collectionName}</span>
           <ChevronRight className="w-3 h-3" />
-          <span>{item.suite_name}</span>
+          <span>{item.suiteName}</span>
         </div>
         <h3 className="text-2xl font-medium text-[var(--foreground)]">
-          {item.tool_name}
+          {item.toolName}
         </h3>
         <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <Clock className="w-3 h-3" />
@@ -39,7 +39,7 @@ export function AICreditsDetail({ item, formatTimestamp, onCopy, showCopied }: A
           <div className="grid grid-cols-2 gap-x-8 gap-y-2">
             {/* Credits Before */}
             <p className="text-3xl font-medium text-[var(--text-secondary)] text-right leading-none">
-              {item.credits_before}
+              {item.creditsBefore}
             </p>
             <p className="text-lg text-[var(--text-secondary)] leading-none pt-2">Credits Before</p>
 
@@ -47,7 +47,7 @@ export function AICreditsDetail({ item, formatTimestamp, onCopy, showCopied }: A
             <div className="flex items-center justify-end gap-3">
               <span className="text-3xl font-medium text-red-500 leading-none">−</span>
               <p className="text-3xl font-medium text-red-500 leading-none">
-                {item.credits_cost}
+                {item.creditsCost}
               </p>
             </div>
             <p className="text-lg text-red-500 leading-none pt-2">Credits Used</p>
@@ -57,7 +57,7 @@ export function AICreditsDetail({ item, formatTimestamp, onCopy, showCopied }: A
 
             {/* Credits Remaining */}
             <p className="text-3xl font-bold text-[var(--foreground)] text-right leading-none">
-              {item.credits_after}
+              {item.creditsAfter}
             </p>
             <p className="text-lg text-[var(--foreground)] leading-none pt-2">Credits Remaining</p>
           </div>
@@ -70,7 +70,7 @@ export function AICreditsDetail({ item, formatTimestamp, onCopy, showCopied }: A
         <div className="flex items-center justify-between">
           <p className="text-lg text-[var(--text-secondary)]">AI Response</p>
           <button 
-            onClick={() => onCopy(item.ai_response)}
+            onClick={() => onCopy(item.aiResponse)}
             className="p-2 rounded-lg hover:bg-[var(--hover-bg)] flex items-center gap-2"
           >
             {showCopied ? (
@@ -104,7 +104,7 @@ export function AICreditsDetail({ item, formatTimestamp, onCopy, showCopied }: A
             "prose-code:before:content-none prose-code:after:content-none"
           )}>
             <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {item.ai_response}
+              {item.aiResponse}
             </Markdown>
           </div>
         </div>
@@ -112,7 +112,7 @@ export function AICreditsDetail({ item, formatTimestamp, onCopy, showCopied }: A
         {/* Bottom copy button */}
         <div className="flex justify-end">
           <button 
-            onClick={() => onCopy(item.ai_response)}
+            onClick={() => onCopy(item.aiResponse)}
             className="p-2 rounded-lg hover:bg-[var(--hover-bg)] flex items-center gap-2"
           >
             {showCopied ? (
