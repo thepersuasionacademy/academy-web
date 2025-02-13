@@ -33,12 +33,17 @@ interface ToolRun {
   ai_response: string;
 }
 
-export default function ProfileDashboard() {
+interface ProfilePageProps {
+  userId?: string;
+}
+
+export default function ProfilePage({ userId }: ProfilePageProps) {
   // User state
   const [user, setUser] = useState({
     firstName: '',
     lastName: '',
     email: '',
+    hasPassword: false
   });
 
   // Add edit states
@@ -82,13 +87,16 @@ export default function ProfileDashboard() {
   useEffect(() => {
     async function fetchUserData() {
       try {
+        // If userId is provided (admin view), use that, otherwise get current user's ID
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) return;
+        const targetUserId = userId || session?.user?.id;
 
-        // Get user names from auth
+        if (!targetUserId) return;
+
+        // Get user names from user_profiles
         const { data: userData, error: userError } = await supabase
           .rpc('get_user_names', {
-            p_user_id: session.user.id
+            p_user_id: targetUserId
           });
 
         if (userError) {
@@ -98,13 +106,15 @@ export default function ProfileDashboard() {
 
         const firstName = userData?.[0]?.first_name || 'Add your name';
         const lastName = userData?.[0]?.last_name || '';
-        const email = userData?.[0]?.email || session.user.email || '';
+        const email = userData?.[0]?.email || '';
         const profileImageUrl = userData?.[0]?.profile_image_url || null;
+        const hasPassword = userData?.[0]?.has_password || false;
 
         setUser({
           firstName,
           lastName,
           email,
+          hasPassword
         });
         setProfileImage(profileImageUrl);
 
@@ -120,7 +130,7 @@ export default function ProfileDashboard() {
     }
 
     fetchUserData();
-  }, [supabase]);
+  }, [supabase, userId]);
 
   // Handle input changes with save
   const handleNameChange = async (field: 'firstName' | 'lastName', value: string) => {
@@ -133,12 +143,12 @@ export default function ProfileDashboard() {
 
   const handleSaveName = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) return;
+      const targetUserId = userId || (await supabase.auth.getSession()).data.session?.user?.id;
+      if (!targetUserId) return;
 
       const { error } = await supabase
         .rpc('update_user_names', {
-          user_id: session.user.id,
+          user_id: targetUserId,
           new_first_name: tempFirstName || user.firstName,
           new_last_name: tempLastName
         });
@@ -165,7 +175,14 @@ export default function ProfileDashboard() {
 
   const handleSaveEmail = async () => {
     try {
-      const { error } = await supabase.auth.updateUser({ email: tempEmail });
+      const targetUserId = userId || (await supabase.auth.getSession()).data.session?.user?.id;
+      if (!targetUserId) return;
+
+      // Update email in user_profiles table
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({ email: tempEmail })
+        .eq('id', targetUserId);
       
       if (error) {
         console.error('Error updating email:', error);
@@ -234,17 +251,20 @@ export default function ProfileDashboard() {
     }
   };
 
-  // Fetch tool runs on component mount
+  // Fetch tool runs
   useEffect(() => {
     async function fetchData() {
       try {
+        // If userId is provided (admin view), use that, otherwise get current user's ID
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) return;
+        const targetUserId = userId || session?.user?.id;
 
-        console.log('Fetching tool runs for user:', session.user.id);
+        if (!targetUserId) return;
+
+        console.log('Fetching tool runs for user:', targetUserId);
         const { data: toolRuns, error } = await supabase
           .rpc('get_user_tool_runs', {
-            p_user_id: session.user.id,
+            p_user_id: targetUserId,
             p_limit: 10
           });
 
@@ -275,7 +295,7 @@ export default function ProfileDashboard() {
     }
 
     fetchData();
-  }, [supabase]);
+  }, [supabase, userId]);
 
   const [activeTab, setActiveTab] = useState<'credits' | 'billing'>('credits');
   const [selectedItem, setSelectedItem] = useState<AIItem | null>(null);
@@ -448,11 +468,15 @@ export default function ProfileDashboard() {
 
   const handleBillingPortal = async () => {
     try {
+      const targetUserId = userId || (await supabase.auth.getSession()).data.session?.user?.id;
+      if (!targetUserId) return;
+
       const response = await fetch('/api/payments/billing-portal', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ userId: targetUserId })
       });
 
       const data = await response.json();
@@ -522,11 +546,6 @@ export default function ProfileDashboard() {
               onChange={handleImageUpload}
               className="hidden"
             />
-            {isUploadingImage && (
-              <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
             {toast && toast.position === 'profile-image' && (
               <Toast
                 message={toast.message}
@@ -577,23 +596,17 @@ export default function ProfileDashboard() {
               </div>
             ) : (
               <div 
-                onClick={() => {
-                  setIsEditingName(true);
-                  setTempFirstName(user.firstName === 'Add your name' ? '' : user.firstName);
-                  setTempLastName(user.lastName);
-                }}
-                className="group relative inline-flex items-center cursor-pointer"
+                onClick={() => setIsEditingName(true)}
+                className={cn(
+                  "group relative inline-flex items-center"
+                )}
               >
                 <h2 className={cn(
                   "text-3xl font-medium text-[var(--foreground)] transition-colors",
-                  user.firstName === 'Add your name' && "text-[var(--text-secondary)] italic",
-                  "group-hover:text-[var(--accent)]"
+                  user.firstName === 'Add your name' && "text-[var(--text-secondary)] italic"
                 )}>
                   {user.firstName} {user.lastName}
                 </h2>
-                <div className="absolute -right-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Pencil className="w-5 h-5 text-[var(--accent)]" />
-                </div>
               </div>
             )}
 
@@ -628,13 +641,14 @@ export default function ProfileDashboard() {
             ) : (
               <div className="flex flex-col gap-2">
                 <div 
-                  onClick={() => {
-                    setIsEditingEmail(true);
-                    setTempEmail(user.email);
-                  }}
-                  className="group relative inline-flex items-center cursor-pointer"
+                  onClick={() => setIsEditingEmail(true)}
+                  className={cn(
+                    "group relative inline-flex items-center cursor-pointer"
+                  )}
                 >
-                  <p className="text-xl text-[var(--text-secondary)] transition-colors group-hover:text-[var(--accent)]">
+                  <p className={cn(
+                    "text-xl text-[var(--text-secondary)] transition-colors group-hover:text-[var(--accent)]"
+                  )}>
                     {user.email}
                   </p>
                   <div className="absolute -right-8 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -702,7 +716,7 @@ export default function ProfileDashboard() {
                   >
                     <p className="text-sm text-[var(--text-secondary)] transition-colors group-hover:text-[var(--accent)] flex items-center gap-2">
                       <Lock className="w-4 h-4" />
-                      Change password
+                      {user.hasPassword ? 'Change password' : 'Set password'}
                     </p>
                     <div className="absolute -right-8 opacity-0 group-hover:opacity-100 transition-opacity">
                       <ChevronRight className="w-4 h-4 text-[var(--accent)]" />

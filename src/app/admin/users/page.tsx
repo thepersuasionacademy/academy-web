@@ -1,66 +1,75 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Search, 
   Filter,
   Mail,
   Calendar,
-  CreditCard,
-  Brain,
-  MoreVertical,
   ArrowUpDown,
-  ChevronLeft
+  ChevronLeft,
+  Loader2,
+  User
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import Link from 'next/link';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useRouter } from 'next/navigation';
 
 interface User {
   id: string;
-  name: string;
   email: string;
-  joinDate: string;
-  credits: number;
-  status: 'active' | 'inactive';
-  subscription: 'free' | 'pro' | 'enterprise';
+  first_name: string | null;
+  last_name: string | null;
+  created_at: string;
+  updated_at: string;
+  profile_image_url: string | null;
 }
 
 export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortField, setSortField] = useState<keyof User>('name');
+  const [sortField, setSortField] = useState<'email' | 'created_at'>('email');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const supabase = createClientComponentClient();
+  const router = useRouter();
 
-  // Mock user data
-  const users: User[] = [
-    {
-      id: '1',
-      name: 'John Doe',
-      email: 'john@example.com',
-      joinDate: '2024-01-15',
-      credits: 1500,
-      status: 'active',
-      subscription: 'pro'
-    },
-    {
-      id: '2',
-      name: 'Jane Smith',
-      email: 'jane@example.com',
-      joinDate: '2024-02-01',
-      credits: 2500,
-      status: 'active',
-      subscription: 'enterprise'
-    },
-    {
-      id: '3',
-      name: 'Bob Wilson',
-      email: 'bob@example.com',
-      joinDate: '2024-03-10',
-      credits: 500,
-      status: 'inactive',
-      subscription: 'free'
-    },
-    // Add more mock users as needed
-  ];
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch('/api/admin/users');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        setUsers(data.users || []);
+      } catch (err) {
+        console.error('Error fetching users:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch users');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUsers();
+  }, []); // Only fetch on mount
+
+  // Client-side sorting
+  const sortedUsers = [...users].sort((a, b) => {
+    const aValue = sortField === 'email' ? a.email : a.created_at;
+    const bValue = sortField === 'email' ? b.email : b.created_at;
+    
+    if (sortDirection === 'asc') {
+      return aValue > bValue ? 1 : -1;
+    }
+    return aValue < bValue ? 1 : -1;
+  });
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -70,7 +79,7 @@ export default function UsersPage() {
     });
   };
 
-  const getSubscriptionColor = (subscription: User['subscription']) => {
+  const getSubscriptionColor = (subscription?: string | null) => {
     switch (subscription) {
       case 'free':
         return 'text-gray-500';
@@ -83,7 +92,7 @@ export default function UsersPage() {
     }
   };
 
-  const handleSort = (field: keyof User) => {
+  const handleSort = (field: 'email' | 'created_at') => {
     if (sortField === field) {
       setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -91,6 +100,24 @@ export default function UsersPage() {
       setSortDirection('asc');
     }
   };
+
+  const getFullName = (user: User) => {
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    }
+    if (user.first_name) return user.first_name;
+    if (user.last_name) return user.last_name;
+    return null;
+  };
+
+  const filteredUsers = sortedUsers.filter(user => {
+    const searchLower = searchQuery.toLowerCase();
+    const fullName = getFullName(user);
+    return (
+      user.email.toLowerCase().includes(searchLower) ||
+      (fullName?.toLowerCase() || '').includes(searchLower)
+    );
+  });
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -128,84 +155,91 @@ export default function UsersPage() {
           </button>
         </div>
 
-        {/* Users Table */}
-        <div className="border border-[var(--border-color)] rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-[var(--card-bg)] border-b border-[var(--border-color)]">
-                <tr>
-                  <th 
-                    className="px-6 py-4 text-left cursor-pointer hover:bg-[var(--hover-bg)]"
-                    onClick={() => handleSort('name')}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span>Name</span>
-                      <ArrowUpDown className="w-4 h-4" />
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left">
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4" />
-                      <span>Email</span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>Join Date</span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left">
-                    <div className="flex items-center gap-2">
-                      <Brain className="w-4 h-4" />
-                      <span>Credits</span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left">
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="w-4 h-4" />
-                      <span>Subscription</span>
-                    </div>
-                  </th>
-                  <th className="px-6 py-4 text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr 
-                    key={user.id}
-                    className="border-b border-[var(--border-color)] last:border-0 hover:bg-[var(--hover-bg)]"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center text-white font-medium">
-                          {user.name.charAt(0)}
-                        </div>
-                        <span>{user.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-[var(--text-secondary)]">{user.email}</td>
-                    <td className="px-6 py-4 text-[var(--text-secondary)]">{formatDate(user.joinDate)}</td>
-                    <td className="px-6 py-4">{user.credits.toLocaleString()}</td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        "capitalize font-medium",
-                        getSubscriptionColor(user.subscription)
-                      )}>
-                        {user.subscription}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button className="p-2 rounded-lg hover:bg-[var(--card-bg)] transition-colors">
-                        <MoreVertical className="w-5 h-5 text-[var(--text-secondary)]" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {/* Error State */}
+        {error && (
+          <div className="p-4 mb-8 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            {error}
           </div>
-        </div>
+        )}
+
+        {/* Loading State */}
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="w-8 h-8 animate-spin text-[var(--accent)]" />
+          </div>
+        ) : (
+          /* Users Table */
+          <div className="border border-[var(--border-color)] rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-[var(--card-bg)] border-b border-[var(--border-color)]">
+                  <tr>
+                    <th 
+                      className="px-6 py-4 text-left cursor-pointer hover:bg-[var(--hover-bg)]"
+                    >
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4" />
+                        <span>Name</span>
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-4 text-left cursor-pointer hover:bg-[var(--hover-bg)]"
+                      onClick={() => handleSort('email')}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4" />
+                        <span>Email</span>
+                        <ArrowUpDown className="w-4 h-4" />
+                      </div>
+                    </th>
+                    <th 
+                      className="px-6 py-4 text-left cursor-pointer hover:bg-[var(--hover-bg)]"
+                      onClick={() => handleSort('created_at')}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>Join Date</span>
+                        <ArrowUpDown className="w-4 h-4" />
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.map((user) => (
+                    <tr 
+                      key={user.id}
+                      className="border-b border-[var(--border-color)] last:border-0 hover:bg-[var(--hover-bg)] cursor-pointer"
+                      onClick={() => router.push(`/admin/users/${user.id}`)}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          {user.profile_image_url ? (
+                            <img 
+                              src={user.profile_image_url} 
+                              alt={getFullName(user) || user.email}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-[var(--accent)] flex items-center justify-center text-white font-medium">
+                              {(getFullName(user) || user.email).charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <span className="font-medium">{getFullName(user) || 'No name'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-[var(--text-secondary)]">
+                        {user.email}
+                      </td>
+                      <td className="px-6 py-4 text-[var(--text-secondary)]">
+                        {formatDate(user.created_at)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
