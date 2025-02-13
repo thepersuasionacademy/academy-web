@@ -5,11 +5,50 @@ import Stripe from 'stripe';
 
 export async function POST() {
   try {
-    if (!process.env.STRIPE_SECRET_KEY) {
-      throw new Error('STRIPE_SECRET_KEY is not defined in environment variables');
+    // Enhanced debug environment variables
+    const stripeKey = process.env.STRIPE_SECRET_KEY;
+    console.log('Environment check:', {
+      hasStripeKey: !!stripeKey,
+      nodeEnv: process.env.NODE_ENV,
+      stripeKeyLength: stripeKey?.length || 0,
+      stripeKeyPrefix: stripeKey?.substring(0, 7) || 'none',
+      allEnvKeys: Object.keys(process.env).filter(key => key.includes('STRIPE')),
+    });
+
+    if (!stripeKey) {
+      console.error('Missing STRIPE_SECRET_KEY in environment');
+      return NextResponse.json(
+        { 
+          error: 'Stripe configuration error', 
+          details: 'Missing STRIPE_SECRET_KEY in environment',
+          debug: {
+            env: process.env.NODE_ENV,
+            hasKey: !!stripeKey,
+            availableEnvKeys: Object.keys(process.env).filter(key => key.includes('STRIPE')),
+            keyPrefix: stripeKey?.substring(0, 7) || 'none',
+          }
+        }, 
+        { status: 500 }
+      );
     }
 
-    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    // Validate key format
+    if (!stripeKey.startsWith('sk_live_') && !stripeKey.startsWith('sk_test_')) {
+      console.error('Invalid STRIPE_SECRET_KEY format');
+      return NextResponse.json(
+        { 
+          error: 'Stripe configuration error', 
+          details: 'Invalid STRIPE_SECRET_KEY format',
+          debug: {
+            env: process.env.NODE_ENV,
+            keyPrefix: stripeKey.substring(0, 7),
+          }
+        }, 
+        { status: 500 }
+      );
+    }
+
+    const stripe = new Stripe(stripeKey, {
       apiVersion: '2025-01-27.acacia',
       typescript: true,
     });
@@ -48,7 +87,15 @@ export async function POST() {
   } catch (error) {
     console.error('Billing portal error:', error);
     return NextResponse.json(
-      { error: 'Failed to create billing portal session' },
+      { 
+        error: 'Failed to create billing portal session',
+        details: error instanceof Error ? error.message : 'Unknown error',
+        debug: {
+          env: process.env.NODE_ENV,
+          hasStripeKey: !!process.env.STRIPE_SECRET_KEY,
+          stripeKeyLength: process.env.STRIPE_SECRET_KEY?.length || 0,
+        }
+      },
       { status: 500 }
     );
   }
