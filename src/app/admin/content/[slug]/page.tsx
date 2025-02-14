@@ -46,7 +46,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
 
       // Fetch all content data using the RPC function
       const { data: contentData, error: contentError } = await supabase
-        .rpc('get_content_by_id', { p_content_id: slug });
+        .rpc('get_streaming_content', { p_content_id: slug });
 
       if (contentError) {
         console.error('Error fetching content:', contentError);
@@ -65,8 +65,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
       // Log the raw AI items
       contentData.modules?.forEach((module: any) => {
         module.media?.forEach((media: any) => {
-          if (media.ai) {
-            console.log('Raw AI item:', media.ai);
+          if (media.tool_id) {
+            console.log('Raw AI item:', media);
           }
         });
       });
@@ -85,8 +85,8 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           id: contentData.content.collection.id,
           name: contentData.content.collection.name,
           description: contentData.content.collection.description,
-          created_at: contentData.content.collection.created_at,
-          updated_at: contentData.content.collection.updated_at
+          created_at: contentData.content.created_at,
+          updated_at: contentData.content.updated_at
         } : null,
         stats: contentData.content.stats || {
           enrolled_count: 0,
@@ -98,7 +98,7 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
           title: module.title || '',
           description: module.description || null,
           order: module.order,
-          content_id: module.content_id,
+          content_id: contentData.content.id,
           created_at: module.created_at,
           updated_at: module.updated_at,
           media: (module.media || []).map((media: any) => ({
@@ -106,50 +106,50 @@ export default function ContentEditPage({ params }: ContentEditPageProps) {
             title: media.title || '',
             description: media.description || null,
             order: media.order,
-            module_id: media.module_id,
-            content_id: media.content_id,
-            created_at: media.created_at,
-            updated_at: media.updated_at,
+            module_id: module.id,
+            content_id: contentData.content.id,
+            created_at: module.created_at,
+            updated_at: module.updated_at,
             items: [
-              media.video && {
-                id: media.video.id,
+              media.video_id && {
+                id: media.id,
                 type: 'VIDEO',
-                title: media.video.title || '',
-                video_id: media.video.video_id || null,
-                video_name: media.video.video_name || null,
+                title: media.video_name || '',
+                video_id: media.video_id || null,
+                video_name: media.video_name || null,
                 order: media.order
               },
-              media.text && {
-                id: media.text.id,
+              media.content_text && {
+                id: media.id,
                 type: 'TEXT',
-                title: media.text.title || '',
-                content_text: media.text.content_text || null,
+                title: media.text_title || '',
+                content_text: media.content_text || null,
                 order: media.order
               },
-              media.ai && {
-                id: media.ai.id,
+              media.tool_id && {
+                id: media.id,
                 type: 'AI',
-                title: media.ai.title || '',
-                tool_id: media.ai.tool_id || null,
+                title: media.tool?.title || '',
+                tool_id: media.tool_id || null,
                 order: media.order
               },
-              media.pdf && {
-                id: media.pdf.id,
+              media.pdf_url && {
+                id: media.id,
                 type: 'PDF',
-                title: media.pdf.title || '',
-                pdf_url: media.pdf.pdf_url || null,
-                pdf_type: media.pdf.pdf_type || null,
-                custom_pdf_type: media.pdf.custom_pdf_type || null,
+                title: media.pdf_title || '',
+                pdf_url: media.pdf_url || null,
+                pdf_type: media.pdf_type || null,
+                custom_pdf_type: media.custom_pdf_type || null,
                 order: media.order
               },
-              media.quiz && {
-                id: media.quiz.id,
+              media.quiz_data && {
+                id: media.id,
                 type: 'QUIZ',
-                title: media.quiz.title || '',
-                quiz_data: media.quiz.quiz_data || {},
+                title: media.quiz_title || '',
+                quiz_data: media.quiz_data || {},
                 order: media.order
               }
-            ].filter(Boolean) // Remove null/undefined items
+            ].filter(Boolean)
           }))
         }))
       };
