@@ -1,11 +1,13 @@
 import { Clock, ChevronRight, Copy, CheckCircle, FolderTree, Plus, X } from 'lucide-react';
-import type { AIItem } from './types';
+import type { AIItem } from '../types';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { cn } from "@/lib/utils";
 import { markdownComponents } from '@/app/ai/components/embed/output/MarkdownStyles';
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { AddAccessModal } from '../content/AddAccessModal';
+import { AccessStructureView } from '../content/AccessStructureView';
 
 interface ContentDetailProps {
   item: AIItem;
@@ -15,6 +17,10 @@ interface ContentDetailProps {
   isAdmin?: boolean;
   showAccessModal: boolean;
   setShowAccessModal: (show: boolean) => void;
+  selectedAccessType: 'collection' | 'content' | null;
+  setSelectedAccessType: (type: 'collection' | 'content' | null) => void;
+  selectedAccessId: string | null;
+  setSelectedAccessId: (id: string | null) => void;
 }
 
 interface ContentNode {
@@ -33,11 +39,20 @@ export function ContentDetail({
   showCopied, 
   isAdmin = false,
   showAccessModal,
-  setShowAccessModal
+  setShowAccessModal,
+  selectedAccessType,
+  setSelectedAccessType,
+  selectedAccessId,
+  setSelectedAccessId
 }: ContentDetailProps) {
   const [contentHierarchy, setContentHierarchy] = useState<ContentNode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClientComponentClient();
+
+  // Debug log for isAdmin
+  useEffect(() => {
+    console.log('ContentDetail isAdmin value:', isAdmin);
+  }, [isAdmin]);
 
   // Debug log for component mount
   useEffect(() => {
@@ -146,9 +161,9 @@ export function ContentDetail({
 
   return (
     <>
-      {/* Debug info - hidden in production */}
+      {/* Debug info - now visible in development */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="hidden">
+        <div className="mb-4 p-2 bg-yellow-100 text-yellow-800 rounded">
           Debug info: isAdmin={String(isAdmin)}, isLoading={String(isLoading)}
         </div>
       )}
@@ -167,7 +182,10 @@ export function ContentDetail({
           {isAdmin && (
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowAccessModal(true)}
+                onClick={() => {
+                  console.log('Add Access button clicked');
+                  setShowAccessModal(true);
+                }}
                 className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
@@ -233,88 +251,30 @@ export function ContentDetail({
         </div>
       </div>
 
-      {/* Content Response with Markdown */}
-      <div className="space-y-4">
-        {/* Header with top copy button */}
-        <div className="flex items-center justify-between">
-          <p className="text-lg text-[var(--text-secondary)]">Content</p>
-          <button 
-            onClick={() => onCopy(item.aiResponse)}
-            className="p-2 rounded-lg hover:bg-[var(--hover-bg)] flex items-center gap-2"
-          >
-            {showCopied ? (
-              <>
-                <span className="text-sm text-green-500">Copied!</span>
-                <CheckCircle className="w-5 h-5 text-green-500" />
-              </>
-            ) : (
-              <>
-                <span className="text-sm text-[var(--text-secondary)]">Copy content</span>
-                <Copy className="w-5 h-5 text-[var(--text-secondary)]" />
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Response content */}
-        <div className="p-6 rounded-lg bg-[var(--hover-bg)]">
-          <div className={cn(
-            "prose max-w-none",
-            "prose-headings:text-[var(--foreground)] prose-headings:font-medium",
-            "prose-p:text-[var(--foreground)]",
-            "prose-strong:text-[var(--foreground)]",
-            "prose-code:text-[var(--foreground)]",
-            "prose-ul:text-[var(--foreground)]",
-            "prose-ol:text-[var(--foreground)]",
-            "prose-li:text-[var(--foreground)]",
-            "prose-pre:bg-[var(--card-bg)]",
-            "prose-pre:border prose-pre:border-[var(--border-color)]",
-            "prose-pre:rounded-lg",
-            "prose-code:before:content-none prose-code:after:content-none"
-          )}>
-            <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {item.aiResponse}
-            </Markdown>
-          </div>
-        </div>
-
-        {/* Bottom copy button */}
-        <div className="flex justify-end">
-          <button 
-            onClick={() => onCopy(item.aiResponse)}
-            className="p-2 rounded-lg hover:bg-[var(--hover-bg)] flex items-center gap-2"
-          >
-            {showCopied ? (
-              <>
-                <span className="text-sm text-green-500">Copied!</span>
-                <CheckCircle className="w-5 h-5 text-green-500" />
-              </>
-            ) : (
-              <>
-                <span className="text-sm text-[var(--text-secondary)]">Copy content</span>
-                <Copy className="w-5 h-5 text-[var(--text-secondary)]" />
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-
       {/* Access Management Modal */}
-      {showAccessModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
-          <div className="bg-[var(--card-bg)] rounded-xl p-8 max-w-2xl w-full mx-4">
-            <h3 className="text-2xl font-medium mb-6">Grant New Access</h3>
-            {/* Add your access management form here */}
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowAccessModal(false)}
-                className="px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
+      {isAdmin && showAccessModal && (
+        <AddAccessModal
+          onSubmit={(type, id) => {
+            console.log('Selected:', { type, id });
+            if (type === 'collection' || type === 'content') {
+              setSelectedAccessType(type);
+              setSelectedAccessId(id);
+            }
+          }}
+          onCancel={() => {
+            setShowAccessModal(false);
+            setSelectedAccessType(null);
+            setSelectedAccessId(null);
+          }}
+        />
+      )}
+
+      {/* Access Structure View */}
+      {showAccessModal && selectedAccessType && selectedAccessId && (
+        <AccessStructureView
+          selectedType={selectedAccessType}
+          selectedId={selectedAccessId}
+        />
       )}
     </>
   );

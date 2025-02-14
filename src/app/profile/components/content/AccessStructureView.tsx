@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check } from 'lucide-react';
+import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, X } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface StructureNode {
@@ -12,6 +12,7 @@ interface StructureNode {
     value: number;
     unit: 'days' | 'weeks' | 'months';
   };
+  order: number;
 }
 
 interface AccessStructureViewProps {
@@ -24,9 +25,10 @@ type AccessMethod = 'instant' | 'drip';
 interface TimeUnitDropdownProps {
   value: 'days' | 'weeks' | 'months';
   onChange: (value: 'days' | 'weeks' | 'months') => void;
+  inputValue?: number;
 }
 
-function TimeUnitDropdown({ value, onChange }: TimeUnitDropdownProps) {
+function TimeUnitDropdown({ value, onChange, disabled, inputValue }: TimeUnitDropdownProps & { disabled?: boolean }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -41,25 +43,41 @@ function TimeUnitDropdown({ value, onChange }: TimeUnitDropdownProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const getSingularForm = (unit: string) => {
+    return unit.endsWith('s') ? unit.slice(0, -1) : unit;
+  };
+
   const options = [
     { value: 'days', label: 'days' },
     { value: 'weeks', label: 'weeks' },
     { value: 'months', label: 'months' }
   ];
 
+  const displayValue = inputValue === 1 ? getSingularForm(value) : value;
+
   return (
     <div className="relative" ref={dropdownRef}>
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-1 text-base text-[var(--text-secondary)] hover:text-[var(--foreground)] transition-colors"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        className={cn(
+          "flex items-center gap-1 text-base transition-colors",
+          disabled 
+            ? "text-[var(--text-secondary)]/40 cursor-not-allowed" 
+            : "text-[var(--foreground)]"
+        )}
       >
-        <span>{value}</span>
-        <ChevronDown className="h-3 w-3" />
+        <span>{displayValue}</span>
+        <ChevronDown className={cn(
+          "h-3 w-3",
+          disabled 
+            ? "opacity-40"
+            : "text-[var(--text-secondary)]"
+        )} />
       </button>
       
-      {isOpen && (
-        <div className="absolute right-0 z-10 mt-1 min-w-[100px] py-1 bg-[#1c1c1c] border border-[#2a2a2a] rounded-md shadow-lg">
+      {!disabled && isOpen && (
+        <div className="absolute right-0 z-10 mt-1 min-w-[100px] py-1 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-md shadow-lg">
           {options.map((option) => (
             <button
               key={option.value}
@@ -67,14 +85,14 @@ function TimeUnitDropdown({ value, onChange }: TimeUnitDropdownProps) {
                 onChange(option.value as 'days' | 'weeks' | 'months');
                 setIsOpen(false);
               }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[#2a2a2a] transition-colors"
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--hover-bg)] transition-colors"
             >
               <span className="w-4">
                 {option.value === value && (
                   <Check className="h-3 w-3 text-[var(--accent)]" />
                 )}
               </span>
-              {option.label}
+              {inputValue === 1 ? getSingularForm(option.label) : option.label}
             </button>
           ))}
         </div>
@@ -91,6 +109,19 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
   const supabase = createClientComponentClient();
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
+  const structureRef = useRef<HTMLDivElement>(null);
+
+  // Add click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (structureRef.current && !structureRef.current.contains(event.target as Node)) {
+        setSelectedNode(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchNodeDetails = async (nodeId: string, nodeType: StructureNode['type']) => {
     if (loadingNodes.has(nodeId)) return;
@@ -206,7 +237,8 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
                 id: item.id,
                 name: item.title,
                 type: 'content' as const,
-                children: []
+                children: [],
+                order: item.position || 0  // Use position from the content item
               };
             }
 
@@ -214,18 +246,24 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
               id: item.id,
               name: item.title,
               type: 'content' as const,
+              order: item.position || 0,  // Use position from the content item
               children: moduleDetails?.map((module: any) => ({
                 id: module.id,
                 name: module.title,
-                type: 'module' as const
-              }))
+                type: 'module' as const,
+                order: module.position || 0  // Use position from the module
+              })).sort((a: StructureNode, b: StructureNode) => a.order - b.order)  // Sort modules by order
             };
           }));
+
+          // Sort content nodes by order
+          contentNodes.sort((a: StructureNode, b: StructureNode) => a.order - b.order);
 
           const structureData = {
             id: selectedCollection.id,
             name: selectedCollection.name,
             type: 'collection' as const,
+            order: 0,
             children: contentNodes
           };
 
@@ -252,16 +290,19 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
             id: selectedContent.id,
             name: selectedContent.title,
             type: 'content',
+            order: 0,
             children: selectedContent.modules?.map((module: any) => ({
               id: module.id,
               name: module.name,
               type: 'module' as const,
+              order: module.position || 0,  // Use position from the module
               children: module.media?.map((media: any) => ({
                 id: media.id,
                 name: media.title,
-                type: 'media' as const
-              }))
-            }))
+                type: 'media' as const,
+                order: media.position || 0  // Use position from the media
+              })).sort((a: StructureNode, b: StructureNode) => a.order - b.order)  // Sort media by order
+            })).sort((a: StructureNode, b: StructureNode) => a.order - b.order)  // Sort modules by order
           });
         }
       } catch (error) {
@@ -297,6 +338,9 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   };
 
   const handleGrantAccess = async () => {
+    setIsLoading(true);
+    setError(null);
+    
     try {
       // Get all nodes with their access delays
       const getNodesWithDelays = (node: StructureNode): { id: string; type: string; delay?: { value: number; unit: string } }[] => {
@@ -320,11 +364,87 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       const accessNodes = getNodesWithDelays(structure);
       console.log('Granting access with method:', accessMethod);
       console.log('Access nodes:', accessNodes);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user?.id) {
+        throw new Error('No user session found');
+      }
+
+      if (accessMethod === 'instant') {
+        // For instant access, use grant_bulk_access
+        const contentIds = accessNodes.map(node => node.id);
+        
+        const { error } = await supabase.rpc('grant_bulk_access', {
+          p_user_id: session.user.id,
+          p_content_ids: contentIds,
+          p_granted_by: session.user.id,
+          p_access_starts_at: new Date().toISOString(),
+          p_metadata: { source: 'admin_panel' }
+        });
+
+        if (error) {
+          console.error('Error granting instant access:', error);
+          throw error;
+        }
+      } else if (accessMethod === 'drip') {
+        // For drip access, use schedule_drip_access
+        const nodesWithDrip = accessNodes.filter(node => node.delay);
+        
+        if (nodesWithDrip.length > 0) {
+          const contentIds = nodesWithDrip.map(node => node.id);
+          const startDates = nodesWithDrip.map(node => {
+            const date = new Date();
+            date.setHours(0, 0, 0, 0); // Set to start of day
+            
+            if (node.delay) {
+              switch (node.delay.unit) {
+                case 'days':
+                  date.setDate(date.getDate() + node.delay.value);
+                  break;
+                case 'weeks':
+                  date.setDate(date.getDate() + (node.delay.value * 7));
+                  break;
+                case 'months':
+                  date.setMonth(date.getMonth() + node.delay.value);
+                  break;
+              }
+            }
+            
+            return date.toISOString();
+          });
+
+          // Create an array of null end dates with the same length as contentIds
+          const endDates = new Array(contentIds.length).fill(null);
+
+          const { error } = await supabase.rpc('schedule_drip_access', {
+            p_user_id: session.user.id,
+            p_content_ids: contentIds,
+            p_granted_by: session.user.id,
+            p_start_dates: startDates,
+            p_end_dates: endDates,
+            p_metadata: { source: 'admin_panel' }
+          });
+
+          if (error) {
+            console.error('Error scheduling drip access:', error);
+            throw error;
+          }
+        }
+      }
+
+      // Show success message
+      console.log('Access granted successfully');
+      window.location.reload(); // Refresh the page to show updated access
       
-      // TODO: Call appropriate Supabase RPC here with the access nodes and their delays
     } catch (error) {
       console.error('Error granting access:', error);
-      setError('Failed to grant access');
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Failed to grant access');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -358,30 +478,107 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
         node.type === 'media' || 
         (node.type === 'collection' && !structure?.children?.some(child => child.id === node.id))) return null;
 
-    const delay = node.accessDelay || { value: 0, unit: 'days' };
+    const findParentNode = (nodeId: string, tree: StructureNode | null): StructureNode | null => {
+      if (!tree) return null;
+      
+      if (tree.children?.some(child => child.id === nodeId)) {
+        return tree;
+      }
+      
+      for (const child of tree.children || []) {
+        const parent = findParentNode(nodeId, child);
+        if (parent) return parent;
+      }
+      
+      return null;
+    };
 
-    return (
-      <div className="flex items-center gap-2 ml-auto">
-        <div className="flex items-center gap-1">
+    const parentNode = findParentNode(node.id, structure);
+    const parentHasDrip = parentNode?.accessDelay !== undefined;
+    const hasDripSettings = node.accessDelay !== undefined;
+
+    const handleAddDrip = () => {
+      updateNodeAccessDelay(node.id, 0, 'days');
+    };
+
+    const handleRemoveDrip = () => {
+      // Actually remove the accessDelay object completely
+      setStructure(prevStructure => {
+        if (!prevStructure) return null;
+
+        const updateNode = (currNode: StructureNode): StructureNode => {
+          if (currNode.id === node.id) {
+            const { accessDelay, ...nodeWithoutDelay } = currNode;
+            return nodeWithoutDelay;
+          }
+          if (currNode.children) {
+            return {
+              ...currNode,
+              children: currNode.children.map(child => updateNode(child))
+            };
+          }
+          return currNode;
+        };
+
+        return updateNode(prevStructure);
+      });
+    };
+
+    // If parent has drip, show only lock icon
+    if (parentHasDrip) {
+      return (
+        <div className="flex items-center gap-2 ml-auto">
+          <Lock className="w-4 h-4 text-[var(--text-secondary)]/40" />
+        </div>
+      );
+    }
+
+    // If node has drip settings, show editable settings with delete option
+    if (hasDripSettings) {
+      return (
+        <div className="flex items-center gap-2 ml-auto">
           <input
             type="number"
-            min="0"
+            min="1"
             max="99"
-            value={delay.value === 0 ? '' : delay.value}
-            onChange={(e) => updateNodeAccessDelay(node.id, Math.max(0, parseInt(e.target.value) || 0), delay.unit)}
-            onBlur={(e) => {
-              if (!e.target.value) {
-                updateNodeAccessDelay(node.id, 0, delay.unit);
-              }
+            value={node.accessDelay?.value || ''}
+            onChange={(e) => {
+              const value = e.target.value;
+              // Just update the value, keeping the accessDelay object intact
+              updateNodeAccessDelay(node.id, value === '' ? 0 : Math.max(0, Math.min(99, parseInt(value) || 0)), node.accessDelay?.unit || 'days');
             }}
-            className="w-8 text-base text-right text-[var(--text-secondary)] focus:text-[var(--foreground)] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none mr-1 bg-transparent"
-            placeholder="0"
+            className="w-8 text-base text-right bg-transparent text-[var(--foreground)] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
           />
           <TimeUnitDropdown
-            value={delay.unit}
-            onChange={(value) => updateNodeAccessDelay(node.id, delay.value, value)}
+            value={node.accessDelay?.unit || 'days'}
+            onChange={(unit) => updateNodeAccessDelay(node.id, node.accessDelay?.value || 0, unit)}
+            inputValue={node.accessDelay?.value || 0}
           />
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleRemoveDrip();
+            }}
+            className="p-1 hover:bg-[var(--hover-bg)] rounded-full transition-colors"
+          >
+            <X className="w-4 h-4 text-[var(--text-secondary)] hover:text-[var(--foreground)]" />
+          </button>
         </div>
+      );
+    }
+
+    // Default state: show plus icon to add drip
+    return (
+      <div className="flex items-center gap-2 ml-auto">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleAddDrip();
+          }}
+          className="p-1 hover:bg-[var(--hover-bg)] rounded-full transition-colors"
+        >
+          <Plus className="w-4 h-4 text-[var(--text-secondary)] hover:text-[var(--foreground)]" />
+        </button>
       </div>
     );
   };
@@ -409,7 +606,7 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
           className={cn(
             "group py-3 px-4 transition-all duration-200",
             "hover:bg-[var(--hover-bg)]/50",
-            isSelected && "bg-[var(--hover-bg)]",
+            isSelected && "hover:bg-[var(--hover-bg)]/50",
             level === 0 && "bg-[var(--card-bg)] rounded-t-lg border border-[var(--border-color)]",
             level > 0 && "border-x border-b border-[var(--border-color)]",
             node.children?.length === 0 && "border-b border-[var(--border-color)]"
@@ -420,7 +617,7 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
               {/* Node Type Indicator */}
               <div className={cn(
                 "w-1 h-4 transition-colors",
-                isSelected ? "bg-[var(--accent)]" : "bg-[var(--border-color)]"
+                "bg-[var(--border-color)] group-hover:bg-[var(--accent)]"
               )} />
               
               {isLoading ? (
@@ -428,7 +625,7 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
               ) : (
                 <span className={cn(
                   "font-medium transition-colors",
-                  level === 0 ? "text-xl" : "text-base",
+                  level === 0 ? "text-3xl" : "text-xl",
                   "text-[var(--text-secondary)] group-hover:text-[var(--foreground)]"
                 )}>{node.name}</span>
               )}
@@ -439,7 +636,10 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
 
         {node.children && node.children.length > 0 && (
           <div>
-            {node.children.map((child) => renderNode(child, level + 1))}
+            {/* Sort children by order before rendering */}
+            {[...node.children]
+              .sort((a: StructureNode, b: StructureNode) => a.order - b.order)
+              .map((child) => renderNode(child, level + 1))}
           </div>
         )}
       </div>
@@ -528,7 +728,7 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       </div>
 
       {/* Content Structure Tree */}
-      <div className="space-y-1">
+      <div ref={structureRef} className="space-y-1">
         {renderNode(structure)}
       </div>
     </div>
