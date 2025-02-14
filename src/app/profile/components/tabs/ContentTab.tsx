@@ -32,9 +32,10 @@ interface AccessRecord {
 interface ContentTabProps {
   isAdmin: boolean;
   userId?: string;
+  contentItems: any[];
 }
 
-export function ContentTab({ isAdmin, userId }: ContentTabProps) {
+export function ContentTab({ isAdmin, userId, contentItems }: ContentTabProps) {
   const [accessRecords, setAccessRecords] = useState<AccessRecord[]>([]);
   const [selectedRecord, setSelectedRecord] = useState<AccessRecord | null>(null);
   const [showAccessModal, setShowAccessModal] = useState(false);
@@ -43,32 +44,9 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
   const supabase = createClientComponentClient();
 
   useEffect(() => {
-    async function fetchAccessRecords() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const targetUserId = userId || session?.user?.id;
-
-        if (!targetUserId) return;
-
-        const { data, error } = await supabase
-          .rpc('get_user_content', {
-            p_user_id: targetUserId
-          });
-
-        if (error) {
-          console.error('Error fetching access records:', error);
-          return;
-        }
-
-        console.log('Access records:', data);
-        setAccessRecords(data || []);
-      } catch (error) {
-        console.error('Error in fetchAccessRecords:', error);
-      }
-    }
-
-    fetchAccessRecords();
-  }, [supabase, userId]);
+    // Use the contentItems directly instead of fetching
+    setAccessRecords(contentItems);
+  }, [contentItems]);
 
   // Helper function to get content title
   const getContentTitle = async (contentId: string) => {

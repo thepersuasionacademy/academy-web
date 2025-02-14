@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, X } from 'lucide-react';
+import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, X, Film, Book, Wrench, FileText, HelpCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface StructureNode {
@@ -13,6 +13,7 @@ interface StructureNode {
     unit: 'days' | 'weeks' | 'months';
   };
   order: number;
+  mediaType?: string;
 }
 
 interface AccessStructureViewProps {
@@ -124,65 +125,229 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   }, []);
 
   const fetchNodeDetails = async (nodeId: string, nodeType: StructureNode['type']) => {
-    if (loadingNodes.has(nodeId)) return;
-    
     try {
       if (nodeType === 'content') {
-        console.log('Fetching modules for content:', nodeId);
-        
-        // Fetch modules for this content using get_content_cards
-        const { data: moduleDetails, error: moduleError } = await supabase
-          .rpc('get_content_cards', { 
-            p_content_id: nodeId 
+        const { data: streamingContent, error } = await supabase
+          .rpc('get_streaming_content', {
+            p_content_id: nodeId
           });
 
-        if (moduleError) throw moduleError;
+        if (error) throw error;
 
-        console.log('Module details:', moduleDetails);
+        // Transform streaming content data into StructureNode format
+        const contentNode: StructureNode = {
+          id: streamingContent.content.id,
+          name: streamingContent.content.title,
+          type: 'content',
+          order: 0,
+          children: streamingContent.modules?.map((module: any, index: number) => ({
+            id: module.id,
+            name: module.title,
+            type: 'module' as const,
+            order: module.order || index,
+            children: module.media?.map((media: any, mediaIndex: number) => {
+              const mediaItems = [];
+              
+              // Add video if exists
+              if (media.video_id) {
+                mediaItems.push({
+                  id: `${media.id}-video`,
+                  name: media.video_name || 'Video',
+                  type: 'media' as const,
+                  order: 0,
+                  mediaType: 'video'
+                });
+              }
 
-        // Transform the data to match our structure
-        setStructure(prevStructure => {
-          if (!prevStructure) return null;
+              // Add text content if exists
+              if (media.content_text) {
+                mediaItems.push({
+                  id: `${media.id}-text`,
+                  name: media.text_title || 'Text Content',
+                  type: 'media' as const,
+                  order: 1,
+                  mediaType: 'text'
+                });
+              }
 
-          const updateNode = (node: StructureNode): StructureNode => {
-            if (node.id === nodeId) {
+              // Add tool if exists
+              if (media.tool) {
+                mediaItems.push({
+                  id: `${media.id}-tool`,
+                  name: media.tool.title || 'AI Tool',
+                  type: 'media' as const,
+                  order: 2,
+                  mediaType: 'tool'
+                });
+              }
+
+              // Add PDF if exists
+              if (media.pdf_url) {
+                mediaItems.push({
+                  id: `${media.id}-pdf`,
+                  name: media.pdf_title || 'PDF',
+                  type: 'media' as const,
+                  order: 3,
+                  mediaType: 'pdf'
+                });
+              }
+
+              // Add quiz if exists
+              if (media.quiz_data) {
+                mediaItems.push({
+                  id: `${media.id}-quiz`,
+                  name: media.quiz_title || 'Quiz',
+                  type: 'media' as const,
+                  order: 4,
+                  mediaType: 'quiz'
+                });
+              }
+
               return {
-                ...node,
-                children: moduleDetails?.map((module: any) => ({
-                  id: module.id,
-                  name: module.title,
-                  type: 'module' as const
-                }))
+                id: media.id,
+                name: media.title,
+                type: 'media' as const,
+                order: mediaIndex,
+                children: mediaItems
               };
-            }
-            if (node.children) {
-              return {
-                ...node,
-                children: node.children.map(child => updateNode(child))
-              };
-            }
-            return node;
-          };
+            })
+          }))
+        };
 
-          return updateNode(prevStructure);
-        });
+        return contentNode;
+      } else if (nodeType === 'collection') {
+        // First get the collection details
+        const { data: collection, error: collectionError } = await supabase
+          .from('collections')
+          .select('id, name')
+          .eq('id', nodeId)
+          .single();
+
+        if (collectionError) throw collectionError;
+
+        // Then get all content for this collection
+        const { data: content, error: contentError } = await supabase
+          .from('content')
+          .select('id, title')
+          .eq('collection_id', nodeId)
+          .order('title');
+
+        if (contentError) throw contentError;
+
+        // Get streaming content for each content item
+        const contentNodes = await Promise.all(content.map(async (item, index) => {
+          const { data: streamingContent, error: streamingError } = await supabase
+            .rpc('get_streaming_content', {
+              p_content_id: item.id
+            });
+
+          if (streamingError) {
+            console.error('Error fetching streaming content:', streamingError);
+            return {
+              id: item.id,
+              name: item.title,
+              type: 'content' as const,
+              order: index,
+              children: []
+            } as StructureNode;
+          }
+
+          // Use streaming content data
+          return {
+            id: streamingContent.content.id,
+            name: streamingContent.content.title,
+            type: 'content' as const,
+            order: index,
+            children: streamingContent.modules?.map((module: any, moduleIndex: number) => ({
+              id: module.id,
+              name: module.title,
+              type: 'module' as const,
+              order: module.order || moduleIndex,
+              children: module.media?.map((media: any, mediaIndex: number) => {
+                const mediaItems = [];
+                
+                // Add video if exists
+                if (media.video_id) {
+                  mediaItems.push({
+                    id: `${media.id}-video`,
+                    name: media.video_name || 'Video',
+                    type: 'media' as const,
+                    order: 0,
+                    mediaType: 'video'
+                  });
+                }
+
+                // Add text content if exists
+                if (media.content_text) {
+                  mediaItems.push({
+                    id: `${media.id}-text`,
+                    name: media.text_title || 'Text Content',
+                    type: 'media' as const,
+                    order: 1,
+                    mediaType: 'text'
+                  });
+                }
+
+                // Add tool if exists
+                if (media.tool) {
+                  mediaItems.push({
+                    id: `${media.id}-tool`,
+                    name: media.tool.title || 'AI Tool',
+                    type: 'media' as const,
+                    order: 2,
+                    mediaType: 'tool'
+                  });
+                }
+
+                // Add PDF if exists
+                if (media.pdf_url) {
+                  mediaItems.push({
+                    id: `${media.id}-pdf`,
+                    name: media.pdf_title || 'PDF',
+                    type: 'media' as const,
+                    order: 3,
+                    mediaType: 'pdf'
+                  });
+                }
+
+                // Add quiz if exists
+                if (media.quiz_data) {
+                  mediaItems.push({
+                    id: `${media.id}-quiz`,
+                    name: media.quiz_title || 'Quiz',
+                    type: 'media' as const,
+                    order: 4,
+                    mediaType: 'quiz'
+                  });
+                }
+
+                return {
+                  id: media.id,
+                  name: media.title,
+                  type: 'media' as const,
+                  order: mediaIndex,
+                  children: mediaItems
+                };
+              })
+            }))
+          } as StructureNode;
+        }));
+
+        const collectionNode: StructureNode = {
+          id: collection.id,
+          name: collection.name,
+          type: 'collection',
+          order: 0,
+          children: contentNodes
+        };
+
+        return collectionNode;
       }
+      return null;
     } catch (error) {
       console.error('Error fetching node details:', error);
-      setError('Failed to load details');
-    } finally {
-      setLoadingNodes(prev => {
-        const next = new Set(prev);
-        next.delete(nodeId);
-        return next;
-      });
-    }
-  };
-
-  const handleNodeClick = async (node: StructureNode) => {
-    if (!node.children) {
-      setLoadingNodes(prev => new Set(prev).add(node.id));
-      await fetchNodeDetails(node.id, node.type);
+      setError(error instanceof Error ? error.message : 'Failed to load structure');
+      return null;
     }
   };
 
@@ -191,136 +356,37 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       setIsLoading(true);
       setError(null);
       try {
-        if (selectedType === 'collection') {
-          console.log('Fetching collection structure for ID:', selectedId);
-          
-          // First get the collection details
-          const { data: collections, error: collectionsError } = await supabase
-            .rpc('get_content_collections');
+        if (!selectedId) {
+          setIsLoading(false);
+          return;
+        }
 
-          if (collectionsError) {
-            console.error('Error fetching collections:', collectionsError);
-            throw collectionsError;
-          }
-
-          const selectedCollection = collections.find((c: any) => c.id === selectedId);
-          if (!selectedCollection) {
-            throw new Error('Collection not found');
-          }
-
-          console.log('Collection data:', selectedCollection);
-
-          // Then get all content for this collection
-          const { data: content, error: contentError } = await supabase
-            .rpc('get_content_by_collection', {
-              p_collection_id: selectedId
-            });
-
-          if (contentError) {
-            console.error('Error fetching content:', contentError);
-            throw contentError;
-          }
-
-          console.log('Content data:', content);
-
-          // Transform the content into our tree structure
-          const contentNodes = await Promise.all((content || []).map(async (item: any) => {
-            // Fetch modules for each content item
-            const { data: moduleDetails, error: moduleError } = await supabase
-              .rpc('get_content_cards', { 
-                p_content_id: item.id 
-              });
-
-            if (moduleError) {
-              console.error('Error fetching modules for content:', item.id, moduleError);
-              return {
-                id: item.id,
-                name: item.title,
-                type: 'content' as const,
-                children: [],
-                order: item.position || 0  // Use position from the content item
-              };
-            }
-
-            return {
-              id: item.id,
-              name: item.title,
-              type: 'content' as const,
-              order: item.position || 0,  // Use position from the content item
-              children: moduleDetails?.map((module: any) => ({
-                id: module.id,
-                name: module.title,
-                type: 'module' as const,
-                order: module.position || 0  // Use position from the module
-              })).sort((a: StructureNode, b: StructureNode) => a.order - b.order)  // Sort modules by order
-            };
-          }));
-
-          // Sort content nodes by order
-          contentNodes.sort((a: StructureNode, b: StructureNode) => a.order - b.order);
-
-          const structureData = {
-            id: selectedCollection.id,
-            name: selectedCollection.name,
-            type: 'collection' as const,
-            order: 0,
-            children: contentNodes
-          };
-
-          console.log('Final structure data:', structureData);
-          setStructure(structureData);
-        } else {
-          // For content type, get the content directly
-          const { data: content, error: contentError } = await supabase
-            .rpc('get_content_by_collection', {
-              p_collection_id: selectedId
-            });
-
-          if (contentError) {
-            console.error('Error fetching content:', contentError);
-            throw contentError;
-          }
-
-          const selectedContent = content.find((c: any) => c.id === selectedId);
-          if (!selectedContent) {
-            throw new Error('Content not found');
-          }
-
-          setStructure({
-            id: selectedContent.id,
-            name: selectedContent.title,
-            type: 'content',
-            order: 0,
-            children: selectedContent.modules?.map((module: any) => ({
-              id: module.id,
-              name: module.name,
-              type: 'module' as const,
-              order: module.position || 0,  // Use position from the module
-              children: module.media?.map((media: any) => ({
-                id: media.id,
-                name: media.title,
-                type: 'media' as const,
-                order: media.position || 0  // Use position from the media
-              })).sort((a: StructureNode, b: StructureNode) => a.order - b.order)  // Sort media by order
-            })).sort((a: StructureNode, b: StructureNode) => a.order - b.order)  // Sort modules by order
-          });
+        const rootNode = await fetchNodeDetails(selectedId, selectedType);
+        if (rootNode) {
+          setStructure(rootNode);
         }
       } catch (error) {
-        console.error('Error details:', error);
-        if (error instanceof Error) {
-          setError(error.message);
-        } else if (typeof error === 'object' && error !== null) {
-          setError(JSON.stringify(error));
-        } else {
-          setError('Failed to load content structure');
-        }
+        console.error('Error fetching structure:', error);
+        setError('Failed to load content structure');
       } finally {
         setIsLoading(false);
       }
     }
 
     fetchStructure();
-  }, [selectedType, selectedId, supabase]);
+  }, [selectedId, selectedType]);
+
+  const handleNodeClick = async (node: StructureNode) => {
+    if (!node.children) {
+      setLoadingNodes(prev => new Set(prev).add(node.id));
+      await fetchNodeDetails(node.id, node.type);
+      setLoadingNodes(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(node.id);
+        return newSet;
+      });
+    }
+  };
 
   const getNodeEmoji = (type: StructureNode['type']) => {
     switch (type) {
@@ -338,10 +404,9 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   };
 
   const handleGrantAccess = async () => {
-    setIsLoading(true);
-    setError(null);
-    
     try {
+      if (!structure) return;
+
       // Get all nodes with their access delays
       const getNodesWithDelays = (node: StructureNode): { id: string; type: string; delay?: { value: number; unit: string } }[] => {
         const nodes: { id: string; type: string; delay?: { value: number; unit: string } }[] = [{
@@ -359,92 +424,34 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
         return nodes;
       };
 
-      if (!structure) return;
+      const nodesWithDelays = getNodesWithDelays(structure);
       
-      const accessNodes = getNodesWithDelays(structure);
-      console.log('Granting access with method:', accessMethod);
-      console.log('Access nodes:', accessNodes);
+      // Grant access to each node
+      for (const node of nodesWithDelays) {
+        const accessDelay = node.delay ? {
+          value: node.delay.value,
+          unit: node.delay.unit
+        } : undefined;
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.id) {
-        throw new Error('No user session found');
-      }
-
-      if (accessMethod === 'instant') {
-        // For instant access, use grant_bulk_access
-        const contentIds = accessNodes.map(node => node.id);
-        
-        const { error } = await supabase.rpc('grant_bulk_access', {
-          p_user_id: session.user.id,
-          p_content_ids: contentIds,
-          p_granted_by: session.user.id,
-          p_access_starts_at: new Date().toISOString(),
-          p_metadata: { source: 'admin_panel' }
+        const { error } = await supabase.rpc('grant_content_access', {
+          p_content_id: node.id,
+          p_content_type: node.type,
+          p_access_delay: accessDelay
+            ? JSON.stringify(accessDelay)
+            : null
         });
 
-        if (error) {
-          console.error('Error granting instant access:', error);
-          throw error;
-        }
-      } else if (accessMethod === 'drip') {
-        // For drip access, use schedule_drip_access
-        const nodesWithDrip = accessNodes.filter(node => node.delay);
-        
-        if (nodesWithDrip.length > 0) {
-          const contentIds = nodesWithDrip.map(node => node.id);
-          const startDates = nodesWithDrip.map(node => {
-            const date = new Date();
-            date.setHours(0, 0, 0, 0); // Set to start of day
-            
-            if (node.delay) {
-              switch (node.delay.unit) {
-                case 'days':
-                  date.setDate(date.getDate() + node.delay.value);
-                  break;
-                case 'weeks':
-                  date.setDate(date.getDate() + (node.delay.value * 7));
-                  break;
-                case 'months':
-                  date.setMonth(date.getMonth() + node.delay.value);
-                  break;
-              }
-            }
-            
-            return date.toISOString();
-          });
-
-          // Create an array of null end dates with the same length as contentIds
-          const endDates = new Array(contentIds.length).fill(null);
-
-          const { error } = await supabase.rpc('schedule_drip_access', {
-            p_user_id: session.user.id,
-            p_content_ids: contentIds,
-            p_granted_by: session.user.id,
-            p_start_dates: startDates,
-            p_end_dates: endDates,
-            p_metadata: { source: 'admin_panel' }
-          });
-
-          if (error) {
-            console.error('Error scheduling drip access:', error);
-            throw error;
-          }
-        }
+        if (error) throw error;
       }
 
-      // Show success message
-      console.log('Access granted successfully');
-      window.location.reload(); // Refresh the page to show updated access
-      
+      // Refresh the structure
+      const updatedNode = await fetchNodeDetails(selectedId, selectedType);
+      if (updatedNode) {
+        setStructure(updatedNode);
+      }
+
     } catch (error) {
       console.error('Error granting access:', error);
-      if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('Failed to grant access');
-      }
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -583,6 +590,23 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
     );
   };
 
+  const getMediaTypeIcon = (mediaType?: string) => {
+    switch (mediaType) {
+      case 'video':
+        return <Film className="w-4 h-4 text-[var(--text-secondary)]" />;
+      case 'text':
+        return <Book className="w-4 h-4 text-[var(--text-secondary)]" />;
+      case 'tool':
+        return <Wrench className="w-4 h-4 text-[var(--text-secondary)]" />;
+      case 'pdf':
+        return <FileText className="w-4 h-4 text-[var(--text-secondary)]" />;
+      case 'quiz':
+        return <HelpCircle className="w-4 h-4 text-[var(--text-secondary)]" />;
+      default:
+        return null;
+    }
+  };
+
   const renderNode = (node: StructureNode, level: number = 0) => {
     const isLoading = loadingNodes?.has(node.id);
     const isSelected = selectedNode === node.id;
@@ -623,11 +647,14 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin text-[var(--text-secondary)]" />
               ) : (
-                <span className={cn(
-                  "font-medium transition-colors",
-                  level === 0 ? "text-3xl" : "text-xl",
-                  "text-[var(--text-secondary)] group-hover:text-[var(--foreground)]"
-                )}>{node.name}</span>
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "font-medium transition-colors",
+                    level === 0 ? "text-3xl" : "text-xl",
+                    "text-[var(--text-secondary)] group-hover:text-[var(--foreground)]"
+                  )}>{node.name}</span>
+                  {node.type === 'media' && getMediaTypeIcon(node.mediaType)}
+                </div>
               )}
             </div>
             {renderAccessControls(node)}

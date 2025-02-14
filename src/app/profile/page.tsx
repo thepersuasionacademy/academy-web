@@ -183,18 +183,42 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
         if (!targetUserId) return;
 
         console.log('Fetching content for user:', targetUserId);
-        const { data: contentData, error } = await supabase
+        
+        // First get the user's content access
+        const { data: userContent, error: accessError } = await supabase
           .rpc('get_user_content', {
             p_user_id: targetUserId
           });
 
-        if (error) {
-          console.error('Error fetching content:', error);
+        if (accessError) {
+          console.error('Error fetching content access:', accessError);
           return;
         }
 
-        console.log('Content data:', contentData);
-        setContentItems(contentData || []);
+        // Then fetch detailed streaming content for each content item
+        const contentPromises = userContent.map(async (content: any) => {
+          const { data: streamingContent, error: streamingError } = await supabase
+            .rpc('get_streaming_content', {
+              p_content_id: content.content_id
+            });
+
+          if (streamingError) {
+            console.error('Error fetching streaming content:', streamingError);
+            return null;
+          }
+
+          // Merge the access information with the streaming content
+          return {
+            ...content,
+            streamingData: streamingContent
+          };
+        });
+
+        const resolvedContent = await Promise.all(contentPromises);
+        const validContent = resolvedContent.filter(item => item !== null);
+
+        console.log('Content data:', validContent);
+        setContentItems(validContent || []);
       } catch (error) {
         console.error('Error in fetchContentData:', error);
       }

@@ -9,11 +9,12 @@ interface TabsContainerProps {
   isAdmin: boolean;
   userId?: string;
   aiItems: AIItem[];
+  contentItems: any[];
 }
 
 type TabType = 'credits' | 'content' | 'billing';
 
-export function TabsContainer({ isAdmin, userId, aiItems }: TabsContainerProps) {
+export function TabsContainer({ isAdmin, userId, aiItems, contentItems }: TabsContainerProps) {
   const [activeTab, setActiveTab] = useState<TabType>('credits');
 
   const renderTabContent = () => {
@@ -21,7 +22,7 @@ export function TabsContainer({ isAdmin, userId, aiItems }: TabsContainerProps) 
       case 'credits':
         return <AICreditsTab aiItems={aiItems} />;
       case 'content':
-        return <ContentTab aiItems={aiItems} isAdmin={isAdmin} />;
+        return <ContentTab isAdmin={isAdmin} contentItems={contentItems} userId={userId} />;
       case 'billing':
         return <BillingTab userId={userId} />;
       default:
