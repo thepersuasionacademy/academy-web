@@ -579,15 +579,6 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       });
     };
 
-    // If any ancestor has drip or no access, show lock icon
-    if (hasAncestorWithDrip) {
-      return (
-        <div className="flex items-center gap-2 ml-auto">
-          <Lock className="w-4 h-4 text-[var(--muted-foreground)]/40" />
-        </div>
-      );
-    }
-
     // Base controls that are always shown (eye icon)
     const baseControls = (
       <button
@@ -609,29 +600,19 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       </button>
     );
 
-    // If not in drip mode, only show the eye icon
-    if (accessMethod !== 'drip') {
+    // If any ancestor has drip or no access, show lock icon
+    if (hasAncestorWithDrip) {
       return (
         <div className="flex items-center gap-2 ml-auto">
-          {baseControls}
+          <Lock className="w-4 h-4 text-[var(--muted-foreground)]/40" />
         </div>
       );
     }
 
-    // If in drip mode and has drip settings, show all controls
-    if (hasDripSettings) {
+    // If in drip mode and has drip settings, show only drip controls
+    if (accessMethod === 'drip' && hasDripSettings) {
       return (
         <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleAddDrip();
-            }}
-            className="p-1 hover:bg-[var(--muted)] rounded-full transition-colors"
-          >
-            <Plus className="w-4 h-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]" />
-          </button>
-          {baseControls}
           <input
             type="number"
             min="1"
@@ -661,18 +642,20 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       );
     }
 
-    // Default state in drip mode: show plus icon and eye icon
+    // For all other cases (instant mode or drip mode without drip settings), show base controls
     return (
       <div className="flex items-center gap-2 ml-auto">
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleAddDrip();
-          }}
-          className="p-1 hover:bg-[var(--muted)] rounded-full transition-colors"
-        >
-          <Plus className="w-4 h-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]" />
-        </button>
+        {accessMethod === 'drip' && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddDrip();
+            }}
+            className="p-1 hover:bg-[var(--muted)] rounded-full transition-colors"
+          >
+            <Plus className="w-4 h-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]" />
+          </button>
+        )}
         {baseControls}
       </div>
     );
