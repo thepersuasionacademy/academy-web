@@ -1,20 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, CheckCircle, Clock, FolderTree, Film, Book } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { AddAccessModal } from '../content/AddAccessModal';
 import { AccessStructureView } from '../content/AccessStructureView';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+
+interface AccessItem {
+  id: string;
+  title: string;
+  order: number;
+  has_access: boolean;
+  access_date: string | null;
+  module_id?: string;
+}
 
 interface AccessRecord {
   id: string;
   content_id: string;
   content_title: string | null;
   content_type: string | null;
+  collection_name: string | null;
   status: string;
   granted_by: string;
   granted_at: string;
   access_starts_at: string;
   access_ends_at: string | null;
+  modules: AccessItem[] | null;
+  media: AccessItem[] | null;
 }
 
 interface ContentTabProps {
@@ -74,6 +86,123 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
     return data.title;
   };
 
+  // Add this helper function for date formatting
+  const formatAccessDate = (date: string | null) => {
+    if (!date) return 'Not scheduled';
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  // Add this component for rendering access items
+  const AccessItemList = ({ items, title }: { items: AccessItem[] | null; title: string }) => {
+    if (!items || items.length === 0) return null;
+
+    return (
+      <div className="space-y-2">
+        <h3 className="text-lg font-medium text-[var(--text-secondary)]">{title}</h3>
+        <div className="space-y-1">
+          {items.sort((a, b) => a.order - b.order).map((item) => (
+            <div key={item.id} className="flex items-center justify-between py-2 border-b border-[var(--border-color)] last:border-0">
+              <span className="text-[var(--foreground)]">{item.title}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-[var(--text-secondary)]">
+                  {formatAccessDate(item.access_date)}
+                </span>
+                {item.has_access ? (
+                  <CheckCircle className="w-5 h-5 text-green-500" />
+                ) : (
+                  <Clock className="w-5 h-5 text-[var(--text-secondary)]" />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // Add this component for rendering the content structure
+  const ContentStructureView = ({ record }: { record: AccessRecord }) => {
+    return (
+      <div className="space-y-1">
+        {/* Content root */}
+        <div className="py-3 px-4 bg-[var(--card-bg)] rounded-t-lg border border-[var(--border-color)]">
+          <div className="flex items-center">
+            <span className="text-3xl font-medium text-[var(--text-secondary)]">
+              {record.content_title}
+            </span>
+          </div>
+        </div>
+        
+        {/* Modules section */}
+        {record.modules && record.modules.length > 0 && (
+          <div>
+            {record.modules.sort((a, b) => a.order - b.order).map((module) => (
+              <div
+                key={module.id}
+                className="pl-6"
+              >
+                <div className="py-3 px-4 border-x border-b border-[var(--border-color)]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "w-1 h-4",
+                        module.has_access ? "bg-green-500" : "bg-[var(--border-color)]"
+                      )} />
+                      <span className="text-xl font-medium text-[var(--text-secondary)]">
+                        {module.title}
+                      </span>
+                    </div>
+                    {!module.has_access && (
+                      <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                        <Clock className="w-4 h-4" />
+                        <span>{formatAccessDate(module.access_date)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Media section */}
+        {record.media && record.media.length > 0 && (
+          <div>
+            {record.media.sort((a, b) => a.order - b.order).map((media) => {
+              const parentModule = record.modules?.find(m => m.id === media.module_id);
+              const hasAccess = parentModule?.has_access || media.has_access;
+              
+              return (
+                <div
+                  key={media.id}
+                  className="pl-12"
+                >
+                  <div className="py-3 px-4 border-x border-b border-[var(--border-color)]">
+                    <div className="flex items-center">
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-1 h-4",
+                          hasAccess ? "bg-green-500" : "bg-[var(--border-color)]"
+                        )} />
+                        <span className="text-xl font-medium text-[var(--text-secondary)]">
+                          {media.title}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="grid grid-cols-12 gap-8">
       {/* Left Column - Recent History */}
@@ -126,12 +255,13 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
                 >
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                      <span>{record.content_type || 'Unknown Type'}</span>
-                      <ChevronRight className="w-3 h-3" />
-                      <span>{record.status}</span>
+                      <span>{record.collection_name || 'Uncategorized'}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-lg text-[var(--foreground)]">{record.content_title || 'Untitled Content'}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-500 rounded-full" />
+                        <span className="text-lg text-[var(--foreground)]">{record.content_title || 'Untitled Content'}</span>
+                      </div>
                       <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
                     </div>
                     <div className="text-sm text-[var(--text-secondary)]">
@@ -158,38 +288,8 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
           />
         ) : selectedRecord ? (
           <div className="rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)] p-8">
-            <div className="space-y-4">
-              <h2 className="text-2xl font-medium text-[var(--foreground)]">{selectedRecord.content_title || 'Untitled Content'}</h2>
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Type</span>
-                  <span className="font-medium capitalize">{selectedRecord.content_type || 'Unknown Type'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Status</span>
-                  <span className="font-medium">{selectedRecord.status}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Granted</span>
-                  <span className="font-medium">
-                    {new Date(selectedRecord.granted_at).toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[var(--text-secondary)]">Access Start</span>
-                  <span className="font-medium">
-                    {new Date(selectedRecord.access_starts_at).toLocaleString()}
-                  </span>
-                </div>
-                {selectedRecord.access_ends_at && (
-                  <div className="flex justify-between">
-                    <span className="text-[var(--text-secondary)]">Access End</span>
-                    <span className="font-medium">
-                      {new Date(selectedRecord.access_ends_at).toLocaleString()}
-                    </span>
-                  </div>
-                )}
-              </div>
+            <div className="space-y-6">
+              <ContentStructureView record={selectedRecord} />
             </div>
           </div>
         ) : (
