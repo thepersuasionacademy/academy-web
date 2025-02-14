@@ -480,28 +480,55 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   };
 
   const renderAccessControls = (node: StructureNode) => {
-    // Don't show controls for media nodes or top-level collection nodes
-    if (accessMethod !== 'drip' || 
-        node.type === 'media' || 
-        (node.type === 'collection' && !structure?.children?.some(child => child.id === node.id))) return null;
+    // Only show controls in drip mode
+    if (accessMethod !== 'drip') return null;
 
-    const findParentNode = (nodeId: string, tree: StructureNode | null): StructureNode | null => {
-      if (!tree) return null;
-      
-      if (tree.children?.some(child => child.id === nodeId)) {
-        return tree;
-      }
-      
-      for (const child of tree.children || []) {
-        const parent = findParentNode(nodeId, child);
-        if (parent) return parent;
-      }
-      
-      return null;
+    const findParentWithDrip = (targetNode: StructureNode, tree: StructureNode | null): boolean => {
+      if (!tree) return false;
+
+      // Helper function to check if a node is a descendant of another node
+      const isDescendant = (parent: StructureNode, child: StructureNode): boolean => {
+        if (!parent.children) return false;
+        
+        // Check each child at this level
+        for (const node of parent.children) {
+          // If this is our target node and parent has drip, return true
+          if (node.id === child.id) {
+            return parent.accessDelay !== undefined;
+          }
+          
+          // If this node has drip and our target is somewhere in its children, return true
+          if (node.accessDelay !== undefined) {
+            const hasTargetInChildren = findNodeInChildren(node, child.id);
+            if (hasTargetInChildren) return true;
+          }
+          
+          // Recursively check this node's children
+          if (isDescendant(node, child)) {
+            return true;
+          }
+        }
+        
+        return false;
+      };
+
+      // Helper function to find a node by ID in the children tree
+      const findNodeInChildren = (parent: StructureNode, targetId: string): boolean => {
+        if (!parent.children) return false;
+        
+        for (const child of parent.children) {
+          if (child.id === targetId) return true;
+          if (findNodeInChildren(child, targetId)) return true;
+        }
+        
+        return false;
+      };
+
+      // Start checking from the root
+      return isDescendant(tree, targetNode);
     };
 
-    const parentNode = findParentNode(node.id, structure);
-    const parentHasDrip = parentNode?.accessDelay !== undefined;
+    const hasAncestorWithDrip = findParentWithDrip(node, structure);
     const hasDripSettings = node.accessDelay !== undefined;
 
     const handleAddDrip = () => {
@@ -509,7 +536,6 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
     };
 
     const handleRemoveDrip = () => {
-      // Actually remove the accessDelay object completely
       setStructure(prevStructure => {
         if (!prevStructure) return null;
 
@@ -531,8 +557,8 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       });
     };
 
-    // If parent has drip, show only lock icon
-    if (parentHasDrip) {
+    // If any ancestor has drip, show lock icon
+    if (hasAncestorWithDrip) {
       return (
         <div className="flex items-center gap-2 ml-auto">
           <Lock className="w-4 h-4 text-[var(--text-secondary)]/40" />
@@ -551,7 +577,6 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
             value={node.accessDelay?.value || ''}
             onChange={(e) => {
               const value = e.target.value;
-              // Just update the value, keeping the accessDelay object intact
               updateNodeAccessDelay(node.id, value === '' ? 0 : Math.max(0, Math.min(99, parseInt(value) || 0)), node.accessDelay?.unit || 'days');
             }}
             className="w-8 text-base text-right bg-transparent text-[var(--foreground)] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -574,7 +599,7 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       );
     }
 
-    // Default state: show plus icon to add drip
+    // Default state: show plus icon to add drip for all nodes
     return (
       <div className="flex items-center gap-2 ml-auto">
         <button
@@ -591,17 +616,18 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   };
 
   const getMediaTypeIcon = (mediaType?: string) => {
+    const iconClasses = "w-5 h-5 text-[var(--text-secondary)]";
     switch (mediaType) {
       case 'video':
-        return <Film className="w-4 h-4 text-[var(--text-secondary)]" />;
+        return <Film className={iconClasses} />;
       case 'text':
-        return <Book className="w-4 h-4 text-[var(--text-secondary)]" />;
+        return <Book className={iconClasses} />;
       case 'tool':
-        return <Wrench className="w-4 h-4 text-[var(--text-secondary)]" />;
+        return <Wrench className={iconClasses} />;
       case 'pdf':
-        return <FileText className="w-4 h-4 text-[var(--text-secondary)]" />;
+        return <FileText className={iconClasses} />;
       case 'quiz':
-        return <HelpCircle className="w-4 h-4 text-[var(--text-secondary)]" />;
+        return <HelpCircle className={iconClasses} />;
       default:
         return null;
     }
@@ -613,60 +639,69 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
     
     return (
       <div key={node.id} className={cn(
-        "transition-all duration-200",
-        level > 0 && "pl-6"
+        "relative",
+        level > 0 && "ml-8 pl-4"
       )}>
         {level > 0 && (
-          <div className="absolute -left-4 top-1/2 -translate-y-1/2 w-4 h-px bg-[var(--border-color)]" />
+          <div className="absolute left-0 top-0 bottom-0 w-px bg-[var(--border-color)]" />
         )}
-        {level > 0 && (
-          <div className="absolute left-[-16px] top-0 bottom-0 w-px bg-[var(--border-color)]" />
-        )}
+
         <div
           onClick={() => {
             handleNodeClick(node);
             setSelectedNode(isSelected ? null : node.id);
           }}
           className={cn(
-            "group py-3 px-4 transition-all duration-200",
-            "hover:bg-[var(--hover-bg)]/50",
-            isSelected && "hover:bg-[var(--hover-bg)]/50",
-            level === 0 && "bg-[var(--card-bg)] rounded-t-lg border border-[var(--border-color)]",
-            level > 0 && "border-x border-b border-[var(--border-color)]",
-            node.children?.length === 0 && "border-b border-[var(--border-color)]"
+            "group relative flex items-center py-3 px-4 border border-[var(--border-color)] rounded-lg bg-white",
+            level === 0 && "shadow-sm mb-4"
           )}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* Node Type Indicator */}
-              <div className={cn(
-                "w-1 h-4 transition-colors",
-                "bg-[var(--border-color)] group-hover:bg-[var(--accent)]"
-              )} />
-              
-              {isLoading ? (
-                <Loader2 className="w-4 h-4 animate-spin text-[var(--text-secondary)]" />
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className={cn(
-                    "font-medium transition-colors",
-                    level === 0 ? "text-3xl" : "text-xl",
-                    "text-[var(--text-secondary)] group-hover:text-[var(--foreground)]"
-                  )}>{node.name}</span>
-                  {node.type === 'media' && getMediaTypeIcon(node.mediaType)}
-                </div>
-              )}
-            </div>
+          {level > 0 && (
+            <div className="absolute left-0 top-1/2 w-4 h-px -translate-y-px bg-[var(--border-color)] -translate-x-4" />
+          )}
+          
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            {level === 0 && (
+              <div className="w-1 h-6 bg-[var(--accent)] rounded-full shrink-0" />
+            )}
+            
+            {isLoading ? (
+              <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
+            ) : (
+              <>
+                <span className={cn(
+                  "transition-colors truncate",
+                  level === 0 
+                    ? "text-2xl font-semibold" 
+                    : "text-lg",
+                  "text-[var(--foreground)]"
+                )}>{node.name}</span>
+                {node.type === 'media' && (
+                  <div className="shrink-0">
+                    {getMediaTypeIcon(node.mediaType)}
+                  </div>
+                )}
+              </>
+            )}
             {renderAccessControls(node)}
           </div>
         </div>
 
         {node.children && node.children.length > 0 && (
-          <div>
-            {/* Sort children by order before rendering */}
+          <div className={cn(
+            "relative",
+            level === 0 ? "mt-4" : "mt-3"
+          )}>
             {[...node.children]
               .sort((a: StructureNode, b: StructureNode) => a.order - b.order)
-              .map((child) => renderNode(child, level + 1))}
+              .map((child, index) => (
+                <div key={child.id} className={cn(
+                  "relative",
+                  index > 0 && "mt-3"
+                )}>
+                  {renderNode(child, level + 1)}
+                </div>
+              ))}
           </div>
         )}
       </div>
@@ -709,45 +744,50 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   }
 
   return (
-    <div className="p-8 rounded-xl border border-[var(--border-color)] bg-[var(--card-bg)]">
+    <div className="p-8 rounded-xl border border-[var(--border-color)] bg-white">
       {/* Header with title and access controls */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-2xl font-medium">Access Overview</h3>
+      <div className="flex items-center justify-between mb-8">
+        <h3 className="text-3xl font-medium">Access Overview</h3>
         <div className="flex items-center gap-4">
           {/* Access Method Selection */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 bg-[var(--hover-bg)]/50 p-1.5 rounded-lg">
             <button
               onClick={() => setAccessMethod('instant')}
               title="Instant Access"
               className={cn(
-                "p-2 rounded-full",
-                "border transition-all",
+                "p-2.5 rounded-md",
+                "transition-all",
                 accessMethod === 'instant'
-                  ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                  : "border-[var(--border-color)] hover:border-[var(--accent)] text-[var(--text-secondary)]"
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
               )}
             >
-              <Zap className="w-5 h-5" />
+              <Zap className="w-6 h-6" />
             </button>
             <button
               onClick={() => setAccessMethod('drip')}
               title="Drip Access"
               className={cn(
-                "p-2 rounded-full",
-                "border transition-all",
+                "p-2.5 rounded-md",
+                "transition-all",
                 accessMethod === 'drip'
-                  ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                  : "border-[var(--border-color)] hover:border-[var(--accent)] text-[var(--text-secondary)]"
+                  ? "bg-[var(--accent)] text-white shadow-sm"
+                  : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
               )}
             >
-              <Clock className="w-5 h-5" />
+              <Clock className="w-6 h-6" />
             </button>
           </div>
 
           {/* Save Button */}
           <button
             onClick={handleGrantAccess}
-            className="px-6 py-2 bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity"
+            className={cn(
+              "px-8 py-2.5 rounded-lg text-lg font-medium",
+              "bg-[var(--accent)] text-white",
+              "hover:opacity-90 transition-opacity",
+              "shadow-sm"
+            )}
           >
             Save
           </button>
@@ -755,7 +795,7 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       </div>
 
       {/* Content Structure Tree */}
-      <div ref={structureRef} className="space-y-1">
+      <div ref={structureRef} className="relative">
         {renderNode(structure)}
       </div>
     </div>
