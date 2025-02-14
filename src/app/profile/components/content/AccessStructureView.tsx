@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, X, Film, Book, Wrench, FileText, HelpCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, Eye, EyeOff, X, Film, Book, Wrench, FileText, HelpCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface StructureNode {
@@ -12,6 +12,7 @@ interface StructureNode {
     value: number;
     unit: 'days' | 'weeks' | 'months';
   };
+  hasAccess?: boolean;
   order: number;
   mediaType?: string;
 }
@@ -64,7 +65,7 @@ function TimeUnitDropdown({ value, onChange, disabled, inputValue }: TimeUnitDro
         className={cn(
           "flex items-center gap-1 text-base transition-colors",
           disabled 
-            ? "text-[var(--text-secondary)]/40 cursor-not-allowed" 
+            ? "text-[var(--muted-foreground)]/40 cursor-not-allowed" 
             : "text-[var(--foreground)]"
         )}
       >
@@ -73,12 +74,12 @@ function TimeUnitDropdown({ value, onChange, disabled, inputValue }: TimeUnitDro
           "h-3 w-3",
           disabled 
             ? "opacity-40"
-            : "text-[var(--text-secondary)]"
+            : "text-[var(--muted-foreground)]"
         )} />
       </button>
       
       {!disabled && isOpen && (
-        <div className="absolute right-0 z-10 mt-1 min-w-[100px] py-1 bg-[var(--card-bg)] border border-[var(--border-color)] rounded-md shadow-lg">
+        <div className="absolute right-0 z-10 mt-1 min-w-[100px] py-1 bg-[var(--background)] border border-[var(--border-color)] rounded-md shadow-lg">
           {options.map((option) => (
             <button
               key={option.value}
@@ -86,7 +87,7 @@ function TimeUnitDropdown({ value, onChange, disabled, inputValue }: TimeUnitDro
                 onChange(option.value as 'days' | 'weeks' | 'months');
                 setIsOpen(false);
               }}
-              className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--foreground)] hover:bg-[var(--hover-bg)] transition-colors"
+              className="flex items-center gap-2 w-full px-3 py-1.5 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
             >
               <span className="w-4">
                 {option.value === value && (
@@ -480,9 +481,6 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   };
 
   const renderAccessControls = (node: StructureNode) => {
-    // Only show controls in drip mode
-    if (accessMethod !== 'drip') return null;
-
     const findParentWithDrip = (targetNode: StructureNode, tree: StructureNode | null): boolean => {
       if (!tree) return false;
 
@@ -492,13 +490,13 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
         
         // Check each child at this level
         for (const node of parent.children) {
-          // If this is our target node and parent has drip, return true
+          // If this is our target node and parent has drip or no access, return true
           if (node.id === child.id) {
-            return parent.accessDelay !== undefined;
+            return parent.accessDelay !== undefined || parent.hasAccess === false;
           }
           
-          // If this node has drip and our target is somewhere in its children, return true
-          if (node.accessDelay !== undefined) {
+          // If this node has drip/no access and our target is somewhere in its children, return true
+          if (node.accessDelay !== undefined || node.hasAccess === false) {
             const hasTargetInChildren = findNodeInChildren(node, child.id);
             if (hasTargetInChildren) return true;
           }
@@ -557,19 +555,83 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       });
     };
 
-    // If any ancestor has drip, show lock icon
+    const handleToggleAccess = () => {
+      setStructure(prevStructure => {
+        if (!prevStructure) return null;
+
+        const updateNode = (currNode: StructureNode): StructureNode => {
+          if (currNode.id === node.id) {
+            return {
+              ...currNode,
+              hasAccess: currNode.hasAccess === false ? undefined : false
+            };
+          }
+          if (currNode.children) {
+            return {
+              ...currNode,
+              children: currNode.children.map(child => updateNode(child))
+            };
+          }
+          return currNode;
+        };
+
+        return updateNode(prevStructure);
+      });
+    };
+
+    // If any ancestor has drip or no access, show lock icon
     if (hasAncestorWithDrip) {
       return (
         <div className="flex items-center gap-2 ml-auto">
-          <Lock className="w-4 h-4 text-[var(--text-secondary)]/40" />
+          <Lock className="w-4 h-4 text-[var(--muted-foreground)]/40" />
         </div>
       );
     }
 
-    // If node has drip settings, show editable settings with delete option
+    // Base controls that are always shown (eye icon)
+    const baseControls = (
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          handleToggleAccess();
+        }}
+        className={cn(
+          "p-1 hover:bg-[var(--muted)] rounded-full transition-colors",
+          node.hasAccess === false && "bg-red-500/10"
+        )}
+        title={node.hasAccess === false ? "Enable access" : "Disable access"}
+      >
+        {node.hasAccess === false ? (
+          <EyeOff className="w-4 h-4 text-red-500" />
+        ) : (
+          <Eye className="w-4 h-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]" />
+        )}
+      </button>
+    );
+
+    // If not in drip mode, only show the eye icon
+    if (accessMethod !== 'drip') {
+      return (
+        <div className="flex items-center gap-2 ml-auto">
+          {baseControls}
+        </div>
+      );
+    }
+
+    // If in drip mode and has drip settings, show all controls
     if (hasDripSettings) {
       return (
         <div className="flex items-center gap-2 ml-auto">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAddDrip();
+            }}
+            className="p-1 hover:bg-[var(--muted)] rounded-full transition-colors"
+          >
+            <Plus className="w-4 h-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]" />
+          </button>
+          {baseControls}
           <input
             type="number"
             min="1"
@@ -591,15 +653,15 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
               e.stopPropagation();
               handleRemoveDrip();
             }}
-            className="p-1 hover:bg-[var(--hover-bg)] rounded-full transition-colors"
+            className="p-1 hover:bg-[var(--muted)] rounded-full transition-colors"
           >
-            <X className="w-4 h-4 text-[var(--text-secondary)] hover:text-[var(--foreground)]" />
+            <X className="w-4 h-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]" />
           </button>
         </div>
       );
     }
 
-    // Default state: show plus icon to add drip for all nodes
+    // Default state in drip mode: show plus icon and eye icon
     return (
       <div className="flex items-center gap-2 ml-auto">
         <button
@@ -607,16 +669,22 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
             e.stopPropagation();
             handleAddDrip();
           }}
-          className="p-1 hover:bg-[var(--hover-bg)] rounded-full transition-colors"
+          className="p-1 hover:bg-[var(--muted)] rounded-full transition-colors"
         >
-          <Plus className="w-4 h-4 text-[var(--text-secondary)] hover:text-[var(--foreground)]" />
+          <Plus className="w-4 h-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]" />
         </button>
+        {baseControls}
       </div>
     );
   };
 
-  const getMediaTypeIcon = (mediaType?: string) => {
-    const iconClasses = "w-5 h-5 text-[var(--text-secondary)]";
+  const getMediaTypeIcon = (mediaType?: string, hasNoAccess?: boolean) => {
+    const iconClasses = cn(
+      "w-5 h-5",
+      hasNoAccess 
+        ? "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
+        : "text-[var(--muted-foreground)]"
+    );
     switch (mediaType) {
       case 'video':
         return <Film className={iconClasses} />;
@@ -633,9 +701,10 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
     }
   };
 
-  const renderNode = (node: StructureNode, level: number = 0) => {
+  const renderNode = (node: StructureNode, level: number = 0, hasAncestorWithNoAccess: boolean = false) => {
     const isLoading = loadingNodes?.has(node.id);
     const isSelected = selectedNode === node.id;
+    const hasNoAccess = hasAncestorWithNoAccess || node.hasAccess === false;
     
     return (
       <div key={node.id} className={cn(
@@ -652,12 +721,19 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
             setSelectedNode(isSelected ? null : node.id);
           }}
           className={cn(
-            "group relative flex items-center py-3 px-4 border border-[var(--border-color)] rounded-lg bg-white",
-            level === 0 && "shadow-sm mb-4"
+            "group relative flex items-center py-3 px-4 border border-[var(--border-color)] rounded-lg",
+            "bg-[var(--background)] transition-colors",
+            level === 0 && "shadow-sm mb-4",
+            hasNoAccess && "dark:bg-[var(--muted)]/30 bg-[var(--muted)]"
           )}
         >
           {level > 0 && (
             <div className="absolute left-0 top-1/2 w-4 h-px -translate-y-px bg-[var(--border-color)] -translate-x-4" />
+          )}
+          
+          {/* Add overlay for no access */}
+          {hasNoAccess && (
+            <div className="absolute inset-0 rounded-lg pointer-events-none dark:bg-black/30 bg-gray-100/50" />
           )}
           
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -669,18 +745,19 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
               <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
             ) : (
               <>
+                {node.type === 'media' && (
+                  <div className="shrink-0">
+                    {getMediaTypeIcon(node.mediaType, hasNoAccess)}
+                  </div>
+                )}
                 <span className={cn(
                   "transition-colors truncate",
                   level === 0 
                     ? "text-2xl font-semibold" 
                     : "text-lg",
-                  "text-[var(--foreground)]"
+                  "text-[var(--foreground)]",
+                  hasNoAccess && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
                 )}>{node.name}</span>
-                {node.type === 'media' && (
-                  <div className="shrink-0">
-                    {getMediaTypeIcon(node.mediaType)}
-                  </div>
-                )}
               </>
             )}
             {renderAccessControls(node)}
@@ -699,7 +776,7 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
                   "relative",
                   index > 0 && "mt-3"
                 )}>
-                  {renderNode(child, level + 1)}
+                  {renderNode(child, level + 1, hasNoAccess)}
                 </div>
               ))}
           </div>
@@ -744,22 +821,21 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   }
 
   return (
-    <div className="p-8 rounded-xl border border-[var(--border-color)] bg-white">
+    <div className="p-8 rounded-xl border border-[var(--border-color)] bg-[var(--background)]">
       {/* Header with title and access controls */}
       <div className="flex items-center justify-between mb-8">
-        <h3 className="text-3xl font-medium">Access Overview</h3>
+        <h3 className="text-3xl font-medium text-[var(--foreground)]">Access Overview</h3>
         <div className="flex items-center gap-4">
           {/* Access Method Selection */}
-          <div className="flex gap-2 bg-[var(--hover-bg)]/50 p-1.5 rounded-lg">
+          <div className="flex gap-2 bg-[var(--muted)]/50 p-1.5 rounded-lg">
             <button
               onClick={() => setAccessMethod('instant')}
               title="Instant Access"
               className={cn(
-                "p-2.5 rounded-md",
-                "transition-all",
+                "p-2.5 rounded-md transition-all",
                 accessMethod === 'instant'
                   ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
+                  : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
               )}
             >
               <Zap className="w-6 h-6" />
@@ -768,11 +844,10 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
               onClick={() => setAccessMethod('drip')}
               title="Drip Access"
               className={cn(
-                "p-2.5 rounded-md",
-                "transition-all",
+                "p-2.5 rounded-md transition-all",
                 accessMethod === 'drip'
                   ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "hover:bg-[var(--hover-bg)] text-[var(--text-secondary)]"
+                  : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
               )}
             >
               <Clock className="w-6 h-6" />
@@ -796,7 +871,7 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
 
       {/* Content Structure Tree */}
       <div ref={structureRef} className="relative">
-        {renderNode(structure)}
+        {renderNode(structure, 0, false)}
       </div>
     </div>
   );
