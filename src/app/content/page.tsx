@@ -9,18 +9,33 @@ import { CategoryPills } from '@/app/content/components/CategoryPills';
 import type { MediaItem } from '@/app/content/lib/types';
 import { FeaturedContent } from '@/app/content/components/dashboard/FeaturedContent';
 import { cn } from '@/lib/utils';
-import { getCollections, getContent, getLessons, getContentById, type Collection, type Content, type Lesson, type ContentWithModules } from '@/lib/supabase/learning';
+import { getCollections, getContent, getLessons, getStreamingContent, type Collection, type Content, type Lesson, type ContentWithModules } from '@/lib/supabase/learning';
+import { ExtendedContent } from '@/types/extended';
 
-// Featured content that matches the design
-const featuredItem = {
-  id: 'focus-flow',
-  title: 'Focus Flow',
-  description: 'Deep concentration tracks',
-  image: '/images/focus-flow.jpg',
-  tracks: 12
+type ContentMediaItem = {
+  id: string;
+  title: string;
+  video_id?: string | null;
+  video_name?: string | null;
+  content_text?: string | null;
+  text_title?: string | null;
+  tool_id?: string | null;
+  tool?: {
+    id: string;
+    title: string;
+    description: string;
+    credits_cost: number;
+    collection_title: string | null;
+    suite_title: string | null;
+  } | null;
+  pdf_url?: string | null;
+  pdf_title?: string | null;
+  quiz_data?: Record<string, any> | null;
+  quiz_title?: string | null;
+  order: number;
 };
 
-interface MediaItemType {
+interface MediaPlayerMediaItem {
   id: string;
   title: string;
   order: number;
@@ -63,6 +78,15 @@ interface MediaItemType {
   };
 }
 
+// Featured content that matches the design
+const featuredItem = {
+  id: 'focus-flow',
+  title: 'Focus Flow',
+  description: 'Deep concentration tracks',
+  image: '/images/focus-flow.jpg',
+  tracks: 12
+};
+
 // Convert Supabase Content to MediaItem format for ContentGrid
 function convertContentToMediaItem(content: Content): MediaItem {
   return {
@@ -83,38 +107,196 @@ function convertToCategory(collection: Collection, content: Content[]) {
   };
 }
 
+// Convert ContentMediaItem to MediaPlayerItem
+const convertToMediaItem = (item: ContentMediaItem): MediaPlayerItem => {
+  return {
+    id: item.id,
+    title: item.title,
+    order: item.order,
+    video: item.video_id ? {
+      id: `${item.id}-video`,
+      video_id: item.video_id,
+      title: item.video_name || item.title,
+      order: item.order
+    } : undefined,
+    text: item.content_text ? {
+      id: `${item.id}-text`,
+      content_text: item.content_text,
+      title: item.text_title || item.title,
+      order: item.order
+    } : undefined,
+    ai: item.tool_id ? {
+      id: `${item.id}-ai`,
+      tool_id: item.tool_id,
+      title: item.tool?.title || item.title,
+      order: item.order,
+      tool: item.tool ? {
+        id: item.tool.id,
+        title: item.tool.title,
+        description: item.tool.description,
+        credits_cost: item.tool.credits_cost,
+        status: 'published'
+      } : undefined
+    } : undefined,
+    pdf: item.pdf_url ? {
+      id: `${item.id}-pdf`,
+      pdf_url: item.pdf_url,
+      title: item.pdf_title || item.title,
+      order: item.order
+    } : undefined,
+    quiz: item.quiz_data ? {
+      id: `${item.id}-quiz`,
+      quiz_data: item.quiz_data,
+      title: item.quiz_title || item.title,
+      order: item.order
+    } : undefined
+  };
+};
+
+interface MediaPlayerItem {
+  id: string;
+  title: string;
+  order: number;
+  video?: {
+    id: string;
+    video_id: string;
+    title: string;
+    order: number;
+  };
+  text?: {
+    id: string;
+    content_text: string;
+    title: string;
+    order: number;
+  };
+  ai?: {
+    id: string;
+    tool_id: string;
+    title: string;
+    order: number;
+    tool?: {
+      id: string;
+      title: string;
+      description: string;
+      credits_cost: number;
+      status: 'draft' | 'published' | 'archived' | 'maintenance';
+    };
+  };
+  pdf?: {
+    id: string;
+    pdf_url: string;
+    title: string;
+    order: number;
+  };
+  quiz?: {
+    id: string;
+    quiz_data: any;
+    title: string;
+    order: number;
+  };
+}
+
+const getMediaItems = (mediaItem: MediaPlayerItem) => {
+  const items: { id: string; title: string; type: string; order: number }[] = [];
+  
+  // Add each media type if it exists, using its own order value
+  if (mediaItem.video) {
+    items.push({
+      id: mediaItem.video.id,
+      title: mediaItem.video.title || 'Video',
+      type: 'video',
+      order: mediaItem.video.order
+    });
+  }
+  
+  if (mediaItem.ai) {
+    items.push({
+      id: mediaItem.ai.id,
+      title: mediaItem.ai.title || 'AI Tool',
+      type: 'ai',
+      order: mediaItem.ai.order
+    });
+  }
+  
+  if (mediaItem.pdf?.pdf_url) {
+    items.push({
+      id: mediaItem.pdf.id,
+      title: mediaItem.pdf.title || 'PDF',
+      type: 'pdf',
+      order: mediaItem.pdf.order
+    });
+  }
+  
+  if (mediaItem.text) {
+    items.push({
+      id: mediaItem.text.id,
+      title: mediaItem.text.title || 'Text Lesson',
+      type: 'text',
+      order: mediaItem.text.order
+    });
+  }
+  
+  if (mediaItem.quiz) {
+    items.push({
+      id: mediaItem.quiz.id,
+      title: mediaItem.quiz.title || 'Quiz',
+      type: 'quiz',
+      order: mediaItem.quiz.order
+    });
+  }
+
+  return items.sort((a, b) => a.order - b.order);
+};
+
 export default function Page(): React.JSX.Element {
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
-  const [activeCategory, setActiveCategory] = useState<'learning' | 'imprinting'>('learning');
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [contentByCollection, setContentByCollection] = useState<Record<string, Content[]>>({});
   const [selectedContent, setSelectedContent] = useState<ContentWithModules | null>(null);
-  const [selectedMediaItem, setSelectedMediaItem] = useState<MediaItemType | null>(null);
+  const [selectedMediaItem, setSelectedMediaItem] = useState<MediaPlayerItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isContentLoading, setIsContentLoading] = useState(false);
   const [showMediaPlayer, setShowMediaPlayer] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
+      setIsLoading(true);
       try {
         console.log('Fetching collections...');
         const collectionsData = await getCollections();
         console.log('Collections fetched:', collectionsData);
-        setCollections(collectionsData);
+        setCollections(collectionsData || []);
 
         const contentData: Record<string, Content[]> = {};
         
-        for (const collection of collectionsData) {
-          try {
-            console.log(`Fetching content for collection ${collection.id}...`);
-            const collectionContent = await getContent(collection.id);
-            console.log(`Content fetched for collection ${collection.id}:`, collectionContent);
-            if (Array.isArray(collectionContent)) {
-              contentData[collection.id] = collectionContent;
+        if (Array.isArray(collectionsData)) {
+          for (const collection of collectionsData) {
+            try {
+              console.log(`Fetching content for collection ${collection.id}...`);
+              const collectionContent = await getContent(collection.id);
+              console.log(`Content fetched for collection ${collection.id}:`, collectionContent);
+              
+              // For each content item, fetch its full streaming data
+              if (Array.isArray(collectionContent)) {
+                const streamingContent = await Promise.all(
+                  collectionContent.map(async (content) => {
+                    try {
+                      const fullContent = await getStreamingContent(content.id);
+                      return fullContent.content;
+                    } catch (error) {
+                      console.error(`Error fetching streaming content for ${content.id}:`, error);
+                      return content;
+                    }
+                  })
+                );
+                contentData[collection.id] = streamingContent;
+              }
+            } catch (error) {
+              console.error(`Error fetching content for collection ${collection.id}:`, error);
+              contentData[collection.id] = [];
             }
-          } catch (error) {
-            console.error(`Error fetching content for collection ${collection.id}:`, error);
-            contentData[collection.id] = [];
           }
         }
         
@@ -122,6 +304,9 @@ export default function Page(): React.JSX.Element {
         setContentByCollection(contentData);
       } catch (error) {
         console.error('Error loading data:', error);
+        // Set empty arrays to prevent undefined errors
+        setCollections([]);
+        setContentByCollection({});
       } finally {
         setIsLoading(false);
       }
@@ -131,8 +316,12 @@ export default function Page(): React.JSX.Element {
   }, []);
 
   // Convert Supabase data to the format expected by ContentGrid
-  const categories = collections
-    .map(collection => convertToCategory(collection, contentByCollection[collection.id] || []));
+  const categories = React.useMemo(() => {
+    if (!collections || collections.length === 0) return [];
+    return collections.map(collection => 
+      convertToCategory(collection, contentByCollection[collection.id] || [])
+    );
+  }, [collections, contentByCollection]);
 
   const handleItemClick = async (itemId: string) => {
     const item = categories
@@ -141,31 +330,55 @@ export default function Page(): React.JSX.Element {
     if (item) {
       setSelectedItem(item);
       setSelectedLesson(null);
+      setIsContentLoading(true);
       try {
-        const contentData = await getContentById(itemId);
+        console.log('Fetching streaming content for item:', item);
+        const contentData = await getStreamingContent(itemId);
+        console.log('Streaming content data received:', contentData);
         setSelectedContent(contentData);
+        
+        // If there are modules and media items, set up the initial media item
+        if (contentData.modules && contentData.modules.length > 0) {
+          const firstModule = contentData.modules[0];
+          if (firstModule.media && firstModule.media.length > 0) {
+            const firstMediaItem = firstModule.media[0];
+            setSelectedMediaItem(convertToMediaItem(firstMediaItem));
+          }
+        }
       } catch (error) {
-        console.error('Error fetching content details:', error);
+        console.error('Error fetching streaming content:', error);
+        setSelectedItem(null);
+        // TODO: Add proper error toast/notification here
+      } finally {
+        setIsContentLoading(false);
       }
     }
   };
 
-  const handleModuleSelect = (moduleId: string, mediaItem: MediaItemType) => {
+  const handleModuleSelect = (moduleId: string, mediaItem: ContentMediaItem) => {
     if (selectedContent) {
       const moduleItem = selectedContent.modules.find(m => m.id === moduleId);
       if (moduleItem) {
         console.log('Selected media item:', mediaItem);
-        setSelectedMediaItem(mediaItem);
+        setSelectedMediaItem(convertToMediaItem(mediaItem));
         setShowMediaPlayer(true);
       }
     }
   };
 
   const handleMediaSelect = (item: { id: string; title: string; type: string }) => {
-    // No need for complex logic here since MediaPlayer handles the state internally
-    if (selectedMediaItem) {
-      setSelectedMediaItem({...selectedMediaItem});
-      setShowMediaPlayer(true);
+    if (selectedContent) {
+      const moduleWithMedia = selectedContent.modules.find(m => 
+        m.media?.some(mediaItem => mediaItem.id === item.id)
+      );
+      
+      if (moduleWithMedia) {
+        const mediaItem = moduleWithMedia.media.find(mediaItem => mediaItem.id === item.id);
+        if (mediaItem) {
+          setSelectedMediaItem(convertToMediaItem(mediaItem));
+          setShowMediaPlayer(true);
+        }
+      }
     }
   };
 
@@ -174,7 +387,7 @@ export default function Page(): React.JSX.Element {
       <ScrollProgress />
       
       <main className="relative">
-      <div className="backdrop-blur-md bg-[var(--background)]/80 border-b border-[var(--border-color)]">
+        <div className="backdrop-blur-md bg-[var(--background)]/80 border-b border-[var(--border-color)]">
           <div className="relative">
             <div className="px-[10px]">
               <CategoryPills onCategoryChange={setActiveCategory} />
@@ -193,65 +406,57 @@ export default function Page(): React.JSX.Element {
             <div className="flex justify-center items-center min-h-[200px]">
               <div className="text-[var(--text-secondary)]">Loading content...</div>
             </div>
-          ) : (
+          ) : categories.length > 0 ? (
             <div className="mt-8">
               <ContentGrid
                 categories={categories}
                 onItemClick={handleItemClick}
               />
             </div>
+          ) : (
+            <div className="flex justify-center items-center min-h-[200px]">
+              <div className="text-[var(--text-secondary)]">No content available</div>
+            </div>
           )}
         </div>
 
-        {/* Overlay layer for SuiteView */}
-        {selectedItem && selectedContent && (
-          <div 
-            className="fixed inset-0 z-50 flex overflow-hidden"
-            onClick={(e) => {
-              if (!showMediaPlayer && e.target === e.currentTarget) {
-                setSelectedItem(null);
-                setSelectedContent(null);
-                setSelectedMediaItem(null);
-                setShowMediaPlayer(false);
-              }
-            }}
-          >
-            {/* Left side - empty until media is selected */}
-            <div className="flex-1">
-              {selectedMediaItem && showMediaPlayer && (
-                <MediaPlayer
-                  title={selectedMediaItem.title}
-                  description={selectedContent.content.description || ''}
-                  isOpen={true}
-                  category={categories.find(cat => 
-                    cat.items.some(item => item.id === selectedItem?.id)
-                  )?.name}
-                  courseName={selectedContent.content.title}
-                  videoId={selectedMediaItem.video?.video_id}
-                  mediaItems={selectedContent.modules[0].media}
-                  selectedMediaItem={selectedMediaItem}
-                  onMediaSelect={handleMediaSelect}
-                />
-              )}
-            </div>
-
-            {/* SuiteView - always shown when content is selected */}
-            <div className="w-[400px] overflow-hidden">
-              <SuiteView
-                isOpen={true}
-                onClose={() => {
-                  setSelectedItem(null);
-                  setSelectedContent(null);
-                  setSelectedMediaItem(null);
-                  setShowMediaPlayer(false);
-                }}
+        {selectedContent && selectedContent.content && (
+          <div className="fixed inset-0 z-50 flex">
+            {selectedMediaItem && (
+              <MediaPlayer
                 title={selectedContent.content.title}
                 description={selectedContent.content.description || ''}
-                modules={selectedContent.modules}
-                onPlay={handleModuleSelect}
-                thumbnailUrl={selectedContent.content.thumbnail_url}
-                activeMediaItem={selectedMediaItem}
+                isOpen={showMediaPlayer}
+                category={selectedContent.content.collection?.name}
+                videoId={selectedMediaItem.video?.video_id}
+                courseName={selectedContent.content.title}
+                mediaItems={selectedContent.modules.flatMap(m => m.media || [])}
+                onMediaSelect={handleMediaSelect}
+                selectedMediaItem={selectedMediaItem as MediaPlayerItem}
               />
+            )}
+            <div className="w-[400px] overflow-hidden">
+              {isContentLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-[var(--text-secondary)]">Loading content...</div>
+                </div>
+              ) : (
+                <SuiteView
+                  isOpen={true}
+                  onClose={() => {
+                    setSelectedItem(null);
+                    setSelectedContent(null);
+                    setSelectedMediaItem(null);
+                    setShowMediaPlayer(false);
+                  }}
+                  title={selectedContent.content.title}
+                  description={selectedContent.content.description || ''}
+                  modules={selectedContent.modules}
+                  onPlay={handleModuleSelect}
+                  thumbnailUrl={selectedContent.content.thumbnail_url}
+                  activeMediaItem={selectedMediaItem}
+                />
+              )}
             </div>
           </div>
         )}

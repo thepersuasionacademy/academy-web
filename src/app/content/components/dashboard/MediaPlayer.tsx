@@ -152,14 +152,16 @@ export const MediaPlayer = ({
   };
 
   useEffect(() => {
-    setActiveMediaItem(selectedMediaItem);
-    // Only set the initial active type if there isn't one already
-    if (!activeType) {
-      if (selectedMediaItem.video) setActiveType('video');
-      else if (selectedMediaItem.text) setActiveType('text');
-      else if (selectedMediaItem.ai) setActiveType('ai');
-      else if (selectedMediaItem.pdf) setActiveType('pdf');
-      else if (selectedMediaItem.quiz) setActiveType('quiz');
+    if (selectedMediaItem) {
+      setActiveMediaItem(selectedMediaItem);
+      // Only set the initial active type if there isn't one already
+      if (!activeType) {
+        if (selectedMediaItem.video) setActiveType('video');
+        else if (selectedMediaItem.text) setActiveType('text');
+        else if (selectedMediaItem.ai) setActiveType('ai');
+        else if (selectedMediaItem.pdf) setActiveType('pdf');
+        else if (selectedMediaItem.quiz) setActiveType('quiz');
+      }
     }
   }, [selectedMediaItem]);
 
@@ -255,14 +257,14 @@ export const MediaPlayer = ({
                     remarkPlugins={[remarkGfm]}
                     className="text-[var(--foreground)]"
                     components={{
-                      h1: ({node, ...props}) => <h1 className="text-4xl font-bold mb-4 text-[var(--foreground)]" {...props} />,
-                      h2: ({node, ...props}) => <h2 className="text-3xl font-bold mb-3 text-[var(--foreground)]" {...props} />,
-                      h3: ({node, ...props}) => <h3 className="text-2xl font-bold mb-2 text-[var(--foreground)]" {...props} />,
-                      p: ({node, ...props}) => <p className="mb-4 leading-relaxed text-[var(--foreground)]" {...props} />,
-                      ul: ({node, ...props}) => <ul className="list-disc pl-6 mb-4 text-[var(--foreground)]" {...props} />,
-                      ol: ({node, ...props}) => <ol className="list-decimal pl-6 mb-4 text-[var(--foreground)]" {...props} />,
-                      li: ({node, ...props}) => <li className="mb-1 text-[var(--foreground)]" {...props} />,
-                      blockquote: ({node, ...props}) => (
+                      h1: ({...props}) => <h1 className="text-4xl font-bold mb-4 text-[var(--foreground)]" {...props} />,
+                      h2: ({...props}) => <h2 className="text-3xl font-bold mb-3 text-[var(--foreground)]" {...props} />,
+                      h3: ({...props}) => <h3 className="text-2xl font-bold mb-2 text-[var(--foreground)]" {...props} />,
+                      p: ({...props}) => <p className="mb-4 leading-relaxed text-[var(--foreground)]" {...props} />,
+                      ul: ({...props}) => <ul className="list-disc pl-6 mb-4 text-[var(--foreground)]" {...props} />,
+                      ol: ({...props}) => <ol className="list-decimal pl-6 mb-4 text-[var(--foreground)]" {...props} />,
+                      li: ({...props}) => <li className="mb-1 text-[var(--foreground)]" {...props} />,
+                      blockquote: ({...props}) => (
                         <blockquote className="border-l-4 border-[var(--accent)] pl-4 italic mb-4 text-[var(--foreground)]" {...props} />
                       ),
                       code: ({node, className, ...props}: any) => {
@@ -426,6 +428,10 @@ export const MediaPlayer = ({
         {activeType === 'quiz' ? 'Quiz interface coming soon' : 'No content available'}
       </div>
     );
+  };
+
+  const handleMediaSelect = (item: { id: string; title: string; type: string }) => {
+    setActiveType(item.type);
   };
 
   return (

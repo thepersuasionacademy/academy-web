@@ -105,11 +105,73 @@ export async function getLessons(contentId: string) {
 
 export async function getContentById(contentId: string): Promise<ContentWithModules> {
   const supabase = createClientComponentClient();
+  console.log('Fetching content for ID:', contentId);
   const { data, error } = await supabase
     .rpc('get_content_by_id', { p_content_id: contentId });
 
   if (error) {
     console.error('Error fetching content:', error);
+    throw error;
+  }
+
+  console.log('Raw response data:', data);
+
+  // If data is an array, take the first item
+  const rawContent = Array.isArray(data) ? data[0] : data;
+  console.log('Processed raw content:', rawContent);
+
+  if (!rawContent) {
+    throw new Error('Content not found');
+  }
+
+  // Transform the flat content structure into the expected nested format
+  const transformedContent: ContentWithModules = {
+    content: {
+      id: rawContent.id,
+      collection_id: rawContent.collection_id,
+      title: rawContent.title,
+      description: rawContent.description || '',
+      status: rawContent.status || 'draft',
+      thumbnail_url: rawContent.thumbnail_url,
+      created_at: rawContent.created_at,
+      updated_at: rawContent.updated_at || rawContent.created_at,
+      collection: {
+        id: rawContent.collection_id,
+        name: '', // We'll need to fetch this separately if needed
+        description: ''
+      },
+      stats: {
+        enrolled_count: 0,
+        created_at: rawContent.created_at,
+        updated_at: rawContent.updated_at || rawContent.created_at
+      }
+    },
+    modules: [] // Initialize with empty modules array
+  };
+
+  // Fetch modules for this content
+  const { data: modules, error: modulesError } = await supabase
+    .rpc('get_content_cards', { p_content_id: contentId });
+
+  if (modulesError) {
+    console.error('Error fetching modules:', modulesError);
+  } else if (modules) {
+    transformedContent.modules = Array.isArray(modules) ? modules : [modules];
+  }
+
+  console.log('Transformed content:', transformedContent);
+  return transformedContent;
+}
+
+export async function getStreamingContent(contentId: string): Promise<ContentWithModules> {
+  const supabase = createClientComponentClient();
+  const { data, error } = await supabase
+    .rpc('get_streaming_content', {
+      p_content_id: contentId
+    });
+
+  if (error) {
+    console.error('Error fetching streaming content:', error);
     throw error;
   }
 
