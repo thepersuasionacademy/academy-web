@@ -186,7 +186,7 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
                       <div className="flex items-center gap-3">
                         <div className={cn(
                           "w-1 h-4",
-                          hasAccess ? "bg-green-500" : "bg-[var(--border-color)]"
+                          parentModule?.has_access || media.has_access ? "bg-green-500" : "bg-[var(--border-color)]"
                         )} />
                         <span className="text-xl font-medium text-[var(--text-secondary)]">
                           {media.title}
