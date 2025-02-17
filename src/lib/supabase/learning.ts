@@ -70,7 +70,7 @@ export async function getCollections() {
     .rpc('get_content_collections');
 
   if (error) {
-    console.error('Error fetching collections:', error);
+    console.error('Error fetching collections');
     throw error;
   }
 
@@ -83,7 +83,7 @@ export async function getContent(collectionId: string) {
     .rpc('get_content_by_collection', { p_collection_id: collectionId });
 
   if (error) {
-    console.error('Error fetching content:', error);
+    console.error('Error fetching content');
     throw error;
   }
 
@@ -96,7 +96,7 @@ export async function getLessons(contentId: string) {
     .rpc('get_content_cards', { p_content_id: contentId });
 
   if (error) {
-    console.error('Error fetching lessons:', error);
+    console.error('Error fetching lessons');
     throw error;
   }
 
@@ -105,20 +105,16 @@ export async function getLessons(contentId: string) {
 
 export async function getContentById(contentId: string): Promise<ContentWithModules> {
   const supabase = createClientComponentClient();
-  console.log('Fetching content for ID:', contentId);
   const { data, error } = await supabase
     .rpc('get_content_by_id', { p_content_id: contentId });
 
   if (error) {
-    console.error('Error fetching content:', error);
+    console.error('Error fetching content');
     throw error;
   }
 
-  console.log('Raw response data:', data);
-
   // If data is an array, take the first item
   const rawContent = Array.isArray(data) ? data[0] : data;
-  console.log('Processed raw content:', rawContent);
 
   if (!rawContent) {
     throw new Error('Content not found');
@@ -154,26 +150,25 @@ export async function getContentById(contentId: string): Promise<ContentWithModu
     .rpc('get_content_cards', { p_content_id: contentId });
 
   if (modulesError) {
-    console.error('Error fetching modules:', modulesError);
+    console.error('Error fetching modules');
   } else if (modules) {
     transformedContent.modules = Array.isArray(modules) ? modules : [modules];
   }
 
-  console.log('Transformed content:', transformedContent);
   return transformedContent;
 }
 
-export async function getStreamingContent(contentId: string): Promise<ContentWithModules> {
-  const supabase = createClientComponentClient();
-  const { data, error } = await supabase
-    .rpc('get_streaming_content', {
-      p_content_id: contentId
-    });
+export async function getStreamingContentBySuiteId(contentId: string): Promise<ContentWithModules> {
+  try {
+    const response = await fetch(`/api/content/streaming?id=${contentId}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch content');
+    }
 
-  if (error) {
-    console.error('Error fetching streaming content:', error);
-    throw error;
+    return await response.json();
+  } catch (error) {
+    console.error('Error loading content');
+    throw new Error('Failed to load content');
   }
-
-  return data;
 } 

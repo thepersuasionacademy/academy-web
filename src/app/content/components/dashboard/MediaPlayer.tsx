@@ -452,7 +452,7 @@ export const MediaPlayer = ({
                 <ChevronRight className="w-4 h-4" />
               </>
             )}
-            {courseName && (
+            {courseName && courseName !== title && (
               <>
                 <span className="text-[var(--text-secondary)]">{courseName}</span>
                 <ChevronRight className="w-4 h-4" />

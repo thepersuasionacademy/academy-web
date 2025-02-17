@@ -5,11 +5,10 @@ import { ContentGrid } from '@/app/content/components/dashboard/ContentGrid';
 import { SuiteView } from '@/app/content/components/SuiteView';
 import { MediaPlayer } from '@/app/content/components/dashboard/MediaPlayer';
 import ScrollProgress from '@/app/content/components/ScrollProgress';
-import { CategoryPills } from '@/app/content/components/CategoryPills';
 import type { MediaItem } from '@/app/content/lib/types';
 import { FeaturedContent } from '@/app/content/components/dashboard/FeaturedContent';
 import { cn } from '@/lib/utils';
-import { getCollections, getContent, getLessons, getStreamingContent, type Collection, type Content, type Lesson, type ContentWithModules } from '@/lib/supabase/learning';
+import { getCollections, getContent, getLessons, getStreamingContentBySuiteId, type Collection, type Content, type Lesson, type ContentWithModules } from '@/lib/supabase/learning';
 import { ExtendedContent } from '@/types/extended';
 
 type ContentMediaItem = {
@@ -258,15 +257,12 @@ export default function Page(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [showMediaPlayer, setShowMediaPlayer] = useState(false);
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
       try {
-        console.log('Fetching collections...');
         const collectionsData = await getCollections();
-        console.log('Collections fetched:', collectionsData);
         setCollections(collectionsData || []);
 
         const contentData: Record<string, Content[]> = {};
@@ -274,36 +270,18 @@ export default function Page(): React.JSX.Element {
         if (Array.isArray(collectionsData)) {
           for (const collection of collectionsData) {
             try {
-              console.log(`Fetching content for collection ${collection.id}...`);
               const collectionContent = await getContent(collection.id);
-              console.log(`Content fetched for collection ${collection.id}:`, collectionContent);
-              
-              // For each content item, fetch its full streaming data
-              if (Array.isArray(collectionContent)) {
-                const streamingContent = await Promise.all(
-                  collectionContent.map(async (content) => {
-                    try {
-                      const fullContent = await getStreamingContent(content.id);
-                      return fullContent.content;
-                    } catch (error) {
-                      console.error(`Error fetching streaming content for ${content.id}:`, error);
-                      return content;
-                    }
-                  })
-                );
-                contentData[collection.id] = streamingContent;
-              }
+              contentData[collection.id] = collectionContent;
             } catch (error) {
-              console.error(`Error fetching content for collection ${collection.id}:`, error);
+              console.error(`Error fetching content for collection ${collection.id}`);
               contentData[collection.id] = [];
             }
           }
         }
         
-        console.log('All content data:', contentData);
         setContentByCollection(contentData);
       } catch (error) {
-        console.error('Error loading data:', error);
+        console.error('Error loading data');
         // Set empty arrays to prevent undefined errors
         setCollections([]);
         setContentByCollection({});
@@ -332,9 +310,7 @@ export default function Page(): React.JSX.Element {
       setSelectedLesson(null);
       setIsContentLoading(true);
       try {
-        console.log('Fetching streaming content for item:', item);
-        const contentData = await getStreamingContent(itemId);
-        console.log('Streaming content data received:', contentData);
+        const contentData = await getStreamingContentBySuiteId(itemId);
         setSelectedContent(contentData);
         
         // If there are modules and media items, set up the initial media item
@@ -346,9 +322,8 @@ export default function Page(): React.JSX.Element {
           }
         }
       } catch (error) {
-        console.error('Error fetching streaming content:', error);
+        console.error('Error loading content');
         setSelectedItem(null);
-        // TODO: Add proper error toast/notification here
       } finally {
         setIsContentLoading(false);
       }
@@ -359,7 +334,6 @@ export default function Page(): React.JSX.Element {
     if (selectedContent) {
       const moduleItem = selectedContent.modules.find(m => m.id === moduleId);
       if (moduleItem) {
-        console.log('Selected media item:', mediaItem);
         setSelectedMediaItem(convertToMediaItem(mediaItem));
         setShowMediaPlayer(true);
       }
@@ -387,14 +361,6 @@ export default function Page(): React.JSX.Element {
       <ScrollProgress />
       
       <main className="relative">
-        <div className="backdrop-blur-md bg-[var(--background)]/80 border-b border-[var(--border-color)]">
-          <div className="relative">
-            <div className="px-[10px]">
-              <CategoryPills onCategoryChange={setActiveCategory} />
-            </div>
-          </div>
-        </div>
-
         <div className="px-[5px]">
           <FeaturedContent 
             content={featuredItem}
@@ -427,9 +393,8 @@ export default function Page(): React.JSX.Element {
                 title={selectedContent.content.title}
                 description={selectedContent.content.description || ''}
                 isOpen={showMediaPlayer}
-                category={selectedContent.content.collection?.name}
-                videoId={selectedMediaItem.video?.video_id}
                 courseName={selectedContent.content.title}
+                videoId={selectedMediaItem.video?.video_id}
                 mediaItems={selectedContent.modules.flatMap(m => m.media || [])}
                 onMediaSelect={handleMediaSelect}
                 selectedMediaItem={selectedMediaItem as MediaPlayerItem}
