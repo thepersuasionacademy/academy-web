@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, Eye, EyeOff, X, Youtube, FileText, Bot, HelpCircle, Type } from 'lucide-react';
+import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, Eye, EyeOff, X, Youtube, FileText, Bot, HelpCircle, Type, ChevronRight } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Toast } from "../common/Toast";
 
@@ -25,6 +25,8 @@ interface AccessStructureViewProps {
   targetUserId?: string;
   onAccessGranted?: () => void;
   onRefreshContentHistory?: () => void;
+  isAdmin?: boolean;
+  isSuperAdmin?: boolean;
 }
 
 type AccessMethod = 'instant' | 'drip';
@@ -120,12 +122,21 @@ interface TransformedNode {
   children: TransformedNode[];
 }
 
-export function AccessStructureView({ selectedType, selectedId, targetUserId, onAccessGranted, onRefreshContentHistory }: AccessStructureViewProps) {
+export function AccessStructureView({ 
+  selectedType, 
+  selectedId, 
+  targetUserId, 
+  onAccessGranted, 
+  onRefreshContentHistory,
+  isAdmin,
+  isSuperAdmin 
+}: AccessStructureViewProps) {
   const [structure, setStructure] = useState<StructureNode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [accessMethod, setAccessMethod] = useState<AccessMethod>('instant');
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
   const supabase = createClientComponentClient();
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
   const structureRef = useRef<HTMLDivElement>(null);
@@ -164,7 +175,17 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
             p_content_id: nodeId
           });
 
-        if (streamingError) throw streamingError;
+        if (streamingError) {
+          console.error('Error fetching streaming content:', streamingError);
+          return {
+            id: nodeId,
+            name: '',
+            type: 'content' as const,
+            order: 0,
+            isHidden: false,
+            children: []
+          } as StructureNode;
+        }
 
         // Merge the access structure with content details
         const contentNode: StructureNode = {
@@ -174,6 +195,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
           order: 0,
           hasAccess: accessStructure?.hasAccess !== false,
           accessDelay: accessStructure?.accessDelay,
+          isHidden: streamingContent.content.is_hidden,
           children: streamingContent.modules?.map((module: any, index: number) => {
             // Find module in access structure
             const moduleAccess = accessStructure?.children?.find((m: any) => m.id === module.id);
@@ -185,6 +207,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
               order: module.order || index,
               hasAccess: moduleAccess?.hasAccess !== false,
               accessDelay: moduleAccess?.accessDelay,
+              isHidden: module.is_hidden,
               children: module.media?.map((media: any, mediaIndex: number) => {
                 // Find media in access structure
                 const mediaAccess = moduleAccess?.children?.find((m: any) => m.id === media.id);
@@ -200,7 +223,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     order: 0,
                     mediaType: 'video',
                     hasAccess: mediaAccess?.hasAccess !== false,
-                    accessDelay: mediaAccess?.accessDelay
+                    accessDelay: mediaAccess?.accessDelay,
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -213,7 +237,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     order: 1,
                     mediaType: 'text',
                     hasAccess: mediaAccess?.hasAccess !== false,
-                    accessDelay: mediaAccess?.accessDelay
+                    accessDelay: mediaAccess?.accessDelay,
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -226,7 +251,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     order: 2,
                     mediaType: 'tool',
                     hasAccess: mediaAccess?.hasAccess !== false,
-                    accessDelay: mediaAccess?.accessDelay
+                    accessDelay: mediaAccess?.accessDelay,
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -239,7 +265,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     order: 3,
                     mediaType: 'pdf',
                     hasAccess: mediaAccess?.hasAccess !== false,
-                    accessDelay: mediaAccess?.accessDelay
+                    accessDelay: mediaAccess?.accessDelay,
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -252,7 +279,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     order: 4,
                     mediaType: 'quiz',
                     hasAccess: mediaAccess?.hasAccess !== false,
-                    accessDelay: mediaAccess?.accessDelay
+                    accessDelay: mediaAccess?.accessDelay,
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -263,6 +291,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                   order: mediaIndex,
                   hasAccess: mediaAccess?.hasAccess !== false,
                   accessDelay: mediaAccess?.accessDelay,
+                  isHidden: media.is_hidden,
                   children: mediaItems
                 };
               })
@@ -304,6 +333,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
               name: item.title,
               type: 'content' as const,
               order: index,
+              isHidden: false,
               children: []
             } as StructureNode;
           }
@@ -314,11 +344,13 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
             name: streamingContent.content.title,
             type: 'content' as const,
             order: index,
+            isHidden: streamingContent.content.is_hidden,
             children: streamingContent.modules?.map((module: any, moduleIndex: number) => ({
               id: module.id,
               name: module.title,
               type: 'module' as const,
               order: module.order || moduleIndex,
+              isHidden: module.is_hidden,
               children: module.media?.map((media: any, mediaIndex: number) => {
                 const mediaItems = [];
                 
@@ -329,7 +361,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     name: media.video_name || 'Video',
                     type: 'media' as const,
                     order: 0,
-                    mediaType: 'video'
+                    mediaType: 'video',
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -340,7 +373,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     name: media.text_title || 'Text Content',
                     type: 'media' as const,
                     order: 1,
-                    mediaType: 'text'
+                    mediaType: 'text',
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -351,7 +385,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     name: media.tool.title || 'AI Tool',
                     type: 'media' as const,
                     order: 2,
-                    mediaType: 'tool'
+                    mediaType: 'tool',
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -362,7 +397,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     name: media.pdf_title || 'PDF',
                     type: 'media' as const,
                     order: 3,
-                    mediaType: 'pdf'
+                    mediaType: 'pdf',
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -373,7 +409,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     name: media.quiz_title || 'Quiz',
                     type: 'media' as const,
                     order: 4,
-                    mediaType: 'quiz'
+                    mediaType: 'quiz',
+                    isHidden: media.is_hidden
                   });
                 }
 
@@ -382,6 +419,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                   name: media.title,
                   type: 'media' as const,
                   order: mediaIndex,
+                  isHidden: media.is_hidden,
                   children: mediaItems
                 };
               })
@@ -459,14 +497,41 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
     }
   };
 
-  const getAccessStatusColor = (node: StructureNode) => {
-    if (node.hasAccess === false) return 'bg-red-500'; // No access
-    
-    if (node.accessDelay) {
-      return 'bg-blue-500'; // Pending access (changed from orange-500)
+  const getAccessStatusColor = (node: StructureNode, isNodeInEditMode: boolean = false) => {
+    // First check for no access
+    if (node.hasAccess === false) return 'bg-red-500';
+
+    // In instant mode (not drip mode) and edit mode, everything is green except hidden items
+    // But we don't modify any state, just the visual display
+    if (isNodeInEditMode && accessMethod === 'instant') {
+      return 'bg-green-500';
     }
+
+    // Helper function to check if a node or any of its descendants have a delay
+    const hasNodeOrDescendantsWithDelay = (checkNode: StructureNode): boolean => {
+      // Only return true if there's an actual delay value greater than 0
+      const delayValue = checkNode.accessDelay?.value;
+      if (delayValue !== undefined && delayValue > 0) {
+        return true;
+      }
+      
+      // Check if any children have delays greater than 0
+      if (checkNode.children) {
+        return checkNode.children.some(child => hasNodeOrDescendantsWithDelay(child));
+      }
+      
+      return false;
+    };
+
+    // Check for actual delays (value > 0)
+    const hasDelay = hasNodeOrDescendantsWithDelay(node);
     
-    return 'bg-green-500'; // Has access
+    // In drip mode, show blue for nodes with delays
+    if (accessMethod === 'drip' && hasDelay) {
+      return 'bg-blue-500';
+    }
+
+    return 'bg-green-500';
   };
 
   const getRemainingDays = (node: StructureNode) => {
@@ -498,7 +563,8 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
           id: node.id,
           type: node.type,
           hasAccess: node.hasAccess !== false,
-          accessDelay: node.accessDelay,
+          // Only include accessDelay if we're in drip mode
+          ...(accessMethod === 'drip' && { accessDelay: node.accessDelay }),
           children: node.children?.map(transformNode) || []
         };
         return transformed;
@@ -549,98 +615,189 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
 
       const updateNode = (node: StructureNode): StructureNode => {
         if (node.id === nodeId) {
+          const newDelay = { value, unit };
+          
+          // For modules, apply delay to the module and all media groups and their children
+          if (node.type === 'module') {
+            return {
+              ...node,
+              accessDelay: newDelay,
+              children: node.children?.map(mediaGroup => ({
+                ...mediaGroup,
+                accessDelay: newDelay,
+                // Also update all media items within the media group
+                children: mediaGroup.children?.map(mediaItem => ({
+                  ...mediaItem,
+                  accessDelay: newDelay
+                }))
+              }))
+            };
+          }
+          
+          // For media groups, apply delay to both group and all child items
+          if (node.type === 'media' && node.children) {
+            return {
+              ...node,
+              accessDelay: newDelay,
+              children: node.children.map(child => ({
+                ...child,
+                accessDelay: newDelay
+              }))
+            };
+          }
+
           return {
             ...node,
-            accessDelay: { value, unit }
+            accessDelay: newDelay
           };
         }
-        if (node.children) {
-          return {
-            ...node,
-            children: node.children.map(child => updateNode(child))
-          };
-        }
-        return node;
+
+        return {
+          ...node,
+          children: node.children 
+            ? node.children.map(child => updateNode(child))
+            : undefined
+        };
       };
 
       return updateNode(prevStructure);
     });
   };
 
-  const renderAccessControls = (node: StructureNode) => {
-    // If this is a media item (not a media group), don't show any controls
-    if (node.type === 'media' && node.mediaType) {
+  const hasMediaGroupWithDrip = (node: StructureNode): boolean => {
+    if (!node.children) return false;
+    
+    return node.children.some(child => {
+      // Check if this is a media group (media type with children)
+      if (child.type === 'media' && child.children && child.children.length > 0) {
+        return child.accessDelay !== undefined;
+      }
+      return false;
+    });
+  };
+
+  const findParentModule = (node: StructureNode, tree: StructureNode | null): StructureNode | null => {
+    if (!tree || !tree.children) return null;
+
+    for (const child of tree.children) {
+      if (child.type === 'module') {
+        if (child.children?.some(mediaGroup => mediaGroup.id === node.id)) {
+          return child;
+        }
+      }
+      const found = findParentModule(node, child);
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const renderAccessControls = (node: StructureNode, level: number = 0) => {
+    // If not in edit mode, this is a media item with mediaType, or this is the content level, don't show controls
+    if (!isEditMode || (node.type === 'media' && node.mediaType) || node.type === 'content') {
       return null;
     }
 
     const findParentWithDrip = (targetNode: StructureNode, tree: StructureNode | null): boolean => {
       if (!tree) return false;
 
-      // Helper function to check if a node is a descendant of another node
-      const isDescendant = (parent: StructureNode, child: StructureNode): boolean => {
-        if (!parent.children) return false;
+      const findParentRecursive = (parent: StructureNode, targetId: string): boolean => {
+        // Don't consider the node itself as its own parent
+        if (parent.id === targetId) return false;
         
-        // Check each child at this level
-        for (const node of parent.children) {
-          // If this is our target node and parent has drip or no access, return true
-          if (node.id === child.id) {
-            return parent.accessDelay !== undefined || parent.hasAccess === false;
-          }
-          
-          // If this node has drip/no access and our target is somewhere in its children, return true
-          if (node.accessDelay !== undefined || node.hasAccess === false) {
-            const hasTargetInChildren = findNodeInChildren(node, child.id);
-            if (hasTargetInChildren) return true;
-          }
-          
-          // Recursively check this node's children
-          if (isDescendant(node, child)) {
-            return true;
+        // Check direct children first
+        if (parent.children) {
+          for (const child of parent.children) {
+            if (child.id === targetId) {
+              // Only return true if the parent has a drip delay
+              return parent.accessDelay !== undefined;
+            }
+            // Recursively check child's children
+            if (findParentRecursive(child, targetId)) {
+              return true;
+            }
           }
         }
-        
         return false;
       };
 
-      // Helper function to find a node by ID in the children tree
-      const findNodeInChildren = (parent: StructureNode, targetId: string): boolean => {
-        if (!parent.children) return false;
-        
-        for (const child of parent.children) {
-          if (child.id === targetId) return true;
-          if (findNodeInChildren(child, targetId)) return true;
-        }
-        
-        return false;
-      };
-
-      // Start checking from the root
-      return isDescendant(tree, targetNode);
+      return findParentRecursive(tree, targetNode.id);
     };
 
     const hasAncestorWithDrip = findParentWithDrip(node, structure);
     const hasDripSettings = node.accessDelay !== undefined;
+    const hasChildMediaGroupWithDrip = node.type === 'module' && hasMediaGroupWithDrip(node);
+
+    // For media groups, check if parent module has drip
+    const parentModule = node.type === 'media' && node.children ? findParentModule(node, structure) : null;
+    const hasParentModuleWithDrip = parentModule?.accessDelay !== undefined;
+
+    // Only show lock icon for media groups when their parent module has drip
+    if (node.type === 'media' && node.children && hasParentModuleWithDrip) {
+      return (
+        <div className="flex items-center gap-2 ml-auto">
+          <Lock className="w-4 h-4 text-[var(--muted-foreground)]/40" />
+        </div>
+      );
+    }
+
+    // If any ancestor has drip, show lock icon (but not for modules themselves)
+    if (hasAncestorWithDrip && node.type !== 'module') {
+      return (
+        <div className="flex items-center gap-2 ml-auto">
+          <Lock className="w-4 h-4 text-[var(--muted-foreground)]/40" />
+        </div>
+      );
+    }
 
     const handleAddDrip = () => {
       updateNodeAccessDelay(node.id, 0, 'days');
     };
 
-    const handleRemoveDrip = () => {
+    const handleRemoveDrip = (targetNode: StructureNode) => {
       setStructure(prevStructure => {
         if (!prevStructure) return null;
 
         const updateNode = (currNode: StructureNode): StructureNode => {
-          if (currNode.id === node.id) {
+          if (currNode.id === targetNode.id) {
             const { accessDelay, ...nodeWithoutDelay } = currNode;
+            
+            // For modules, remove delay from both module and all media groups and their children
+            if (currNode.type === 'module') {
+              return {
+                ...nodeWithoutDelay,
+                children: currNode.children?.map(mediaGroup => {
+                  const { accessDelay, ...mediaGroupWithoutDelay } = mediaGroup;
+                  return {
+                    ...mediaGroupWithoutDelay,
+                    children: mediaGroup.children?.map(mediaItem => {
+                      const { accessDelay, ...mediaItemWithoutDelay } = mediaItem;
+                      return mediaItemWithoutDelay;
+                    })
+                  };
+                })
+              };
+            }
+            
+            // For media groups, remove delay from both group and all child items
+            if (currNode.type === 'media' && currNode.children) {
+              return {
+                ...nodeWithoutDelay,
+                children: currNode.children.map(child => {
+                  const { accessDelay, ...childWithoutDelay } = child;
+                  return childWithoutDelay;
+                })
+              };
+            }
+            
             return nodeWithoutDelay;
           }
-          if (currNode.children) {
-            return {
-              ...currNode,
-              children: currNode.children.map(child => updateNode(child))
-            };
-          }
-          return currNode;
+          
+          return {
+            ...currNode,
+            children: currNode.children 
+              ? currNode.children.map(child => updateNode(child))
+              : undefined
+          };
         };
 
         return updateNode(prevStructure);
@@ -692,15 +849,6 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
       </button>
     );
 
-    // If any ancestor has drip or no access, show lock icon
-    if (hasAncestorWithDrip) {
-      return (
-        <div className="flex items-center gap-2 ml-auto">
-          <Lock className="w-4 h-4 text-[var(--muted-foreground)]/40" />
-        </div>
-      );
-    }
-
     // If in drip mode and has drip settings, show only drip controls
     if (accessMethod === 'drip' && hasDripSettings) {
       return (
@@ -724,7 +872,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleRemoveDrip();
+              handleRemoveDrip(node);
             }}
             className="p-1 hover:bg-[var(--muted)] rounded-full transition-colors"
           >
@@ -788,82 +936,74 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
     });
   };
 
+  const getChildrenAccessStatus = (): { 
+    hasPendingChildren: boolean; 
+    nextAvailableChild: StructureNode | null; 
+    earliestDate: number; 
+  } => {
+    if (!structure) return { hasPendingChildren: false, nextAvailableChild: null, earliestDate: 0 };
+    
+    let earliestDate = Infinity;
+    let nextAvailableChild: StructureNode | null = null;
+    let hasPendingChildren = false;
+
+    const checkNode = (childNode: StructureNode) => {
+      if (childNode.hasAccess === false) {
+        hasPendingChildren = true;
+        return;
+      }
+
+      if (childNode.accessDelay) {
+        const days = calculateDaysFromDelay(childNode.accessDelay);
+        if (days > 0 && days < earliestDate) {
+          earliestDate = days;
+          nextAvailableChild = childNode;
+        }
+        hasPendingChildren = true;
+      }
+
+      if (childNode.children) {
+        childNode.children.forEach(checkNode);
+      }
+    };
+
+    checkNode(structure);
+    return { hasPendingChildren, nextAvailableChild, earliestDate: earliestDate === Infinity ? 0 : earliestDate };
+  };
+
+  const calculateDaysFromDelay = (delay: { value: number, unit: 'days' | 'weeks' | 'months' }) => {
+    const now = new Date();
+    const startDate = new Date(now);
+    
+    switch (delay.unit) {
+      case 'days':
+        startDate.setDate(startDate.getDate() + delay.value);
+        break;
+      case 'weeks':
+        startDate.setDate(startDate.getDate() + (delay.value * 7));
+        break;
+      case 'months':
+        startDate.setMonth(startDate.getMonth() + delay.value);
+        break;
+    }
+    
+    const diffTime = startDate.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
   const renderNode = (node: StructureNode, level: number = 0, hasAncestorWithNoAccess: boolean = false) => {
+    // Skip hidden nodes and nodes with no access in view mode
+    if (!isEditMode && (node.isHidden || node.hasAccess === false || hasAncestorWithNoAccess)) {
+      return null;
+    }
+
     const isLoading = loadingNodes?.has(node.id);
     const isSelected = selectedNode === node.id;
     const hasNoAccess = hasAncestorWithNoAccess || node.hasAccess === false;
     const isExpanded = expandedNodes.has(node.id);
     const hasChildren = node.children && node.children.length > 0;
     const isMediaGroup = node.type === 'media' && hasChildren;
-
-    // Check if any children have pending access
-    const getChildrenAccessStatus = (): { 
-      hasPendingChildren: boolean; 
-      nextAvailableChild: StructureNode | null; 
-      earliestDate: number; 
-    } => {
-      if (!node.children) return { hasPendingChildren: false, nextAvailableChild: null, earliestDate: 0 };
-      
-      let earliestDate = Infinity;
-      let nextAvailableChild: StructureNode | null = null;
-      let hasPendingChildren = false;
-
-      const checkNode = (childNode: StructureNode) => {
-        if (childNode.hasAccess === false) {
-          hasPendingChildren = true;
-          return;
-        }
-
-        if (childNode.accessDelay) {
-          const days = calculateDaysFromDelay(childNode.accessDelay);
-          if (days > 0 && days < earliestDate) {
-            earliestDate = days;
-            nextAvailableChild = childNode;
-          }
-          hasPendingChildren = true;
-        }
-
-        if (childNode.children) {
-          childNode.children.forEach(checkNode);
-        }
-      };
-
-      node.children.forEach(checkNode);
-      return { hasPendingChildren, nextAvailableChild, earliestDate: earliestDate === Infinity ? 0 : earliestDate };
-    };
-
-    const calculateDaysFromDelay = (delay: { value: number, unit: 'days' | 'weeks' | 'months' }) => {
-      const now = new Date();
-      const startDate = new Date(now);
-      
-      switch (delay.unit) {
-        case 'days':
-          startDate.setDate(startDate.getDate() + delay.value);
-          break;
-        case 'weeks':
-          startDate.setDate(startDate.getDate() + (delay.value * 7));
-          break;
-        case 'months':
-          startDate.setMonth(startDate.getMonth() + delay.value);
-          break;
-      }
-      
-      const diffTime = startDate.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays > 0 ? diffDays : 0;
-    };
-
-    const { hasPendingChildren, nextAvailableChild, earliestDate } = getChildrenAccessStatus();
-
-    const getAccessStatusColor = () => {
-      if (hasNoAccess) return 'bg-red-500'; // No access
-      
-      if (node.accessDelay || hasPendingChildren) {
-        return 'bg-blue-500'; // Pending access
-      }
-      
-      return 'bg-green-500'; // Has access
-    };
     
     return (
       <div key={node.id} className={cn(
@@ -903,7 +1043,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
           {/* Access status indicator */}
           <div className={cn(
             "absolute left-0 top-0 bottom-0 w-1 rounded-l-lg",
-            getAccessStatusColor()
+            getAccessStatusColor(node, isEditMode)
           )} />
           
           <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -931,7 +1071,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                     "text-[var(--foreground)]",
                     hasNoAccess && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
                   )}>{node.name}</span>
-                  {node.accessDelay && (
+                  {accessMethod === 'drip' && node.accessDelay && node.accessDelay.value > 0 && (
                     <span className="text-sm text-blue-500">
                       Available in {calculateDaysFromDelay(node.accessDelay)} days
                     </span>
@@ -939,7 +1079,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
                 </div>
               </>
             )}
-            {renderAccessControls(node)}
+            {renderAccessControls(node, level)}
           </div>
         </div>
 
@@ -949,6 +1089,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
             level === 0 ? "mt-4" : "mt-3"
           )}>
             {node.children?.sort((a: StructureNode, b: StructureNode) => a.order - b.order)
+              .filter(child => isEditMode || (!child.isHidden && child.hasAccess !== false))
               .map((child, index) => (
                 <div key={child.id} className={cn(
                   "relative",
@@ -1000,50 +1141,73 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
 
   return (
     <div className="p-8 rounded-xl border border-[var(--border-color)] bg-[var(--background)]">
-      {/* Header with title and access controls */}
+      {/* Header with title and controls */}
       <div className="flex items-center justify-between mb-8">
         <h3 className="text-3xl font-medium text-[var(--foreground)]">Access Overview</h3>
         <div className="flex items-center gap-4">
-          {/* Access Method Selection */}
-          <div className="flex gap-2 bg-[var(--muted)]/50 p-1.5 rounded-lg">
+          {/* Edit Mode Toggle (only for admins and super admins) */}
+          {(isAdmin || isSuperAdmin) && (
             <button
-              onClick={() => setAccessMethod('instant')}
-              title="Instant Access"
+              onClick={() => setIsEditMode(!isEditMode)}
               className={cn(
-                "p-2.5 rounded-md transition-all",
-                accessMethod === 'instant'
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
+                "p-2.5 rounded-lg transition-colors",
+                isEditMode
+                  ? "bg-[var(--muted)] text-[var(--foreground)]"
+                  : "bg-[var(--accent)] text-white"
               )}
             >
-              <Zap className="w-6 h-6" />
-            </button>
-            <button
-              onClick={() => setAccessMethod('drip')}
-              title="Drip Access"
-              className={cn(
-                "p-2.5 rounded-md transition-all",
-                accessMethod === 'drip'
-                  ? "bg-[var(--accent)] text-white shadow-sm"
-                  : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
+              {isEditMode ? (
+                <ChevronRight className="w-5 h-5" />
+              ) : (
+                "Edit Mode"
               )}
-            >
-              <Clock className="w-6 h-6" />
             </button>
-          </div>
+          )}
 
-          {/* Save Button */}
-          <button
-            onClick={handleGrantAccess}
-            className={cn(
-              "px-8 py-2.5 rounded-lg text-lg font-medium",
-              "bg-[var(--accent)] text-white",
-              "hover:opacity-90 transition-opacity",
-              "shadow-sm"
-            )}
-          >
-            Save
-          </button>
+          {/* Access Method Selection (only visible in edit mode) */}
+          {isEditMode && (
+            <div className="flex gap-2 bg-[var(--muted)]/50 p-1.5 rounded-lg">
+              <button
+                onClick={() => setAccessMethod('instant')}
+                title="Instant Access"
+                className={cn(
+                  "p-2.5 rounded-md transition-all",
+                  accessMethod === 'instant'
+                    ? "bg-[var(--accent)] text-white shadow-sm"
+                    : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
+                )}
+              >
+                <Zap className="w-6 h-6" />
+              </button>
+              <button
+                onClick={() => setAccessMethod('drip')}
+                title="Drip Access"
+                className={cn(
+                  "p-2.5 rounded-md transition-all",
+                  accessMethod === 'drip'
+                    ? "bg-[var(--accent)] text-white shadow-sm"
+                    : "hover:bg-[var(--muted)] text-[var(--muted-foreground)]"
+                )}
+              >
+                <Clock className="w-6 h-6" />
+              </button>
+            </div>
+          )}
+
+          {/* Save Button (only visible in edit mode) */}
+          {isEditMode && (
+            <button
+              onClick={handleGrantAccess}
+              className={cn(
+                "px-8 py-2.5 rounded-lg text-lg font-medium",
+                "bg-[var(--accent)] text-white",
+                "hover:opacity-90 transition-opacity",
+                "shadow-sm"
+              )}
+            >
+              Save
+            </button>
+          )}
         </div>
       </div>
 

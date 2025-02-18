@@ -263,6 +263,8 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
             selectedType={selectedAccessType}
             selectedId={selectedAccessId}
             targetUserId={userId}
+            isAdmin={isAdmin}
+            isSuperAdmin={isAdmin}
             onRefreshContentHistory={() => {
               // Refresh content groups
               if (userId) {
@@ -291,6 +293,8 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
                 selectedType="content"
                 selectedId={selectedGroup.content_id}
                 targetUserId={userId}
+                isAdmin={isAdmin}
+                isSuperAdmin={isAdmin}
                 onRefreshContentHistory={() => {
                   // Refresh content groups
                   if (userId) {
