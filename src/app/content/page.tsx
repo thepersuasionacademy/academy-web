@@ -94,6 +94,8 @@ function convertContentToMediaItem(content: Content): MediaItem {
     description: content.description || '',
     image: content.thumbnail_url || '/images/default-content.jpg',
     tracks: 1,
+    has_access: content.has_access || false,
+    debug_info: content.debug_info
   };
 }
 

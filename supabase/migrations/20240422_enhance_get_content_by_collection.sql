@@ -17,33 +17,23 @@ RETURNS TABLE (
     created_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ,
     has_access BOOLEAN,
-    has_any_media_access BOOLEAN
+    debug_info JSONB
 )
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public, content, access
 STABLE
 AS $$
-    WITH content_access AS (
+    WITH user_access_debug AS (
+        -- Get ALL user access records for this user, regardless of content
         SELECT 
             ua.content_id,
-            -- Basic access check for content level
-            CASE 
-                WHEN ua.access_starts_at > NOW() THEN false
-                WHEN (ua.access_settings->0->>'hasAccess')::boolean = false THEN false
-                ELSE true
-            END as has_access,
-            -- Check if ANY media items are immediately accessible
-            EXISTS (
-                SELECT 1
-                FROM jsonb_array_elements(ua.access_settings->0->'children') as module,
-                     jsonb_array_elements(module->'children') as media
-                WHERE (module->>'hasAccess')::boolean = true
-                  AND (media->>'hasAccess')::boolean = true
-                  -- Only check immediate access (no drip delay)
-                  AND (module->'accessDelay') IS NULL
-                  AND (media->'accessDelay') IS NULL
-            ) as has_any_media_access
+            jsonb_build_object(
+                'found_record', true,
+                'content_id', ua.content_id,
+                'user_id', ua.user_id,
+                'access_settings', ua.access_settings
+            ) as debug_info
         FROM access.user_access ua
         WHERE ua.user_id = p_user_id
     )
@@ -56,10 +46,18 @@ AS $$
         c.thumbnail_url,
         c.created_at,
         c.updated_at,
-        COALESCE(ca.has_access, false) as has_access,
-        COALESCE(ca.has_any_media_access, false) as has_any_media_access
+        -- If we found a user_access record, they have access
+        CASE WHEN ua.content_id IS NOT NULL THEN true ELSE false END as has_access,
+        COALESCE(
+            ua.debug_info,
+            jsonb_build_object(
+                'found_record', false,
+                'checked_user_id', p_user_id,
+                'content_id', c.id
+            )
+        ) as debug_info
     FROM content.content c
-    LEFT JOIN content_access ca ON ca.content_id = c.id
+    LEFT JOIN user_access_debug ua ON ua.content_id = c.id
     WHERE c.collection_id = p_collection_id 
     ORDER BY c.created_at DESC;
 $$;
@@ -68,4 +66,4 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_content_by_collection(UUID, UUID) TO authenticated;
 
 -- Add comment to function
-COMMENT ON FUNCTION public.get_content_by_collection(UUID, UUID) IS 'Get content by collection with basic access information. Returns content items with their immediate access status, ignoring drip settings.'; 
+COMMENT ON FUNCTION public.get_content_by_collection(UUID, UUID) IS 'Debug version that shows exactly what user_access records exist.'; 

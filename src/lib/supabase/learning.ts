@@ -18,6 +18,8 @@ export interface Content {
   thumbnail_url?: string;
   created_at: string;
   updated_at: string;
+  has_access?: boolean;
+  debug_info?: any;
 }
 
 export type LessonType = 'text' | 'video';

@@ -11,7 +11,7 @@ interface Category {
     description: string;
     image: string;
     has_access: boolean;
-    has_any_media_access: boolean;
+    debug_info?: any;
   }[];
 }
 
@@ -19,6 +19,27 @@ interface ContentGridProps {
   categories: Category[];
   onItemClick: (itemId: string) => void;
 }
+
+// Extract card rendering to avoid duplication
+const ContentCard = ({ item, onClick }: { 
+  item: Category['items'][0], 
+  onClick: (id: string, e: React.MouseEvent) => void 
+}) => {
+  // Debug log in development
+  if (process.env.NODE_ENV === 'development' && item.debug_info) {
+    console.log(`Access debug for ${item.title}:`, item.debug_info);
+  }
+  
+  return (
+    <BentoCard
+      title={item.title}
+      description={item.description}
+      image={item.image}
+      onClick={(e) => onClick(item.id, e)}
+      hasAccess={Boolean(item.has_access)}
+    />
+  );
+};
 
 export const ContentGrid = ({ categories, onItemClick }: ContentGridProps) => {
   const handleCardClick = (itemId: string, event: React.MouseEvent) => {
@@ -30,23 +51,19 @@ export const ContentGrid = ({ categories, onItemClick }: ContentGridProps) => {
     <div className="relative py-8 space-y-12">
       {categories.map((category) => (
         <div key={category.name} className="relative">
+          {/* Desktop View */}
           <div className="hidden md:block">
             <div className="px-10">
               <h2 className="text-2xl font-semibold mb-4">{category.name}</h2>
-              <div className="relative overflow-visible">
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+              <div className="relative">
+                <div className="flex gap-4 overflow-x-auto pt-4 pb-8 -my-4 scrollbar-hide">
                   {category.items.map((item) => (
                     <div 
                       key={item.id} 
+                      className="relative"
                       style={{ width: '23%', minWidth: '400px', height: '250px', flexShrink: 0 }}
                     >
-                      <BentoCard
-                        title={item.title}
-                        description={item.description}
-                        image={item.image}
-                        onClick={(e) => handleCardClick(item.id, e)}
-                        hasAccess={item.has_access === true && item.has_any_media_access === true}
-                      />
+                      <ContentCard item={item} onClick={handleCardClick} />
                     </div>
                   ))}
                 </div>
@@ -54,18 +71,13 @@ export const ContentGrid = ({ categories, onItemClick }: ContentGridProps) => {
             </div>
           </div>
 
+          {/* Mobile View */}
           <div className="block md:hidden">
             <MobileCarousel
               title={category.name}
               items={category.items.map((item) => (
-                <div key={item.id} onClick={() => onItemClick(item.id)}>
-                  <BentoCard
-                    title={item.title}
-                    description={item.description}
-                    image={item.image}
-                    onClick={(e) => handleCardClick(item.id, e)}
-                    hasAccess={item.has_access === true && item.has_any_media_access === true}
-                  />
+                <div key={item.id} className="relative pt-4">
+                  <ContentCard item={item} onClick={handleCardClick} />
                 </div>
               ))}
             />

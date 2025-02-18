@@ -24,24 +24,30 @@ interface UserProfile {
 const INTERCOM_APP_ID = process.env.NEXT_PUBLIC_INTERCOM_APP_ID || 'lkn5t8ql';
 
 export const initializeIntercom = async (userData?: IntercomUser) => {
-  // Only try to get hash if we have a user_id
+  let intercomData = { app_id: INTERCOM_APP_ID };
+
   if (userData?.user_id) {
     try {
       const response = await fetch('/api/intercom/hash');
       if (response.ok) {
         const { hash } = await response.json();
-        userData.user_hash = hash;
+        // Only initialize with user data if we have the hash
+        intercomData = {
+          ...intercomData,
+          ...userData,
+          user_hash: hash
+        };
+      } else {
+        // If no hash, initialize as anonymous
+        console.warn('Initializing Intercom without user data due to missing hash');
       }
-      // If hash fails, continue without it - Intercom will still work, just without identity verification
     } catch (error) {
-      // Continue without hash
+      // Initialize as anonymous if hash fails
+      console.warn('Initializing Intercom without user data due to hash error');
     }
   }
 
-  IntercomSDK({
-    app_id: INTERCOM_APP_ID,
-    ...userData
-  });
+  IntercomSDK(intercomData);
 };
 
 // Type assertion to handle method calls
@@ -53,16 +59,16 @@ export const updateIntercomUser = async (userData: IntercomUser) => {
   if (!userData.user_id || !window.Intercom) return;
 
   try {
-    // Try to get hash but don't fail if we can't
-    try {
-      const hashResponse = await fetch('/api/intercom/hash');
-      if (hashResponse.ok) {
-        const { hash } = await hashResponse.json();
-        userData.user_hash = hash;
-      }
-    } catch (error) {
-      // Continue without hash
+    // Try to get hash first
+    const hashResponse = await fetch('/api/intercom/hash');
+    if (!hashResponse.ok) {
+      // If no hash available, shut down and reinitialize as anonymous
+      window.Intercom('shutdown');
+      IntercomSDK({ app_id: INTERCOM_APP_ID });
+      return;
     }
+
+    const { hash } = await hashResponse.json();
     
     // Get name from Supabase with fresh data
     const supabase = createClientComponentClient();
@@ -76,22 +82,17 @@ export const updateIntercomUser = async (userData: IntercomUser) => {
     // Remove any existing name from userData
     const { name: _, ...cleanUserData } = userData;
 
-    // Update without full shutdown/reboot cycle
+    // Update with all required data
     window.Intercom('update', {
       app_id: INTERCOM_APP_ID,
       ...cleanUserData,
+      user_hash: hash,
       name: data ? `${data.first_name} ${data.last_name}`.trim() : undefined
     });
   } catch (error) {
-    // If update fails, try a simple update with just the basic user data
-    try {
-      window.Intercom('update', {
-        app_id: INTERCOM_APP_ID,
-        ...userData
-      });
-    } catch (e) {
-      // Silently fail - Intercom will still work with existing data
-    }
+    // If anything fails, reinitialize as anonymous
+    window.Intercom('shutdown');
+    IntercomSDK({ app_id: INTERCOM_APP_ID });
   }
 };
 

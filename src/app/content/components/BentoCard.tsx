@@ -19,7 +19,7 @@ export function BentoCard({
   className,
   image,
   onClick,
-  hasAccess = true
+  hasAccess = false
 }: BentoCardProps) {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -28,12 +28,26 @@ export function BentoCard({
     }
   };
 
+  // Debug log only in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`BentoCard ${title}: ${hasAccess ? 'unlocked' : 'locked'}`);
+  }
+
+  const isLocked = !hasAccess;
+
   return (
     <div
       onClick={handleClick}
-      className={cn("block group w-full cursor-pointer", className)}
+      className={cn(
+        "block group w-full cursor-pointer relative z-10",
+        "hover:z-20",
+        className
+      )}
     >
-      <div className="relative w-full h-[250px]">
+      <div className={cn(
+        "relative w-full h-[250px] overflow-visible",
+        !isLocked && "transition-transform duration-300 group-hover:scale-105 origin-center"
+      )}>
         {/* Base card */}
         <div className={cn(
           "absolute inset-0 rounded-2xl overflow-hidden",
@@ -50,26 +64,41 @@ export function BentoCard({
                 alt={title}
                 fill
                 className={cn(
-                  "object-cover",
-                  !hasAccess && "filter grayscale blur-[4px]"
+                  "object-cover group-hover:scale-105 transition-transform duration-500",
+                  isLocked && "filter grayscale blur-[4px]"
                 )}
               />
+              
+              {/* Active state overlay */}
+              <div className={cn(
+                "absolute inset-0 bg-gradient-to-b from-black/0 to-black/60",
+                "opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+              )} />
             </div>
           </div>
           
           {/* Title bar */}
           <div className="absolute inset-x-0 bottom-0">
-            <div className="px-6 py-4 backdrop-blur-md border-t border-[var(--border-color)] bg-[#fafafa]/80 dark:bg-zinc-900/40">
-              <h3 className="text-2xl font-bold tracking-wide text-[var(--foreground)]">{title}</h3>
+            <div className={cn(
+              "px-6 py-4 backdrop-blur-md border-t border-[var(--border-color)]",
+              "bg-white/90 dark:bg-zinc-900/90 group-hover:bg-[var(--accent)]/90 transition-colors duration-300"
+            )}>
+              <h3 className={cn(
+                "text-2xl font-bold tracking-wide text-[var(--foreground)]",
+                "group-hover:text-white transition-colors duration-300"
+              )}>{title}</h3>
               {description && (
-                <p className="mt-1 text-sm text-[var(--text-secondary)]">{description}</p>
+                <p className={cn(
+                  "mt-1 text-sm text-[var(--text-secondary)]",
+                  "group-hover:text-white/80 transition-colors duration-300"
+                )}>{description}</p>
               )}
             </div>
           </div>
         </div>
 
-        {/* Lock icon */}
-        {!hasAccess && (
+        {/* Lock icon - only show when locked */}
+        {isLocked && (
           <div className="absolute inset-x-0 top-0 h-[calc(100%-52px)] flex items-center justify-center z-20">
             <svg 
               width="80" 
