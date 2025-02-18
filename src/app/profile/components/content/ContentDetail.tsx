@@ -7,7 +7,7 @@ import { markdownComponents } from '@/app/ai/components/embed/output/MarkdownSty
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { AddAccessModal } from '../content/AddAccessModal';
-import { AccessStructureView } from '../content/AccessStructureView';
+import { AccessStructureView } from './access-structure/AccessStructureView';
 
 interface ContentDetailProps {
   item: AIItem;

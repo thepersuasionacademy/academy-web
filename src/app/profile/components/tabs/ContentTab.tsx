@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Clock, Film, Book, FileText, Wrench, HelpCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { AddAccessModal } from '../content/AddAccessModal';
-import { AccessStructureView } from '../content/AccessStructureView';
+import { AccessStructureView } from '../content/access-structure/AccessStructureView';
+import { NewAccessStructureView } from '../content/access-structure/NewAccessStructureView';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface ContentGroup {
@@ -259,7 +260,7 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
       {/* Right Column - Details */}
       <div className="col-span-7">
         {selectedAccessType && selectedAccessId ? (
-          <AccessStructureView
+          <NewAccessStructureView
             selectedType={selectedAccessType}
             selectedId={selectedAccessId}
             targetUserId={userId}
@@ -280,38 +281,23 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
             }}
           />
         ) : selectedGroup ? (
-          <div className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-8">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full min-h-[400px]">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-[var(--accent)] border-t-transparent" />
-                  <span>Loading content structure...</span>
-                </div>
-              </div>
-            ) : contentStructure ? (
-              <AccessStructureView
-                selectedType="content"
-                selectedId={selectedGroup.content_id}
-                targetUserId={userId}
-                isAdmin={isAdmin}
-                isSuperAdmin={isAdmin}
-                onRefreshContentHistory={() => {
-                  // Refresh content groups
-                  if (userId) {
-                    supabase.rpc('get_user_content_groups', {
-                      p_user_id: userId
-                    }).then(({ data }) => {
-                      if (data) setContentGroups(data);
-                    });
-                  }
-                }}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-[var(--text-secondary)] text-lg">
-                <p>No content structure available</p>
-              </div>
-            )}
-          </div>
+          <AccessStructureView
+            selectedType="content"
+            selectedId={selectedGroup.content_id}
+            targetUserId={userId}
+            isAdmin={isAdmin}
+            isSuperAdmin={isAdmin}
+            onRefreshContentHistory={() => {
+              // Refresh content groups
+              if (userId) {
+                supabase.rpc('get_user_content_groups', {
+                  p_user_id: userId
+                }).then(({ data }) => {
+                  if (data) setContentGroups(data);
+                });
+              }
+            }}
+          />
         ) : (
           <div className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-8">
             <div className="flex flex-col items-center justify-center h-full min-h-[400px] text-[var(--text-secondary)] text-lg">
