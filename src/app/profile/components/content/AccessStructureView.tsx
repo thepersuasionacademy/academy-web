@@ -408,8 +408,18 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
     try {
       if (!structure) return;
 
+      // Get the authenticated user's ID
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) throw userError;
+      if (!user) throw new Error('No authenticated user found');
+
       // Get all nodes with their access delays
       const getNodesWithDelays = (node: StructureNode): { id: string; type: string; delay?: { value: number; unit: string } }[] => {
+        // Skip media items with suffixes (like -video, -text, etc.)
+        if (node.type === 'media' && node.id.includes('-')) {
+          return [];
+        }
+
         const nodes: { id: string; type: string; delay?: { value: number; unit: string } }[] = [{
           id: node.id,
           type: node.type,
@@ -427,19 +437,52 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
 
       const nodesWithDelays = getNodesWithDelays(structure);
       
-      // Grant access to each node
-      for (const node of nodesWithDelays) {
-        const accessDelay = node.delay ? {
-          value: node.delay.value,
-          unit: node.delay.unit
-        } : undefined;
+      // Group nodes by their access delay
+      const nodesByDelay: { [key: string]: string[] } = {};
+      nodesWithDelays.forEach(node => {
+        const delayKey = node.delay 
+          ? `${node.delay.value}-${node.delay.unit}`
+          : 'instant';
+        
+        if (!nodesByDelay[delayKey]) {
+          nodesByDelay[delayKey] = [];
+        }
+        nodesByDelay[delayKey].push(node.id);
+      });
 
-        const { error } = await supabase.rpc('grant_content_access', {
-          p_content_id: node.id,
-          p_content_type: node.type,
-          p_access_delay: accessDelay
-            ? JSON.stringify(accessDelay)
-            : null
+      // Grant access for each group of nodes
+      for (const [delayKey, contentIds] of Object.entries(nodesByDelay)) {
+        let accessStartsAt = new Date().toISOString(); // Default to now for instant access
+        
+        // Calculate access_starts_at if there's a delay
+        if (delayKey !== 'instant') {
+          const [value, unit] = delayKey.split('-');
+          const now = new Date();
+          
+          switch (unit) {
+            case 'days':
+              now.setDate(now.getDate() + parseInt(value));
+              break;
+            case 'weeks':
+              now.setDate(now.getDate() + (parseInt(value) * 7));
+              break;
+            case 'months':
+              now.setMonth(now.getMonth() + parseInt(value));
+              break;
+          }
+          
+          accessStartsAt = now.toISOString();
+        }
+
+        const { error } = await supabase.rpc('grant_bulk_access', {
+          p_content_ids: contentIds,
+          p_access_starts_at: accessStartsAt, // This will never be null now
+          p_metadata: JSON.stringify({
+            granted_through: selectedType,
+            granted_from: selectedId
+          }),
+          p_user_id: user.id,
+          p_granted_by: user.id
         });
 
         if (error) throw error;
