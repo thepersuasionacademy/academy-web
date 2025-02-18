@@ -24,14 +24,17 @@ interface UserProfile {
 const INTERCOM_APP_ID = process.env.NEXT_PUBLIC_INTERCOM_APP_ID || 'lkn5t8ql';
 
 export const initializeIntercom = async (userData?: IntercomUser) => {
+  // Only try to get hash if we have a user_id
   if (userData?.user_id) {
     try {
       const response = await fetch('/api/intercom/hash');
-      if (!response.ok) throw new Error('Failed to get Intercom hash');
-      const { hash } = await response.json();
-      userData.user_hash = hash;
+      if (response.ok) {
+        const { hash } = await response.json();
+        userData.user_hash = hash;
+      }
+      // If hash fails, continue without it - Intercom will still work, just without identity verification
     } catch (error) {
-      console.error('Error getting Intercom hash:', error);
+      // Continue without hash
     }
   }
 
@@ -50,10 +53,16 @@ export const updateIntercomUser = async (userData: IntercomUser) => {
   if (!userData.user_id || !window.Intercom) return;
 
   try {
-    // Get user hash first
-    const hashResponse = await fetch('/api/intercom/hash');
-    if (!hashResponse.ok) throw new Error('Failed to get Intercom hash');
-    const { hash } = await hashResponse.json();
+    // Try to get hash but don't fail if we can't
+    try {
+      const hashResponse = await fetch('/api/intercom/hash');
+      if (hashResponse.ok) {
+        const { hash } = await hashResponse.json();
+        userData.user_hash = hash;
+      }
+    } catch (error) {
+      // Continue without hash
+    }
     
     // Get name from Supabase with fresh data
     const supabase = createClientComponentClient();
@@ -67,21 +76,22 @@ export const updateIntercomUser = async (userData: IntercomUser) => {
     // Remove any existing name from userData
     const { name: _, ...cleanUserData } = userData;
 
-    // Completely shutdown and reinitialize
-    window.Intercom('shutdown');
-    
-    // Small delay to ensure shutdown completes
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Reinitialize with new data
-    window.Intercom('boot', {
+    // Update without full shutdown/reboot cycle
+    window.Intercom('update', {
       app_id: INTERCOM_APP_ID,
       ...cleanUserData,
-      user_hash: hash,
       name: data ? `${data.first_name} ${data.last_name}`.trim() : undefined
     });
   } catch (error) {
-    console.error('Error updating Intercom:', error);
+    // If update fails, try a simple update with just the basic user data
+    try {
+      window.Intercom('update', {
+        app_id: INTERCOM_APP_ID,
+        ...userData
+      });
+    } catch (e) {
+      // Silently fail - Intercom will still work with existing data
+    }
   }
 };
 
