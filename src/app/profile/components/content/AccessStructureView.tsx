@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, Eye, EyeOff, X, Film, Book, Wrench, FileText, HelpCircle } from 'lucide-react';
+import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, Eye, EyeOff, X, Youtube, FileText, Bot, HelpCircle, Type } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { Toast } from "../common/Toast";
 
@@ -132,6 +132,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
   const [toastMessage, setToastMessage] = useState<string>('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
 
   // Add click outside handler
   useEffect(() => {
@@ -148,91 +149,125 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
   const fetchNodeDetails = async (nodeId: string, nodeType: StructureNode['type']) => {
     try {
       if (nodeType === 'content') {
-        const { data: streamingContent, error } = await supabase
+        // First get the access structure
+        const { data: accessStructure, error: accessError } = await supabase
+          .rpc('get_content_access_structure', {
+            p_user_id: targetUserId || (await supabase.auth.getUser()).data.user?.id,
+            p_content_id: nodeId
+          });
+
+        if (accessError) throw accessError;
+
+        // Then get the content details
+        const { data: streamingContent, error: streamingError } = await supabase
           .rpc('get_streaming_content', {
             p_content_id: nodeId
           });
 
-        if (error) throw error;
+        if (streamingError) throw streamingError;
 
-        // Transform streaming content data into StructureNode format
+        // Merge the access structure with content details
         const contentNode: StructureNode = {
           id: streamingContent.content.id,
           name: streamingContent.content.title,
           type: 'content',
           order: 0,
-          children: streamingContent.modules?.map((module: any, index: number) => ({
-            id: module.id,
-            name: module.title,
-            type: 'module' as const,
-            order: module.order || index,
-            children: module.media?.map((media: any, mediaIndex: number) => {
-              const mediaItems = [];
-              
-              // Add video if exists
-              if (media.video_id) {
-                mediaItems.push({
-                  id: `${media.id}-video`,
-                  name: media.video_name || 'Video',
-                  type: 'media' as const,
-                  order: 0,
-                  mediaType: 'video'
-                });
-              }
+          hasAccess: accessStructure?.hasAccess !== false,
+          accessDelay: accessStructure?.accessDelay,
+          children: streamingContent.modules?.map((module: any, index: number) => {
+            // Find module in access structure
+            const moduleAccess = accessStructure?.children?.find((m: any) => m.id === module.id);
+            
+            return {
+              id: module.id,
+              name: module.title,
+              type: 'module' as const,
+              order: module.order || index,
+              hasAccess: moduleAccess?.hasAccess !== false,
+              accessDelay: moduleAccess?.accessDelay,
+              children: module.media?.map((media: any, mediaIndex: number) => {
+                // Find media in access structure
+                const mediaAccess = moduleAccess?.children?.find((m: any) => m.id === media.id);
+                
+                const mediaItems = [];
+                
+                // Add video if exists
+                if (media.video_id) {
+                  mediaItems.push({
+                    id: `${media.id}-video`,
+                    name: media.video_name || 'Video',
+                    type: 'media' as const,
+                    order: 0,
+                    mediaType: 'video',
+                    hasAccess: mediaAccess?.hasAccess !== false,
+                    accessDelay: mediaAccess?.accessDelay
+                  });
+                }
 
-              // Add text content if exists
-              if (media.content_text) {
-                mediaItems.push({
-                  id: `${media.id}-text`,
-                  name: media.text_title || 'Text Content',
-                  type: 'media' as const,
-                  order: 1,
-                  mediaType: 'text'
-                });
-              }
+                // Add text content if exists
+                if (media.content_text) {
+                  mediaItems.push({
+                    id: `${media.id}-text`,
+                    name: media.text_title || 'Text Content',
+                    type: 'media' as const,
+                    order: 1,
+                    mediaType: 'text',
+                    hasAccess: mediaAccess?.hasAccess !== false,
+                    accessDelay: mediaAccess?.accessDelay
+                  });
+                }
 
-              // Add tool if exists
-              if (media.tool) {
-                mediaItems.push({
-                  id: `${media.id}-tool`,
-                  name: media.tool.title || 'AI Tool',
-                  type: 'media' as const,
-                  order: 2,
-                  mediaType: 'tool'
-                });
-              }
+                // Add tool if exists
+                if (media.tool) {
+                  mediaItems.push({
+                    id: `${media.id}-tool`,
+                    name: media.tool.title || 'AI Tool',
+                    type: 'media' as const,
+                    order: 2,
+                    mediaType: 'tool',
+                    hasAccess: mediaAccess?.hasAccess !== false,
+                    accessDelay: mediaAccess?.accessDelay
+                  });
+                }
 
-              // Add PDF if exists
-              if (media.pdf_url) {
-                mediaItems.push({
-                  id: `${media.id}-pdf`,
-                  name: media.pdf_title || 'PDF',
-                  type: 'media' as const,
-                  order: 3,
-                  mediaType: 'pdf'
-                });
-              }
+                // Add PDF if exists
+                if (media.pdf_url) {
+                  mediaItems.push({
+                    id: `${media.id}-pdf`,
+                    name: media.pdf_title || 'PDF',
+                    type: 'media' as const,
+                    order: 3,
+                    mediaType: 'pdf',
+                    hasAccess: mediaAccess?.hasAccess !== false,
+                    accessDelay: mediaAccess?.accessDelay
+                  });
+                }
 
-              // Add quiz if exists
-              if (media.quiz_data) {
-                mediaItems.push({
-                  id: `${media.id}-quiz`,
-                  name: media.quiz_title || 'Quiz',
-                  type: 'media' as const,
-                  order: 4,
-                  mediaType: 'quiz'
-                });
-              }
+                // Add quiz if exists
+                if (media.quiz_data) {
+                  mediaItems.push({
+                    id: `${media.id}-quiz`,
+                    name: media.quiz_title || 'Quiz',
+                    type: 'media' as const,
+                    order: 4,
+                    mediaType: 'quiz',
+                    hasAccess: mediaAccess?.hasAccess !== false,
+                    accessDelay: mediaAccess?.accessDelay
+                  });
+                }
 
-              return {
-                id: media.id,
-                name: media.title,
-                type: 'media' as const,
-                order: mediaIndex,
-                children: mediaItems
-              };
-            })
-          }))
+                return {
+                  id: media.id,
+                  name: media.title,
+                  type: 'media' as const,
+                  order: mediaIndex,
+                  hasAccess: mediaAccess?.hasAccess !== false,
+                  accessDelay: mediaAccess?.accessDelay,
+                  children: mediaItems
+                };
+              })
+            };
+          })
         };
 
         return contentNode;
@@ -424,6 +459,26 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
     }
   };
 
+  const getAccessStatusColor = (node: StructureNode) => {
+    if (node.hasAccess === false) return 'bg-red-500'; // No access
+    
+    if (node.accessDelay) {
+      return 'bg-blue-500'; // Pending access (changed from orange-500)
+    }
+    
+    return 'bg-green-500'; // Has access
+  };
+
+  const getRemainingDays = (node: StructureNode) => {
+    if (!node.accessDelay) return null;
+    
+    const value = node.accessDelay.value;
+    const unit = node.accessDelay.unit;
+    
+    // Return the value directly since it's already calculated in days by the backend
+    return value > 0 ? value : 0;
+  };
+
   const handleGrantAccess = async () => {
     try {
       if (!structure) return;
@@ -442,7 +497,7 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
         const transformed = {
           id: node.id,
           type: node.type,
-          hasAccess: !node.isHidden,
+          hasAccess: node.hasAccess !== false,
           accessDelay: node.accessDelay,
           children: node.children?.map(transformNode) || []
         };
@@ -451,12 +506,20 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
 
       const transformedNodes = [transformNode(structure)];
 
+      // Debug log
+      console.log('Sending structure to database:', JSON.stringify(transformedNodes, null, 2));
+
       // Call the RPC function
-      const { error } = await supabase.rpc('grant_user_access', {
+      const { data, error } = await supabase.rpc('grant_user_access', {
         p_user_id: effectiveUserId,
         p_content_structure: transformedNodes,
         p_granted_by: user.id
       });
+
+      // Debug log
+      if (data) {
+        console.log('Response from database:', JSON.stringify(data, null, 2));
+      }
 
       if (error) throw error;
 
@@ -505,6 +568,11 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
   };
 
   const renderAccessControls = (node: StructureNode) => {
+    // If this is a media item (not a media group), don't show any controls
+    if (node.type === 'media' && node.mediaType) {
+      return null;
+    }
+
     const findParentWithDrip = (targetNode: StructureNode, tree: StructureNode | null): boolean => {
       if (!tree) return false;
 
@@ -694,11 +762,11 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
     );
     switch (mediaType) {
       case 'video':
-        return <Film className={iconClasses} />;
+        return <Youtube className={iconClasses} />;
       case 'text':
-        return <Book className={iconClasses} />;
+        return <Type className={iconClasses} />;
       case 'tool':
-        return <Wrench className={iconClasses} />;
+        return <Bot className={iconClasses} />;
       case 'pdf':
         return <FileText className={iconClasses} />;
       case 'quiz':
@@ -708,10 +776,94 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
     }
   };
 
+  const toggleNodeExpansion = (nodeId: string) => {
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(nodeId)) {
+        newSet.delete(nodeId);
+      } else {
+        newSet.add(nodeId);
+      }
+      return newSet;
+    });
+  };
+
   const renderNode = (node: StructureNode, level: number = 0, hasAncestorWithNoAccess: boolean = false) => {
     const isLoading = loadingNodes?.has(node.id);
     const isSelected = selectedNode === node.id;
     const hasNoAccess = hasAncestorWithNoAccess || node.hasAccess === false;
+    const isExpanded = expandedNodes.has(node.id);
+    const hasChildren = node.children && node.children.length > 0;
+    const isMediaGroup = node.type === 'media' && hasChildren;
+
+    // Check if any children have pending access
+    const getChildrenAccessStatus = (): { 
+      hasPendingChildren: boolean; 
+      nextAvailableChild: StructureNode | null; 
+      earliestDate: number; 
+    } => {
+      if (!node.children) return { hasPendingChildren: false, nextAvailableChild: null, earliestDate: 0 };
+      
+      let earliestDate = Infinity;
+      let nextAvailableChild: StructureNode | null = null;
+      let hasPendingChildren = false;
+
+      const checkNode = (childNode: StructureNode) => {
+        if (childNode.hasAccess === false) {
+          hasPendingChildren = true;
+          return;
+        }
+
+        if (childNode.accessDelay) {
+          const days = calculateDaysFromDelay(childNode.accessDelay);
+          if (days > 0 && days < earliestDate) {
+            earliestDate = days;
+            nextAvailableChild = childNode;
+          }
+          hasPendingChildren = true;
+        }
+
+        if (childNode.children) {
+          childNode.children.forEach(checkNode);
+        }
+      };
+
+      node.children.forEach(checkNode);
+      return { hasPendingChildren, nextAvailableChild, earliestDate: earliestDate === Infinity ? 0 : earliestDate };
+    };
+
+    const calculateDaysFromDelay = (delay: { value: number, unit: 'days' | 'weeks' | 'months' }) => {
+      const now = new Date();
+      const startDate = new Date(now);
+      
+      switch (delay.unit) {
+        case 'days':
+          startDate.setDate(startDate.getDate() + delay.value);
+          break;
+        case 'weeks':
+          startDate.setDate(startDate.getDate() + (delay.value * 7));
+          break;
+        case 'months':
+          startDate.setMonth(startDate.getMonth() + delay.value);
+          break;
+      }
+      
+      const diffTime = startDate.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays > 0 ? diffDays : 0;
+    };
+
+    const { hasPendingChildren, nextAvailableChild, earliestDate } = getChildrenAccessStatus();
+
+    const getAccessStatusColor = () => {
+      if (hasNoAccess) return 'bg-red-500'; // No access
+      
+      if (node.accessDelay || hasPendingChildren) {
+        return 'bg-blue-500'; // Pending access
+      }
+      
+      return 'bg-green-500'; // Has access
+    };
     
     return (
       <div key={node.id} className={cn(
@@ -724,14 +876,19 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
 
         <div
           onClick={() => {
-            handleNodeClick(node);
-            setSelectedNode(isSelected ? null : node.id);
+            if (isMediaGroup) {
+              toggleNodeExpansion(node.id);
+            } else {
+              handleNodeClick(node);
+              setSelectedNode(isSelected ? null : node.id);
+            }
           }}
           className={cn(
             "group relative flex items-center py-3 px-4 border border-[var(--border-color)] rounded-lg",
             "bg-[var(--background)] transition-colors",
             level === 0 && "shadow-sm mb-4",
-            hasNoAccess && "dark:bg-[var(--muted)]/30 bg-[var(--muted)]"
+            hasNoAccess && "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
+            isMediaGroup && "cursor-pointer hover:bg-[var(--muted)]/50"
           )}
         >
           {level > 0 && (
@@ -742,42 +899,56 @@ export function AccessStructureView({ selectedType, selectedId, targetUserId, on
           {hasNoAccess && (
             <div className="absolute inset-0 rounded-lg pointer-events-none dark:bg-black/30 bg-gray-100/50" />
           )}
+
+          {/* Access status indicator */}
+          <div className={cn(
+            "absolute left-0 top-0 bottom-0 w-1 rounded-l-lg",
+            getAccessStatusColor()
+          )} />
           
           <div className="flex items-center gap-3 flex-1 min-w-0">
-            {level === 0 && (
-              <div className="w-1 h-6 bg-[var(--accent)] rounded-full shrink-0" />
-            )}
-            
             {isLoading ? (
               <Loader2 className="w-5 h-5 animate-spin text-[var(--text-secondary)]" />
             ) : (
               <>
+                {isMediaGroup && (
+                  <ChevronDown className={cn(
+                    "w-4 h-4 text-[var(--muted-foreground)] transition-transform",
+                    !isExpanded && "-rotate-90"
+                  )} />
+                )}
                 {node.type === 'media' && (
                   <div className="shrink-0">
                     {getMediaTypeIcon(node.mediaType, hasNoAccess)}
                   </div>
                 )}
-                <span className={cn(
-                  "transition-colors truncate",
-                  level === 0 
-                    ? "text-2xl font-semibold" 
-                    : "text-lg",
-                  "text-[var(--foreground)]",
-                  hasNoAccess && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
-                )}>{node.name}</span>
+                <div className="flex flex-col">
+                  <span className={cn(
+                    "transition-colors truncate",
+                    level === 0 
+                      ? "text-2xl font-semibold" 
+                      : "text-lg",
+                    "text-[var(--foreground)]",
+                    hasNoAccess && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
+                  )}>{node.name}</span>
+                  {node.accessDelay && (
+                    <span className="text-sm text-blue-500">
+                      Available in {calculateDaysFromDelay(node.accessDelay)} days
+                    </span>
+                  )}
+                </div>
               </>
             )}
             {renderAccessControls(node)}
           </div>
         </div>
 
-        {node.children && node.children.length > 0 && (
+        {hasChildren && (!isMediaGroup || isExpanded) && (
           <div className={cn(
             "relative",
             level === 0 ? "mt-4" : "mt-3"
           )}>
-            {[...node.children]
-              .sort((a: StructureNode, b: StructureNode) => a.order - b.order)
+            {node.children?.sort((a: StructureNode, b: StructureNode) => a.order - b.order)
               .map((child, index) => (
                 <div key={child.id} className={cn(
                   "relative",

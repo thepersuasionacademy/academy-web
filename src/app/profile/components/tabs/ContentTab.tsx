@@ -14,17 +14,45 @@ interface ContentGroup {
   access_starts_at: string;
 }
 
-interface ContentStructure {
+interface StructureNode {
   id: string;
   name: string;
   type: 'collection' | 'content' | 'module' | 'media';
-  hasAccess: boolean;
+  order: number;
+  hasAccess?: boolean;
   accessDelay?: {
     value: number;
     unit: 'days' | 'weeks' | 'months';
   };
+  children?: StructureNode[];
+  mediaType?: string;
+}
+
+interface ContentModule {
+  id: string;
+  title: string;
   order: number;
-  children?: ContentStructure[];
+  has_access: boolean;
+  access_date?: string;
+  media: ContentMedia[];
+}
+
+interface ContentMedia {
+  id: string;
+  title: string;
+  order: number;
+  has_access: boolean;
+  access_date?: string;
+}
+
+interface ContentRecord {
+  content_id: string;
+  content_title: string;
+  content_type: string;
+  collection_name: string;
+  granted_at: string;
+  access_starts_at: string;
+  modules: ContentModule[];
 }
 
 interface ContentTabProps {
@@ -38,7 +66,7 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
   const [showAccessModal, setShowAccessModal] = useState(false);
   const [selectedAccessType, setSelectedAccessType] = useState<'collection' | 'content' | null>(null);
   const [selectedAccessId, setSelectedAccessId] = useState<string | null>(null);
-  const [contentStructure, setContentStructure] = useState<ContentStructure | null>(null);
+  const [contentStructure, setContentStructure] = useState<StructureNode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const supabase = createClientComponentClient();
 
@@ -71,14 +99,48 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
 
       try {
         setIsLoading(true);
-        const { data, error } = await supabase.rpc('get_content_access_structure', {
-          p_user_id: userId,
-          p_id: selectedGroup.content_id,
-          p_type: 'content'
+        const { data, error } = await supabase.rpc('get_user_content', {
+          p_user_id: userId
         });
 
         if (error) throw error;
-        setContentStructure(data);
+
+        // Find the selected content in the returned data
+        const selectedContent = data?.find((item: ContentRecord) => item.content_id === selectedGroup.content_id);
+        if (selectedContent) {
+          // Transform the data to match the structure we need
+          const transformedStructure: StructureNode = {
+            id: selectedContent.content_id,
+            name: selectedContent.content_title,
+            type: 'content',
+            order: 0,
+            hasAccess: true,
+            children: selectedContent.modules?.map((module: ContentModule) => ({
+              id: module.id,
+              name: module.title,
+              type: 'module' as const,
+              order: module.order,
+              hasAccess: module.has_access,
+              accessDelay: module.access_date ? {
+                value: Math.ceil((new Date(module.access_date).getTime() - new Date(selectedContent.access_starts_at).getTime()) / (1000 * 60 * 60 * 24)),
+                unit: 'days' as const
+              } : undefined,
+              children: module.media?.map((media: ContentMedia) => ({
+                id: media.id,
+                name: media.title,
+                type: 'media' as const,
+                order: media.order,
+                hasAccess: media.has_access,
+                accessDelay: media.access_date ? {
+                  value: Math.ceil((new Date(media.access_date).getTime() - new Date(selectedContent.access_starts_at).getTime()) / (1000 * 60 * 60 * 24)),
+                  unit: 'days' as const
+                } : undefined,
+                children: []
+              }))
+            }))
+          };
+          setContentStructure(transformedStructure);
+        }
       } catch (error) {
         console.error('Error fetching content structure:', error);
       } finally {
@@ -96,6 +158,25 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
       month: 'long',
       day: 'numeric'
     });
+  };
+
+  const getAccessStatusColor = (node: StructureNode) => {
+    if (!node.hasAccess) return 'bg-red-500'; // No access
+    
+    const startDate = node.accessDelay ? new Date(node.accessDelay.value) : null;
+    if (startDate && startDate > new Date()) {
+      return 'bg-orange-500'; // Pending access
+    }
+    
+    return 'bg-green-500'; // Has access
+  };
+
+  const getRemainingDays = (startDate: string) => {
+    const start = new Date(startDate);
+    const now = new Date();
+    const diffTime = start.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
   };
 
   return (
