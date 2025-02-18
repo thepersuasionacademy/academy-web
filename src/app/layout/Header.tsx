@@ -20,11 +20,6 @@ interface Category {
   path: Route;
 }
 
-const baseCategories: Category[] = [
-  { name: 'Content', path: '/content' as Route },
-  { name: 'AI Engine', path: '/ai' as Route },
-];
-
 export default function Header() {
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
@@ -35,7 +30,32 @@ export default function Header() {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  
+  const baseCategories: Category[] = [
+    { name: 'Content', path: '/content' as Route },
+    { name: 'AI Engine', path: '/ai' as Route },
+    { name: 'Testimonials', path: '/testimonials' as Route },
+  ];
+  
   const [categories, setCategories] = useState<Category[]>(baseCategories);
+
+  // Update categories when theme changes
+  useEffect(() => {
+    const updatedBaseCategories = [
+      { name: 'Content', path: '/content' as Route },
+      { name: 'AI Engine', path: '/ai' as Route },
+      { name: 'Testimonials', path: '/testimonials' as Route },
+    ];
+    
+    if (isAdmin) {
+      setCategories([
+        ...updatedBaseCategories,
+        { name: 'Admin', path: '/admin' as Route }
+      ]);
+    } else {
+      setCategories(updatedBaseCategories);
+    }
+  }, [isAdmin]);
 
   // Combined effect for mount and initial data fetching
   useEffect(() => {
@@ -69,10 +89,6 @@ export default function Header() {
           if ((!adminError && isAdminResult) || (!superAdminError && isSuperAdminResult)) {
             console.log('Setting admin status to true');
             setIsAdmin(true);
-            setCategories([
-              ...baseCategories,
-              { name: 'Admin', path: '/admin' as Route }
-            ]);
           }
         }
       } catch (err) {
@@ -142,6 +158,13 @@ export default function Header() {
     "z-[60]"
   );
 
+  const handleCategoryClick = (path: string, e: React.MouseEvent) => {
+    if (path.startsWith('http')) {
+      e.preventDefault();
+      window.open(path, '_blank');
+    }
+  };
+
   return (
     <header className={headerClassName}>
       <div className="flex h-14 items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -161,6 +184,7 @@ export default function Header() {
                 <li key={category.path} className="h-full">
                   <Link
                     href={category.path}
+                    onClick={(e) => handleCategoryClick(category.path, e)}
                     className={navLinkClassName(pathname?.startsWith(category.path))}
                   >
                     {category.name}
