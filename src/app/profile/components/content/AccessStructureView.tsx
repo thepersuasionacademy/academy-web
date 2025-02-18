@@ -498,6 +498,11 @@ export function AccessStructureView({
   };
 
   const getAccessStatusColor = (node: StructureNode, isNodeInEditMode: boolean = false) => {
+    // Content level should always be neutral (green) unless explicitly set to no access
+    if (node.type === 'content') {
+      return node.hasAccess === false ? 'bg-red-500' : 'bg-green-500';
+    }
+
     // First check for no access
     if (node.hasAccess === false) return 'bg-red-500';
 
@@ -692,8 +697,8 @@ export function AccessStructureView({
   };
 
   const renderAccessControls = (node: StructureNode, level: number = 0) => {
-    // If not in edit mode, this is a media item with mediaType, or this is the content level, don't show controls
-    if (!isEditMode || (node.type === 'media' && node.mediaType) || node.type === 'content') {
+    // If not in edit mode, this is a media item with mediaType, don't show controls
+    if (!isEditMode || (node.type === 'media' && node.mediaType)) {
       return null;
     }
 
@@ -810,9 +815,18 @@ export function AccessStructureView({
 
         const updateNode = (currNode: StructureNode): StructureNode => {
           if (currNode.id === node.id) {
+            // For content level, toggle between hidden (false) and neutral (true)
+            // This way, neutral state is explicitly true rather than undefined
+            if (currNode.type === 'content') {
+              return {
+                ...currNode,
+                hasAccess: currNode.hasAccess === false ? true : false
+              };
+            }
+            // For other nodes, toggle between false and true
             return {
               ...currNode,
-              hasAccess: currNode.hasAccess === false ? undefined : false
+              hasAccess: currNode.hasAccess === false ? true : false
             };
           }
           if (currNode.children) {
@@ -993,14 +1007,14 @@ export function AccessStructureView({
   };
 
   const renderNode = (node: StructureNode, level: number = 0, hasAncestorWithNoAccess: boolean = false) => {
-    // Skip hidden nodes and nodes with no access in view mode
-    if (!isEditMode && (node.isHidden || node.hasAccess === false || hasAncestorWithNoAccess)) {
+    // Skip hidden nodes and nodes with no access in view mode, but never skip the content level
+    if (!isEditMode && ((node.isHidden || node.hasAccess === false || hasAncestorWithNoAccess) && node.type !== 'content')) {
       return null;
     }
 
     const isLoading = loadingNodes?.has(node.id);
     const isSelected = selectedNode === node.id;
-    const hasNoAccess = hasAncestorWithNoAccess || node.hasAccess === false;
+    const hasNoAccess = hasAncestorWithNoAccess || (node.hasAccess === false && node.type !== 'content');
     const isExpanded = expandedNodes.has(node.id);
     const hasChildren = node.children && node.children.length > 0;
     const isMediaGroup = node.type === 'media' && hasChildren;
