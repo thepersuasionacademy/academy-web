@@ -47,16 +47,28 @@ export const ContentGrid = ({ categories, onItemClick }: ContentGridProps) => {
     onItemClick(itemId);
   };
 
+  // Sort items within each category to show unlocked items first
+  const sortedCategories = categories.map(category => ({
+    ...category,
+    items: [...category.items].sort((a, b) => {
+      // Sort by access first (accessible items come first)
+      if (a.has_access && !b.has_access) return -1;
+      if (!a.has_access && b.has_access) return 1;
+      // If access is the same, maintain original order
+      return 0;
+    })
+  }));
+
   return (
     <div className="relative py-8 space-y-12">
-      {categories.map((category) => (
+      {sortedCategories.map((category) => (
         <div key={category.name} className="relative">
           {/* Desktop View */}
           <div className="hidden md:block">
-            <div className="px-10">
-              <h2 className="text-2xl font-semibold mb-4">{category.name}</h2>
+            <div className="px-6">
+              <h2 className="text-2xl font-semibold mb-4 ml-4">{category.name}</h2>
               <div className="relative">
-                <div className="flex gap-4 overflow-x-auto pt-4 pb-8 -my-4 scrollbar-hide">
+                <div className="flex gap-4 overflow-x-auto pt-4 pb-8 -my-4 pl-4 -ml-4 scrollbar-hide">
                   {category.items.map((item) => (
                     <div 
                       key={item.id} 
@@ -76,7 +88,7 @@ export const ContentGrid = ({ categories, onItemClick }: ContentGridProps) => {
             <MobileCarousel
               title={category.name}
               items={category.items.map((item) => (
-                <div key={item.id} className="relative pt-4">
+                <div key={item.id} className="relative pt-4 pl-4 -ml-4">
                   <ContentCard item={item} onClick={handleCardClick} />
                 </div>
               ))}

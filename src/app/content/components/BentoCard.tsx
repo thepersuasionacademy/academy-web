@@ -46,7 +46,7 @@ export function BentoCard({
     >
       <div className={cn(
         "relative w-full h-[250px] overflow-visible",
-        !isLocked && "transition-transform duration-300 group-hover:scale-105 origin-center"
+        "transition-transform duration-300 group-hover:scale-105 origin-center"
       )}>
         {/* Base card */}
         <div className={cn(
