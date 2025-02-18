@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { BentoCard } from '@/streaming/components/BentoCard';
+import { BentoCard } from '@/app/content/components/BentoCard';
+import { MobileCarousel } from './MobileCarousel';
 import { cn } from "@/lib/utils";
 
 interface Category {

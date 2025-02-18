@@ -1,8 +1,19 @@
 import { useState } from 'react';
-import { BentoCard } from '@/streaming/components/BentoCard';
+import { BentoCard } from '@/app/content/components/BentoCard';
 import { MobileCarousel } from './MobileCarousel';
-import { Category } from '@/app/content/lib/types';
 import { cn } from "@/lib/utils";
+
+interface Category {
+  name: string;
+  items: {
+    id: string;
+    title: string;
+    description: string;
+    image: string;
+    has_access: boolean;
+    has_any_media_access: boolean;
+  }[];
+}
 
 interface ContentGridProps {
   categories: Category[];
@@ -33,9 +44,8 @@ export const ContentGrid = ({ categories, onItemClick }: ContentGridProps) => {
                         title={item.title}
                         description={item.description}
                         image={item.image}
-                        tracks={item.tracks}
-                        href="#"
                         onClick={(e) => handleCardClick(item.id, e)}
+                        hasAccess={item.has_access === true && item.has_any_media_access === true}
                       />
                     </div>
                   ))}
@@ -53,9 +63,8 @@ export const ContentGrid = ({ categories, onItemClick }: ContentGridProps) => {
                     title={item.title}
                     description={item.description}
                     image={item.image}
-                    tracks={item.tracks}
-                    href="#"
                     onClick={(e) => handleCardClick(item.id, e)}
+                    hasAccess={item.has_access === true && item.has_any_media_access === true}
                   />
                 </div>
               ))}
