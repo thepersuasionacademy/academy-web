@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Loader2, AlertCircle, Zap, Clock, ChevronDown, Check, Plus, Lock, Eye, EyeOff, X, Film, Book, Wrench, FileText, HelpCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { Toast } from "../common/Toast";
 
 interface StructureNode {
   id: string;
@@ -15,11 +16,15 @@ interface StructureNode {
   hasAccess?: boolean;
   order: number;
   mediaType?: string;
+  isHidden?: boolean;
 }
 
 interface AccessStructureViewProps {
   selectedType: 'collection' | 'content';
   selectedId: string;
+  targetUserId?: string;
+  onAccessGranted?: () => void;
+  onRefreshContentHistory?: () => void;
 }
 
 type AccessMethod = 'instant' | 'drip';
@@ -103,7 +108,19 @@ function TimeUnitDropdown({ value, onChange, disabled, inputValue }: TimeUnitDro
   );
 }
 
-export function AccessStructureView({ selectedType, selectedId }: AccessStructureViewProps) {
+interface TransformedNode {
+  id: string;
+  type: string;
+  hasAccess: boolean;
+  accessDelay?: {
+    value: number;
+    unit: 'days' | 'weeks' | 'months';
+  };
+  mediaType?: string;
+  children: TransformedNode[];
+}
+
+export function AccessStructureView({ selectedType, selectedId, targetUserId, onAccessGranted, onRefreshContentHistory }: AccessStructureViewProps) {
   const [structure, setStructure] = useState<StructureNode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +129,9 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   const supabase = createClientComponentClient();
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
   const structureRef = useRef<HTMLDivElement>(null);
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [showToast, setShowToast] = useState(false);
 
   // Add click outside handler
   useEffect(() => {
@@ -407,95 +427,56 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
   const handleGrantAccess = async () => {
     try {
       if (!structure) return;
+      setIsLoading(true);
 
-      // Get the authenticated user's ID
+      // Get current user for granted_by
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) throw userError;
-      if (!user) throw new Error('No authenticated user found');
+      if (!user) throw new Error('No user found');
 
-      // Get all nodes with their access delays
-      const getNodesWithDelays = (node: StructureNode): { id: string; type: string; delay?: { value: number; unit: string } }[] => {
-        // Skip media items with suffixes (like -video, -text, etc.)
-        if (node.type === 'media' && node.id.includes('-')) {
-          return [];
-        }
+      // Get target user ID (either provided or current user)
+      const effectiveUserId = targetUserId || user.id;
 
-        const nodes: { id: string; type: string; delay?: { value: number; unit: string } }[] = [{
+      // Transform nodes to include hasAccess flag
+      const transformNode = (node: StructureNode): any => {
+        const transformed = {
           id: node.id,
           type: node.type,
-          delay: node.accessDelay
-        }];
-        
-        if (node.children) {
-          node.children.forEach(child => {
-            nodes.push(...getNodesWithDelays(child));
-          });
-        }
-        
-        return nodes;
+          hasAccess: !node.isHidden,
+          accessDelay: node.accessDelay,
+          children: node.children?.map(transformNode) || []
+        };
+        return transformed;
       };
 
-      const nodesWithDelays = getNodesWithDelays(structure);
-      
-      // Group nodes by their access delay
-      const nodesByDelay: { [key: string]: string[] } = {};
-      nodesWithDelays.forEach(node => {
-        const delayKey = node.delay 
-          ? `${node.delay.value}-${node.delay.unit}`
-          : 'instant';
-        
-        if (!nodesByDelay[delayKey]) {
-          nodesByDelay[delayKey] = [];
-        }
-        nodesByDelay[delayKey].push(node.id);
+      const transformedNodes = [transformNode(structure)];
+
+      // Call the RPC function
+      const { error } = await supabase.rpc('grant_user_access', {
+        p_user_id: effectiveUserId,
+        p_content_structure: transformedNodes,
+        p_granted_by: user.id
       });
 
-      // Grant access for each group of nodes
-      for (const [delayKey, contentIds] of Object.entries(nodesByDelay)) {
-        let accessStartsAt = new Date().toISOString(); // Default to now for instant access
-        
-        // Calculate access_starts_at if there's a delay
-        if (delayKey !== 'instant') {
-          const [value, unit] = delayKey.split('-');
-          const now = new Date();
-          
-          switch (unit) {
-            case 'days':
-              now.setDate(now.getDate() + parseInt(value));
-              break;
-            case 'weeks':
-              now.setDate(now.getDate() + (parseInt(value) * 7));
-              break;
-            case 'months':
-              now.setMonth(now.getMonth() + parseInt(value));
-              break;
-          }
-          
-          accessStartsAt = now.toISOString();
-        }
+      if (error) throw error;
 
-        const { error } = await supabase.rpc('grant_bulk_access', {
-          p_content_ids: contentIds,
-          p_access_starts_at: accessStartsAt, // This will never be null now
-          p_metadata: JSON.stringify({
-            granted_through: selectedType,
-            granted_from: selectedId
-          }),
-          p_user_id: user.id,
-          p_granted_by: user.id
-        });
+      // Show success message
+      setToastMessage('Access granted successfully');
+      setToastType('success');
+      setShowToast(true);
 
-        if (error) throw error;
-      }
-
-      // Refresh the structure
-      const updatedNode = await fetchNodeDetails(selectedId, selectedType);
-      if (updatedNode) {
-        setStructure(updatedNode);
+      // Refresh the content history view
+      if (onRefreshContentHistory) {
+        onRefreshContentHistory();
       }
 
     } catch (error) {
       console.error('Error granting access:', error);
+      setToastMessage(error instanceof Error ? error.message : 'An unexpected error occurred');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -899,6 +880,14 @@ export function AccessStructureView({ selectedType, selectedId }: AccessStructur
       <div ref={structureRef} className="relative">
         {renderNode(structure, 0, false)}
       </div>
+
+      {showToast && (
+        <Toast
+          message={toastMessage}
+          type={toastType}
+          onClose={() => setShowToast(false)}
+        />
+      )}
     </div>
   );
 } 
