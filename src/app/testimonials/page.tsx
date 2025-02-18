@@ -4,6 +4,15 @@ import { useTheme } from '@/app/context/ThemeContext';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 
+// Add these type declarations at the top of the file
+declare global {
+  interface Window {
+    SenjaCollector?: {
+      open: () => void;
+    };
+  }
+}
+
 const URLS = {
   dark: 'https://love.thepersuasionacademy.com/hC--9R',
   light: 'https://love.thepersuasionacademy.com/daC3tET'
@@ -60,7 +69,31 @@ export default function TestimonialsPage() {
   const testimonialUrl = theme === 'dark' ? URLS.dark : URLS.light;
   const [currentUrl, setCurrentUrl] = useState(testimonialUrl);
   const [cachedContent, setCachedContent] = useState<{ [key: string]: boolean }>({});
-  
+
+  // Handle message from iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        // Check if the message is from our testimonial pages
+        if (event.origin === 'https://love.thepersuasionacademy.com') {
+          if (event.data === 'openSenjaModal') {
+            // Open the Senja modal
+            if (window.SenjaCollector) {
+              window.SenjaCollector.open();
+            } else {
+              console.warn('Senja Collector not initialized yet');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error handling message:', error);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   // Handle theme changes and initial load
   useEffect(() => {
     setIsLoading(true);
@@ -102,8 +135,57 @@ export default function TestimonialsPage() {
   }, []);
 
   // Handle iframe load
-  const handleIframeLoad = () => {
+  const handleIframeLoad = (e: React.SyntheticEvent<HTMLIFrameElement>) => {
     setIsLoading(false);
+    
+    // Get the iframe element
+    const iframe = e.target as HTMLIFrameElement;
+    
+    try {
+      // Inject script into iframe
+      const script = `
+        // Wait for the button to be available
+        const checkForButton = setInterval(() => {
+          // Try multiple selectors to find the button
+          const button = document.querySelector('a[href*="senja"]') || // Look for Senja link
+                        document.querySelector('a[data-senja-collector-open]') || // Look for Senja attribute
+                        Array.from(document.querySelectorAll('a')).find(el => 
+                          el.textContent?.includes('Gift') && 
+                          el.textContent?.includes('Testimonial')
+                        );
+          
+          if (button) {
+            clearInterval(checkForButton);
+            console.log('Found button:', button); // Debug log
+            
+            // Override the button's behavior
+            button.addEventListener('click', function(e) {
+              e.preventDefault();
+              e.stopPropagation();
+              window.parent.postMessage('openSenjaModal', '*');
+              return false;
+            });
+
+            // Remove any href and target attributes
+            button.removeAttribute('href');
+            button.removeAttribute('target');
+            button.style.cursor = 'pointer';
+          }
+        }, 100);
+
+        // Clear the interval after 5 seconds to prevent infinite checking
+        setTimeout(() => clearInterval(checkForButton), 5000);
+      `;
+      
+      // Inject the script directly into the iframe
+      const scriptElement = iframe.contentDocument?.createElement('script');
+      if (scriptElement) {
+        scriptElement.textContent = script;
+        iframe.contentDocument?.body.appendChild(scriptElement);
+      }
+    } catch (error) {
+      console.error('Error injecting script:', error);
+    }
   };
 
   return (
