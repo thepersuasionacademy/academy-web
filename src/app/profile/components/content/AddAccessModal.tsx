@@ -37,6 +37,11 @@ export function AddAccessModal({ onSubmit, onCancel }: AddAccessModalProps) {
   const [selectedItem, setSelectedItem] = useState<string | null>(null);
   const supabase = createClientComponentClient();
 
+  const accessTypes = [
+    { id: 'bundle', label: 'Bundle', icon: Package },
+    { id: 'content', label: 'Content', icon: FileText },
+  ];
+
   // Search for content when query changes
   useEffect(() => {
     const searchContent = async () => {
@@ -50,10 +55,10 @@ export function AddAccessModal({ onSubmit, onCancel }: AddAccessModalProps) {
         let data;
         let error;
 
-        if (selectedType === 'collection') {
-          const result = await supabase.rpc('get_content_collections');
-          data = result.data as Collection[];
-          error = result.error;
+        if (selectedType === 'bundle') {
+          // Placeholder for future bundle implementation
+          data = [];
+          error = null;
         } else if (selectedType === 'content') {
           // First get all collections
           const { data: collections, error: collectionsError } = await supabase
@@ -85,7 +90,7 @@ export function AddAccessModal({ onSubmit, onCancel }: AddAccessModalProps) {
             ? item.name?.toLowerCase().includes(searchQuery.toLowerCase())
             : item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
               item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
+        ) as (Collection | Content)[];
 
         // Transform to ContentItem format
         const transformedResults = filteredData.map(item => ({
@@ -105,11 +110,6 @@ export function AddAccessModal({ onSubmit, onCancel }: AddAccessModalProps) {
     const debounceTimeout = setTimeout(searchContent, 300);
     return () => clearTimeout(debounceTimeout);
   }, [searchQuery, selectedType, supabase]);
-
-  const accessTypes = [
-    { id: 'collection', label: 'Collection', icon: Layers },
-    { id: 'content', label: 'Content', icon: FileText },
-  ];
 
   return (
     <div className="space-y-4 mb-6 p-4 bg-[var(--card-bg)] rounded-lg border border-[var(--border-color)]">

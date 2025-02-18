@@ -64,7 +64,7 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
   const [contentGroups, setContentGroups] = useState<ContentGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<ContentGroup | null>(null);
   const [showAccessModal, setShowAccessModal] = useState(false);
-  const [selectedAccessType, setSelectedAccessType] = useState<'collection' | 'content' | null>(null);
+  const [selectedAccessType, setSelectedAccessType] = useState<'bundle' | 'collection' | 'content' | null>(null);
   const [selectedAccessId, setSelectedAccessId] = useState<string | null>(null);
   const [contentStructure, setContentStructure] = useState<StructureNode | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -199,7 +199,7 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
           {isAdmin && showAccessModal && (
             <AddAccessModal
               onSubmit={(type, id) => {
-                if (type === 'collection' || type === 'content') {
+                if (type === 'bundle' || type === 'collection' || type === 'content') {
                   setSelectedAccessType(type);
                   setSelectedAccessId(id);
                   setSelectedGroup(null); // Clear any selected group when adding new access

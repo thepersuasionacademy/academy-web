@@ -17,8 +17,8 @@ interface ContentDetailProps {
   isAdmin?: boolean;
   showAccessModal: boolean;
   setShowAccessModal: (show: boolean) => void;
-  selectedAccessType: 'collection' | 'content' | null;
-  setSelectedAccessType: (type: 'collection' | 'content' | null) => void;
+  selectedAccessType: 'bundle' | 'collection' | 'content' | null;
+  setSelectedAccessType: (type: 'bundle' | 'collection' | 'content' | null) => void;
   selectedAccessId: string | null;
   setSelectedAccessId: (id: string | null) => void;
 }
@@ -256,7 +256,7 @@ export function ContentDetail({
         <AddAccessModal
           onSubmit={(type, id) => {
             console.log('Selected:', { type, id });
-            if (type === 'collection' || type === 'content') {
+            if (type === 'bundle' || type === 'collection' || type === 'content') {
               setSelectedAccessType(type);
               setSelectedAccessId(id);
             }

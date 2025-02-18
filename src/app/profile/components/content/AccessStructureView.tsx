@@ -7,7 +7,7 @@ import { Toast } from "../common/Toast";
 interface StructureNode {
   id: string;
   name: string;
-  type: 'collection' | 'content' | 'module' | 'media';
+  type: 'collection' | 'content' | 'module' | 'media' | 'bundle';
   children?: StructureNode[];
   accessDelay?: {
     value: number;
@@ -20,7 +20,7 @@ interface StructureNode {
 }
 
 interface AccessStructureViewProps {
-  selectedType: 'collection' | 'content';
+  selectedType: 'bundle' | 'collection' | 'content';
   selectedId: string;
   targetUserId?: string;
   onAccessGranted?: () => void;
