@@ -81,6 +81,7 @@ export const MediaPlayer = ({
   const [activeType, setActiveType] = useState<string | null>(null);
   const [showFontSizeDropdown, setShowFontSizeDropdown] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [playerError, setPlayerError] = useState<string | null>(null);
   const [fontSize, setFontSize] = useState<number>(() => {
     // Initialize from localStorage or default to 16
     const saved = localStorage.getItem('textLessonFontSize');
@@ -139,6 +140,19 @@ export const MediaPlayer = ({
       }
     };
     getSession();
+  }, []);
+
+  // Add error event listener for iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'mediaError') {
+        console.error('Video player error:', event.data);
+        setPlayerError(event.data.reason || 'An error occurred while playing the video');
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   const increaseFontSize = (e: React.MouseEvent) => {
@@ -227,10 +241,13 @@ export const MediaPlayer = ({
 
   const selectedItems = activeMediaItem ? getMediaItems(activeMediaItem) : [];
 
-  // Get library ID from environment variable
+  // Get library ID and security token from environment variables
   const libraryId = process.env.NEXT_PUBLIC_BUNNY_LIBRARY_ID || '376351';
+  const securityToken = process.env.NEXT_PUBLIC_BUNNY_SECURITY_TOKEN || '';
+  
+  // Construct the player URL with security token
   const playerUrl = videoId ? 
-    `https://iframe.mediadelivery.net/embed/376351/${videoId}?autoplay=false` : 
+    `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?token=${securityToken}` : 
     null;
 
   const renderContent = () => {
@@ -381,15 +398,31 @@ export const MediaPlayer = ({
       case 'video':
         if (playerUrl) {
           return contentFrame(
-            <iframe 
-              src={playerUrl}
-              loading="lazy"
-              className="absolute inset-0 w-full h-full"
-              style={{ border: 'none' }}
-              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
-              allowFullScreen
-              title={title}
-            />
+            <div className="relative w-full h-full">
+              <iframe 
+                src={playerUrl}
+                loading="lazy"
+                className="absolute inset-0 w-full h-full"
+                style={{ border: 'none' }}
+                allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen"
+                allowFullScreen
+                title={title}
+              />
+              {playerError && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75">
+                  <div className="text-white text-center p-4">
+                    <p className="mb-2">Error playing video:</p>
+                    <p className="text-sm opacity-75">{playerError}</p>
+                    <button 
+                      onClick={() => window.location.reload()}
+                      className="mt-4 px-4 py-2 bg-[var(--accent)] rounded-full text-sm hover:opacity-90 transition-opacity"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           );
         }
         break;

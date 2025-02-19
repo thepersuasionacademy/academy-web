@@ -8,8 +8,44 @@ import ScrollProgress from '@/app/content/components/ScrollProgress';
 import type { MediaItem } from '@/app/content/lib/types';
 import { FeaturedContent } from '@/app/content/components/dashboard/FeaturedContent';
 import { cn } from '@/lib/utils';
-import { getCollections, getContent, getLessons, getStreamingContentBySuiteId, type Collection, type Content, type Lesson, type ContentWithModules } from '@/lib/supabase/learning';
+import { getCollections, getContent, getLessons, getStreamingContentBySuiteId, type Collection, type Content, type Lesson } from '@/lib/supabase/learning';
 import { ExtendedContent } from '@/types/extended';
+import { supabase } from '@/lib/supabase';
+
+// Update ContentWithModules type to match access structure
+type ModuleType = {
+  id: string;
+  name: string;
+  type: 'module';
+  hasAccess: boolean;
+  accessDelay?: {
+    value: number;
+    unit: 'days' | 'weeks' | 'months';
+  };
+  children?: MediaType[];
+};
+
+type MediaType = {
+  id: string;
+  name: string;
+  type: 'media';
+  mediaType?: string;
+  hasAccess: boolean;
+  accessDelay?: {
+    value: number;
+    unit: 'days' | 'weeks' | 'months';
+  };
+};
+
+type ContentWithModules = {
+  id: string;
+  name: string;
+  type: 'content';
+  hasAccess: boolean;
+  description?: string;
+  thumbnail_url?: string;
+  children?: ModuleType[];
+};
 
 type ContentMediaItem = {
   id: string;
@@ -87,13 +123,15 @@ const featuredItem = {
 };
 
 // Convert Supabase Content to MediaItem format for ContentGrid
-function convertContentToMediaItem(content: Content): MediaItem {
+function convertContentToMediaItem(content: Content): ExtendedMediaItem {
   return {
     id: content.id,
     title: content.title,
     description: content.description || '',
     image: content.thumbnail_url || '/images/default-content.jpg',
-    tracks: 1,
+    type: 'media',
+    order: 0,
+    hasAccess: content.has_access || false,
     has_access: content.has_access || false,
     debug_info: content.debug_info
   };
@@ -249,6 +287,43 @@ const getMediaItems = (mediaItem: MediaPlayerItem) => {
   return items.sort((a, b) => a.order - b.order);
 };
 
+type ContentStructure = {
+  id: string;
+  name: string;
+  type: 'content';
+  children?: Array<{
+    id: string;
+    name: string;
+    type: 'module';
+    order?: number;
+    children?: Array<{
+      id: string;
+      name: string;
+      type: 'media';
+      order?: number;
+    }>;
+  }>;
+};
+
+// Update MediaItem type to include hasAccess
+type MediaItem = {
+  id: string;
+  title: string;
+  type: 'media';
+  hasAccess: boolean;
+  order: number;
+};
+
+// Extend the imported MediaItem type
+interface ExtendedMediaItem extends MediaItem {
+  hasAccess: boolean;
+  name?: string;
+  description?: string;
+  image?: string;
+  debug_info?: any;
+  has_access?: boolean;
+}
+
 export default function Page(): React.JSX.Element {
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
@@ -304,57 +379,170 @@ export default function Page(): React.JSX.Element {
   }, [collections, contentByCollection]);
 
   const handleItemClick = async (itemId: string) => {
+    console.log('🔵 Starting content load for item:', itemId);
     const item = categories
       .flatMap(cat => cat.items)
       .find(item => item.id === itemId);
+    
     if (item) {
+      console.log('🟢 Found item:', {
+        id: item.id,
+        title: item.title,
+        has_access: item.has_access,
+        debug_info: item.debug_info
+      });
       setSelectedItem(item);
       setSelectedLesson(null);
       setIsContentLoading(true);
+      
       try {
-        const contentData = await getStreamingContentBySuiteId(itemId);
-        setSelectedContent(contentData);
+        console.log('🟡 Fetching access structure...');
+        const { data: accessStructure, error } = await supabase.rpc(
+          'get_content_access_structure',
+          { p_content_id: itemId }
+        );
+        
+        if (error) {
+          console.error('🔴 Access Structure Error:', {
+            message: error.message,
+            details: error.details
+          });
+          throw error;
+        }
+        
+        console.log('🟢 Received access structure:', JSON.stringify(accessStructure, null, 2));
+        
+        if (!accessStructure) {
+          throw new Error('No access structure received');
+        }
+
+        const contentStructure = accessStructure;
+        console.log('🔍 Debug info:', item.debug_info);
+        
+        // Get access settings and start time from the debug info
+        const accessSettings = item.debug_info?.access_settings?.[0];
+        const accessStartsAt = item.debug_info?.access_starts_at;
+        
+        // Helper to check if a media item has access and get its delay
+        const getMediaAccess = (id: string) => {
+          if (!accessSettings?.children?.[0]?.children) return { hasAccess: false };
+          
+          // First find the media item in the main children array
+          const mediaItem = accessSettings.children[0].children.find(c => c.id === id);
+          
+          if (!mediaItem) {
+            // If not found, look for it in the nested children arrays
+            for (const module of accessSettings.children[0].children) {
+              const nestedItem = module.children?.find(c => c.id === id);
+              if (nestedItem) {
+                return {
+                  hasAccess: nestedItem.hasAccess,
+                  accessDelay: nestedItem.accessDelay
+                };
+              }
+            }
+            return { hasAccess: false };
+          }
+          
+          return {
+            hasAccess: mediaItem.hasAccess,
+            accessDelay: mediaItem.accessDelay
+          };
+        };
+        
+        // Ensure the thumbnail_url is set from the item's image
+        const contentWithThumbnail: ContentWithModules = {
+          id: contentStructure.id,
+          name: item.title,
+          type: 'content',
+          hasAccess: true, // Content level always has access if we can view it
+          description: item.description,
+          thumbnail_url: item.image,
+          children: contentStructure.children?.map((module) => ({
+            id: module.id,
+            name: module.name || `Module ${module.order || 1}`,
+            type: 'module',
+            hasAccess: true, // Module level always has access
+            children: module.children?.map((media) => {
+              // Get media access status and delay info
+              const accessInfo = getMediaAccess(media.id);
+              return {
+                id: media.id,
+                name: media.name,
+                type: 'media' as const,
+                hasAccess: accessInfo.hasAccess,
+                accessDelay: accessInfo.accessDelay,
+                order: media.order || 0
+              };
+            })
+          }))
+        };
+        
+        console.log('🔍 Mapped content structure:', contentWithThumbnail);
+        
+        setSelectedContent(contentWithThumbnail);
         
         // If there are modules and media items, set up the initial media item
-        if (contentData.modules && contentData.modules.length > 0) {
-          const firstModule = contentData.modules[0];
-          if (firstModule.media && firstModule.media.length > 0) {
-            const firstMediaItem = firstModule.media[0];
-            setSelectedMediaItem(convertToMediaItem(firstMediaItem));
+        if (contentWithThumbnail.children && contentWithThumbnail.children.length > 0) {
+          const firstModule = contentWithThumbnail.children[0];
+          if (firstModule && firstModule.children && firstModule.children.length > 0) {
+            const firstMedia = firstModule.children[0];
+            if (firstMedia) {
+              await handleMediaSelect(firstMedia);
+            }
           }
         }
-      } catch (error) {
-        console.error('Error loading content');
+      } catch (error: any) {
+        console.error('🔴 Error loading content:', {
+          message: error.message,
+          response: error.response ? {
+            data: error.response.data,
+            status: error.response.status
+          } : undefined
+        });
         setSelectedItem(null);
       } finally {
         setIsContentLoading(false);
       }
+    } else {
+      console.log('🔴 Item not found in categories:', itemId);
     }
   };
 
-  const handleModuleSelect = (moduleId: string, mediaItem: ContentMediaItem) => {
-    if (selectedContent) {
-      const moduleItem = selectedContent.modules.find(m => m.id === moduleId);
-      if (moduleItem) {
-        setSelectedMediaItem(convertToMediaItem(mediaItem));
-        setShowMediaPlayer(true);
-      }
+  const handleModuleSelect = async (moduleId: string, mediaItem: { id: string; name: string; type: 'media'; hasAccess: boolean }) => {
+    if (mediaItem.hasAccess) {
+      await handleMediaSelect(mediaItem);
     }
   };
 
-  const handleMediaSelect = (item: { id: string; title: string; type: string }) => {
-    if (selectedContent) {
-      const moduleWithMedia = selectedContent.modules.find(m => 
-        m.media?.some(mediaItem => mediaItem.id === item.id)
+  const handleMediaSelect = async (mediaItem: { id: string; name: string; type: 'media'; hasAccess: boolean }) => {
+    if (!mediaItem.hasAccess) return;
+    
+    try {
+      console.log('🟡 Fetching media content:', mediaItem.id);
+      const { data: mediaContent, error } = await supabase.rpc(
+        'get_media_content',
+        { p_media_id: mediaItem.id }
       );
       
-      if (moduleWithMedia) {
-        const mediaItem = moduleWithMedia.media.find(mediaItem => mediaItem.id === item.id);
-        if (mediaItem) {
-          setSelectedMediaItem(convertToMediaItem(mediaItem));
-          setShowMediaPlayer(true);
-        }
+      if (error) {
+        console.error('🔴 Media Content Error:', {
+          message: error.message,
+          details: error.details
+        });
+        throw error;
       }
+      
+      console.log('🟢 Received media content:', mediaContent);
+      
+      if (!mediaContent) {
+        throw new Error('No media content received');
+      }
+      
+      setSelectedMediaItem(mediaContent);
+      setShowMediaPlayer(true);
+    } catch (error: any) {
+      console.error('🔴 Error loading media:', error);
     }
   };
 
@@ -388,16 +576,29 @@ export default function Page(): React.JSX.Element {
           )}
         </div>
 
-        {selectedContent && selectedContent.content && (
+        {/* Content Viewer */}
+        {selectedContent && (
           <div className="fixed inset-0 z-50 flex">
             {selectedMediaItem && (
               <MediaPlayer
-                title={selectedContent.content.title}
-                description={selectedContent.content.description || ''}
+                title={selectedContent.name}
+                description={selectedContent.description || ''}
                 isOpen={showMediaPlayer}
-                courseName={selectedContent.content.title}
+                courseName={selectedContent.name}
                 videoId={selectedMediaItem.video?.video_id}
-                mediaItems={selectedContent.modules.flatMap(m => m.media || [])}
+                mediaItems={selectedContent.children?.flatMap((module: ModuleType) => 
+                  module.children?.filter((media: MediaType) => media.hasAccess).map(media => ({
+                    id: media.id,
+                    title: media.name,
+                    order: 0,
+                    [media.mediaType || 'video']: {
+                      id: media.id,
+                      video_id: media.id,
+                      title: media.name,
+                      order: 0
+                    }
+                  })) || []
+                ) || []}
                 onMediaSelect={handleMediaSelect}
                 selectedMediaItem={selectedMediaItem as MediaPlayerItem}
               />
@@ -416,11 +617,43 @@ export default function Page(): React.JSX.Element {
                     setSelectedMediaItem(null);
                     setShowMediaPlayer(false);
                   }}
-                  title={selectedContent.content.title}
-                  description={selectedContent.content.description || ''}
-                  modules={selectedContent.modules}
+                  title={selectedContent.name}
+                  description={selectedContent.description || ''}
+                  modules={selectedContent.children?.map(module => {
+                    console.log('🔍 Mapping module:', {
+                      id: module.id,
+                      name: module.name,
+                      hasAccess: module.hasAccess,
+                      type: typeof module.hasAccess
+                    });
+                    
+                    return {
+                      id: module.id,
+                      title: module.name,
+                      order: 0,
+                      hasAccess: module.hasAccess,
+                      accessDelay: module.accessDelay,
+                      media: module.children?.map(child => {
+                        console.log('🔍 Mapping media item:', {
+                          id: child.id,
+                          name: child.name,
+                          hasAccess: child.hasAccess,
+                          type: typeof child.hasAccess
+                        });
+                        
+                        return {
+                          id: child.id,
+                          title: child.name,
+                          order: 0,
+                          hasAccess: child.hasAccess,
+                          accessDelay: child.accessDelay,
+                          mediaType: child.mediaType
+                        };
+                      }) || []
+                    };
+                  }) || []}
                   onPlay={handleModuleSelect}
-                  thumbnailUrl={selectedContent.content.thumbnail_url}
+                  thumbnailUrl={selectedContent.thumbnail_url}
                   activeMediaItem={selectedMediaItem}
                 />
               )}

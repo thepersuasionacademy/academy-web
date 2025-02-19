@@ -19,6 +19,7 @@ export interface Content {
   created_at: string;
   updated_at: string;
   has_access?: boolean;
+  available_at?: string | null;
   debug_info?: any;
 }
 
@@ -47,7 +48,32 @@ export interface Module {
   order: number;
   created_at: string;
   updated_at: string;
-  media: any[]; // You can type this more specifically if needed
+  has_access?: boolean;
+  available_at?: string | null;
+  media: Array<{
+    id: string;
+    title: string;
+    order: number;
+    has_access?: boolean;
+    available_at?: string | null;
+    video_id?: string;
+    video_name?: string;
+    content_text?: string;
+    text_title?: string;
+    tool_id?: string;
+    tool?: {
+      id: string;
+      title: string;
+      description: string;
+      credits_cost: number;
+      collection_title?: string | null;
+      suite_title?: string | null;
+    } | null;
+    pdf_url?: string;
+    pdf_title?: string;
+    quiz_data?: any;
+    quiz_title?: string;
+  }>;
 }
 
 export interface ContentWithModules {
@@ -57,13 +83,24 @@ export interface ContentWithModules {
       name: string;
       description: string;
     };
-    stats: {
+    stats?: {
       enrolled_count: number;
       created_at: string;
       updated_at: string;
     };
   };
   modules: Module[];
+  debug?: {
+    function_start_time: string;
+    function_end_time: string;
+    execution_time_ms: number;
+    p_suite_id: string;
+    p_user_id: string;
+    auth_uid: string;
+    access_settings_found: boolean;
+    access_starts_at: string | null;
+    access_settings: any;
+  };
 }
 
 export async function getCollections() {

@@ -1,14 +1,20 @@
 import React, { useEffect } from 'react';
-import { Play, X, FileText, Video, ChevronRight } from 'lucide-react';
+import { Play, X, ChevronRight } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import type { Module } from '@/lib/supabase/learning';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
+import { NodeTypeIcon } from '@/app/profile/components/content/access-structure/NodeTypeIcon';
 
 interface MediaItem {
   id: string;
   title: string;
   order: number;
+  hasAccess: boolean;
+  accessDelay?: {
+    value: number;
+    unit: 'days' | 'weeks' | 'months';
+  };
+  mediaType?: string;
   video?: {
     id: string;
     video_id: string;
@@ -26,25 +32,16 @@ interface MediaItem {
   };
 }
 
-interface MediaItemType {
+interface Module {
   id: string;
   title: string;
   order: number;
-  video?: {
-    id: string;
-    video_id: string;
-    title: string;
+  hasAccess: boolean;
+  accessDelay?: {
+    value: number;
+    unit: 'days' | 'weeks' | 'months';
   };
-  text?: {
-    id: string;
-    content_text: string;
-    title: string;
-  };
-  ai?: {
-    id: string;
-    tool_id: string;
-    title: string;
-  };
+  media: MediaItem[];
 }
 
 interface SuiteViewProps {
@@ -55,8 +52,69 @@ interface SuiteViewProps {
   modules: Module[];
   onPlay: (moduleId: string, mediaItem: MediaItem) => void;
   thumbnailUrl?: string;
-  activeMediaItem?: MediaItemType | null;
+  activeMediaItem?: MediaItem | null;
 }
+
+const getAccessStatusColor = (item: { hasAccess: boolean; accessDelay?: { value: number; unit: string; daysRemaining?: number } }) => {
+  console.log('🎯 Access Status Check:', {
+    item,
+    hasAccess: item.hasAccess,
+    type: typeof item.hasAccess,
+    delay: item.accessDelay
+  });
+  
+  // If they have a delay, they don't have access yet - show blue
+  if (item.accessDelay) return 'bg-blue-500';
+  
+  // If they have access (and no delay), it's green
+  if (item.hasAccess) return 'bg-green-500';
+  
+  // Otherwise (no access, no delay), it's red
+  return 'bg-red-500';
+};
+
+const getAccessMessage = (item: { hasAccess: boolean; accessDelay?: { value: number; unit: string; daysRemaining?: number } }) => {
+  // If they have a delay, show the message regardless of hasAccess value
+  if (item.accessDelay?.daysRemaining) {
+    return `Access in ${item.accessDelay.daysRemaining} days`;
+  }
+  return null;
+};
+
+const calculateTimeRemaining = (delay: { value: number; unit: 'days' | 'weeks' | 'months' }) => {
+  const now = new Date();
+  const future = new Date();
+  
+  switch (delay.unit) {
+    case 'days':
+      future.setDate(future.getDate() + delay.value);
+      break;
+    case 'weeks':
+      future.setDate(future.getDate() + (delay.value * 7));
+      break;
+    case 'months':
+      future.setMonth(future.getMonth() + delay.value);
+      break;
+  }
+  
+  const diffTime = Math.abs(future.getTime() - now.getTime());
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  
+  if (diffDays > 30) {
+    const months = Math.floor(diffDays / 30);
+    return `${months} month${months > 1 ? 's' : ''}`;
+  } else if (diffDays > 7) {
+    const weeks = Math.floor(diffDays / 7);
+    return `${weeks} week${weeks > 1 ? 's' : ''}`;
+  }
+  return `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+};
+
+const hasEffectiveAccess = (item: { hasAccess: boolean; accessDelay?: { value: number; unit: string; daysRemaining?: number } }) => {
+  // If there's a delay, they don't have access yet, regardless of hasAccess value
+  if (item.accessDelay) return false;
+  return item.hasAccess;
+};
 
 export const SuiteView = ({
   isOpen,
@@ -80,6 +138,47 @@ export const SuiteView = ({
 
   const sortedModules = [...modules].sort((a, b) => (a.order || 0) - (b.order || 0));
   const hasMultipleModules = modules.length > 1;
+
+  // Get library ID from environment variable
+  const libraryId = process.env.NEXT_PUBLIC_BUNNY_LIBRARY_ID || '376351';
+  const playerUrl = activeMediaItem?.video?.video_id ? 
+    `https://iframe.mediadelivery.net/embed/${libraryId}/${activeMediaItem.video.video_id}?autoplay=false&preload=metadata&quality=1080p&enabledTransforms=hls` : 
+    null;
+
+  const renderContent = () => {
+    const contentFrame = (children: React.ReactNode) => (
+      <div className="relative flex-1 bg-[var(--background)]">
+        {children}
+      </div>
+    );
+
+    console.log('Current activeType:', activeMediaItem?.mediaType);
+    console.log('Selected Media Item:', activeMediaItem);
+
+    switch (activeMediaItem?.mediaType) {
+      case 'video':
+        if (playerUrl) {
+          return contentFrame(
+            <iframe 
+              src={playerUrl}
+              loading="lazy"
+              className="absolute inset-0 w-full h-full"
+              style={{ border: 'none' }}
+              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen;"
+              allowFullScreen
+              title={title}
+            />
+          );
+        }
+        break;
+      default:
+        return contentFrame(
+          <div className="flex items-center justify-center h-full">
+            {/* Placeholder for other media types */}
+          </div>
+        );
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -128,22 +227,31 @@ export const SuiteView = ({
                 sortedModules.map((module, index) => (
                   <div key={module.id}>
                     <button
-                      onClick={() => module.media[0] && onPlay(module.id, module.media[0])}
+                      onClick={() => hasEffectiveAccess(module) && module.media[0] && onPlay(module.id, module.media[0])}
                       className={cn(
-                        "w-full flex items-center justify-between py-4 transition-all duration-200 px-6",
+                        "relative w-full flex items-center justify-between py-4 transition-all duration-200 px-6",
                         "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]",
-                        activeMediaItem?.id === module.media[0]?.id ? "bg-[var(--accent)] text-white hover:bg-[var(--accent)] shadow-md" : ""
+                        !hasEffectiveAccess(module) && "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
+                        activeMediaItem?.id === module.media[0]?.id ? "bg-[var(--hover-bg)] shadow-md" : ""
                       )}
                     >
-                      <div className="flex items-center gap-3">
-                        {activeMediaItem?.id === module.media[0]?.id ? (
-                          <ChevronRight className="w-5 h-5" />
-                        ) : (
-                          <Video className="w-5 h-5 text-[var(--text-secondary)]" />
-                        )}
-                        <span className="font-medium text-lg">{module.title || `Module ${index + 1}`}</span>
+                      <div className={cn(
+                        "absolute left-0 top-0 bottom-0 w-1",
+                        getAccessStatusColor(module)
+                      )} />
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex flex-col">
+                          <span className={cn(
+                            "font-medium text-lg truncate",
+                            !hasEffectiveAccess(module) && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
+                          )}>{module.title || `Module ${index + 1}`}</span>
+                          {getAccessMessage(module) && (
+                            <span className="text-sm text-blue-500">
+                              {getAccessMessage(module)}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <Play className="w-5 h-5 text-[var(--text-secondary)]" />
                     </button>
                     {index < sortedModules.length - 1 && (
                       <div className="h-px bg-[var(--border-color)]" />
@@ -155,20 +263,30 @@ export const SuiteView = ({
                 sortedModules[0]?.media.map((mediaItem: MediaItem, index: number) => (
                   <div key={mediaItem.id || index}>
                     <button
-                      onClick={() => onPlay(sortedModules[0].id, mediaItem)}
+                      onClick={() => hasEffectiveAccess(mediaItem) && onPlay(sortedModules[0].id, mediaItem)}
                       className={cn(
-                        "w-full text-left py-4 transition-all duration-200 px-6",
+                        "relative w-full text-left py-4 transition-all duration-200 px-6",
                         "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]",
-                        activeMediaItem?.id === mediaItem.id ? "bg-[var(--accent)] text-white hover:bg-[var(--accent)] shadow-md" : ""
+                        !hasEffectiveAccess(mediaItem) && "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
+                        activeMediaItem?.id === mediaItem.id ? "bg-[var(--hover-bg)] shadow-md" : ""
                       )}
                     >
-                      <div className="flex items-center gap-3">
-                        {activeMediaItem?.id === mediaItem.id ? (
-                          <ChevronRight className="w-5 h-5" />
-                        ) : (
-                          <Video className="w-5 h-5 text-[var(--text-secondary)]" />
-                        )}
-                        <span className="font-medium text-lg">{mediaItem.title || `Item ${index + 1}`}</span>
+                      <div className={cn(
+                        "absolute left-0 top-0 bottom-0 w-1",
+                        getAccessStatusColor(mediaItem)
+                      )} />
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="flex flex-col">
+                          <span className={cn(
+                            "font-medium text-lg truncate",
+                            !hasEffectiveAccess(mediaItem) && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
+                          )}>{mediaItem.title || `Item ${index + 1}`}</span>
+                          {getAccessMessage(mediaItem) && (
+                            <span className="text-sm text-blue-500">
+                              {getAccessMessage(mediaItem)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </button>
                     {index < (sortedModules[0]?.media.length || 0) - 1 && (
@@ -178,6 +296,7 @@ export const SuiteView = ({
                 ))
               )}
             </div>
+            {renderContent()}
           </div>
         </motion.div>
       )}
