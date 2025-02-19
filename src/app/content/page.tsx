@@ -44,6 +44,7 @@ type ContentWithModules = {
   hasAccess: boolean;
   description?: string;
   thumbnail_url?: string;
+  access_starts_at?: string;
   children?: ModuleType[];
 };
 
@@ -458,6 +459,7 @@ export default function Page(): React.JSX.Element {
           hasAccess: true, // Content level always has access if we can view it
           description: item.description,
           thumbnail_url: item.image,
+          access_starts_at: accessStartsAt,
           children: contentStructure.children?.map((module) => ({
             id: module.id,
             name: module.name || `Module ${module.order || 1}`,
@@ -546,6 +548,20 @@ export default function Page(): React.JSX.Element {
     }
   };
 
+  const handleCloseContent = () => {
+    setSelectedItem(null);
+    setSelectedContent(null);
+    setSelectedMediaItem(null);
+    setShowMediaPlayer(false);
+  };
+
+  const handlePlayMedia = (moduleId: string) => {
+    // Implement the logic to handle playing media
+    console.log('Playing media:', moduleId);
+  };
+
+  const activeMediaItem = selectedMediaItem as MediaPlayerItem;
+
   return (
     <div className="min-h-screen text-[color:var(--foreground)]" style={{ background: 'var(--background)' }}>
       <ScrollProgress />
@@ -610,51 +626,29 @@ export default function Page(): React.JSX.Element {
                 </div>
               ) : (
                 <SuiteView
-                  isOpen={true}
-                  onClose={() => {
-                    setSelectedItem(null);
-                    setSelectedContent(null);
-                    setSelectedMediaItem(null);
-                    setShowMediaPlayer(false);
-                  }}
-                  title={selectedContent.name}
-                  description={selectedContent.description || ''}
-                  modules={selectedContent.children?.map(module => {
-                    console.log('🔍 Mapping module:', {
-                      id: module.id,
-                      name: module.name,
-                      hasAccess: module.hasAccess,
-                      type: typeof module.hasAccess
-                    });
-                    
-                    return {
-                      id: module.id,
-                      title: module.name,
-                      order: 0,
-                      hasAccess: module.hasAccess,
-                      accessDelay: module.accessDelay,
-                      media: module.children?.map(child => {
-                        console.log('🔍 Mapping media item:', {
-                          id: child.id,
-                          name: child.name,
-                          hasAccess: child.hasAccess,
-                          type: typeof child.hasAccess
-                        });
-                        
-                        return {
-                          id: child.id,
-                          title: child.name,
-                          order: 0,
-                          hasAccess: child.hasAccess,
-                          accessDelay: child.accessDelay,
-                          mediaType: child.mediaType
-                        };
-                      }) || []
-                    };
-                  }) || []}
-                  onPlay={handleModuleSelect}
-                  thumbnailUrl={selectedContent.thumbnail_url}
-                  activeMediaItem={selectedMediaItem}
+                  isOpen={!!selectedContent}
+                  onClose={handleCloseContent}
+                  title={selectedContent?.name || ''}
+                  description={selectedContent?.description || ''}
+                  modules={selectedContent?.children?.map(module => ({
+                    id: module.id,
+                    title: module.name,
+                    order: module.order || 0,
+                    hasAccess: module.hasAccess,
+                    accessDelay: module.accessDelay,
+                    media: module.children?.map(media => ({
+                      id: media.id,
+                      title: media.name,
+                      order: media.order || 0,
+                      hasAccess: media.hasAccess,
+                      accessDelay: media.accessDelay,
+                      mediaType: media.type
+                    })) || []
+                  })) || []}
+                  accessStartsAt={selectedContent?.access_starts_at || new Date().toISOString()}
+                  onPlay={handlePlayMedia}
+                  thumbnailUrl={selectedContent?.thumbnail_url}
+                  activeMediaItem={activeMediaItem}
                 />
               )}
             </div>

@@ -245,9 +245,9 @@ export const MediaPlayer = ({
   const libraryId = process.env.NEXT_PUBLIC_BUNNY_LIBRARY_ID || '376351';
   const securityToken = process.env.NEXT_PUBLIC_BUNNY_SECURITY_TOKEN || '';
   
-  // Construct the player URL with security token
+  // Construct the player URL with security token and timestamp
   const playerUrl = videoId ? 
-    `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?token=${securityToken}` : 
+    `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?token=${securityToken}&t=${Date.now()}` : 
     null;
 
   const renderContent = () => {

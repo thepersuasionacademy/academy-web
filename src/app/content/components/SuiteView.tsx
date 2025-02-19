@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { NodeTypeIcon } from '@/app/profile/components/content/access-structure/NodeTypeIcon';
+import { AccessStatus, hasEffectiveAccess } from './AccessStatus';
+import { AccessDelayStatus } from './AccessDelayStatus';
 
 interface MediaItem {
   id: string;
@@ -50,36 +52,11 @@ interface SuiteViewProps {
   title: string;
   description: string;
   modules: Module[];
+  accessStartsAt: string; // When the user was first granted access
   onPlay: (moduleId: string, mediaItem: MediaItem) => void;
   thumbnailUrl?: string;
   activeMediaItem?: MediaItem | null;
 }
-
-const getAccessStatusColor = (item: { hasAccess: boolean; accessDelay?: { value: number; unit: string; daysRemaining?: number } }) => {
-  console.log('🎯 Access Status Check:', {
-    item,
-    hasAccess: item.hasAccess,
-    type: typeof item.hasAccess,
-    delay: item.accessDelay
-  });
-  
-  // If they have a delay, they don't have access yet - show blue
-  if (item.accessDelay) return 'bg-blue-500';
-  
-  // If they have access (and no delay), it's green
-  if (item.hasAccess) return 'bg-green-500';
-  
-  // Otherwise (no access, no delay), it's red
-  return 'bg-red-500';
-};
-
-const getAccessMessage = (item: { hasAccess: boolean; accessDelay?: { value: number; unit: string; daysRemaining?: number } }) => {
-  // If they have a delay, show the message regardless of hasAccess value
-  if (item.accessDelay?.daysRemaining) {
-    return `Access in ${item.accessDelay.daysRemaining} days`;
-  }
-  return null;
-};
 
 const calculateTimeRemaining = (delay: { value: number; unit: 'days' | 'weeks' | 'months' }) => {
   const now = new Date();
@@ -110,18 +87,13 @@ const calculateTimeRemaining = (delay: { value: number; unit: 'days' | 'weeks' |
   return `${diffDays} day${diffDays > 1 ? 's' : ''}`;
 };
 
-const hasEffectiveAccess = (item: { hasAccess: boolean; accessDelay?: { value: number; unit: string; daysRemaining?: number } }) => {
-  // If there's a delay, they don't have access yet, regardless of hasAccess value
-  if (item.accessDelay) return false;
-  return item.hasAccess;
-};
-
 export const SuiteView = ({
   isOpen,
   onClose,
   title,
   description,
   modules,
+  accessStartsAt,
   onPlay,
   thumbnailUrl,
   activeMediaItem,
@@ -230,27 +202,38 @@ export const SuiteView = ({
                       onClick={() => hasEffectiveAccess(module) && module.media[0] && onPlay(module.id, module.media[0])}
                       className={cn(
                         "relative w-full flex items-center justify-between py-4 transition-all duration-200 px-6",
-                        "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]",
-                        !hasEffectiveAccess(module) && "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
+                        hasEffectiveAccess(module) ? "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]" : "",
+                        !hasEffectiveAccess(module) && module.accessDelay ? "dark:bg-black/40 bg-gray-200" : "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
                         activeMediaItem?.id === module.media[0]?.id ? "bg-[var(--hover-bg)] shadow-md" : ""
                       )}
                     >
-                      <div className={cn(
-                        "absolute left-0 top-0 bottom-0 w-1",
-                        getAccessStatusColor(module)
-                      )} />
+                      <AccessStatus 
+                        item={{
+                          hasAccess: module.hasAccess,
+                          accessStartsAt: accessStartsAt,
+                          accessDelay: module.accessDelay
+                        }}
+                        showMessage={false}
+                        className="absolute left-0 top-0 bottom-0" 
+                      />
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="flex flex-col">
                           <span className={cn(
                             "font-medium text-lg truncate",
                             !hasEffectiveAccess(module) && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
                           )}>{module.title || `Module ${index + 1}`}</span>
-                          {getAccessMessage(module) && (
-                            <span className="text-sm text-blue-500">
-                              {getAccessMessage(module)}
-                            </span>
-                          )}
                         </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {module.accessDelay && (
+                          <AccessDelayStatus
+                            accessStartsAt={accessStartsAt}
+                            accessDelay={module.accessDelay}
+                          />
+                        )}
+                        {hasEffectiveAccess(module) && activeMediaItem?.id !== module.media[0]?.id && (
+                          <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
+                        )}
                       </div>
                     </button>
                     {index < sortedModules.length - 1 && (
@@ -266,27 +249,38 @@ export const SuiteView = ({
                       onClick={() => hasEffectiveAccess(mediaItem) && onPlay(sortedModules[0].id, mediaItem)}
                       className={cn(
                         "relative w-full text-left py-4 transition-all duration-200 px-6",
-                        "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]",
-                        !hasEffectiveAccess(mediaItem) && "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
+                        hasEffectiveAccess(mediaItem) ? "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]" : "",
+                        !hasEffectiveAccess(mediaItem) && mediaItem.accessDelay ? "dark:bg-black/40 bg-gray-200" : "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
                         activeMediaItem?.id === mediaItem.id ? "bg-[var(--hover-bg)] shadow-md" : ""
                       )}
                     >
-                      <div className={cn(
-                        "absolute left-0 top-0 bottom-0 w-1",
-                        getAccessStatusColor(mediaItem)
-                      )} />
+                      <AccessStatus 
+                        item={{
+                          hasAccess: mediaItem.hasAccess,
+                          accessStartsAt: accessStartsAt,
+                          accessDelay: mediaItem.accessDelay
+                        }}
+                        showMessage={false}
+                        className="absolute left-0 top-0 bottom-0" 
+                      />
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="flex flex-col">
                           <span className={cn(
                             "font-medium text-lg truncate",
                             !hasEffectiveAccess(mediaItem) && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
                           )}>{mediaItem.title || `Item ${index + 1}`}</span>
-                          {getAccessMessage(mediaItem) && (
-                            <span className="text-sm text-blue-500">
-                              {getAccessMessage(mediaItem)}
-                            </span>
-                          )}
                         </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {mediaItem.accessDelay && (
+                          <AccessDelayStatus
+                            accessStartsAt={accessStartsAt}
+                            accessDelay={mediaItem.accessDelay}
+                          />
+                        )}
+                        {hasEffectiveAccess(mediaItem) && activeMediaItem?.id !== mediaItem.id && (
+                          <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
+                        )}
                       </div>
                     </button>
                     {index < (sortedModules[0]?.media.length || 0) - 1 && (
