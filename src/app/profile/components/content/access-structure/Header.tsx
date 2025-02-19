@@ -27,8 +27,8 @@ export function Header({
     <div className="flex items-center justify-between mb-8">
       <h3 className="text-3xl font-medium text-[var(--foreground)]">Access Overview</h3>
       <div className="flex items-center gap-4">
-        {/* Edit Mode Toggle (only for admins and super admins, and only for existing access) */}
-        {(isAdmin || isSuperAdmin) && hasExistingAccess && (
+        {/* Edit Mode Toggle (only for admins and super admins) */}
+        {(isAdmin || isSuperAdmin) && !hasExistingAccess && (
           <button
             onClick={onEditModeToggle}
             className={cn(

@@ -21,7 +21,7 @@ export function AccessStructureView({
   const [error, setError] = useState<string | null>(null);
   const [accessMethod, setAccessMethod] = useState<AccessMethod>('instant');
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
+  const [isEditMode, setIsEditMode] = useState((isAdmin || isSuperAdmin) ? true : false);
   const supabase = createClientComponentClient();
   const [loadingNodes, setLoadingNodes] = useState<Set<string>>(new Set());
   const structureRef = useRef<HTMLDivElement>(null);
@@ -201,13 +201,15 @@ export function AccessStructureView({
             p_content_id: selectedId
           });
 
+        // Reset edit mode based on access structure and admin status
         if (!accessStructure && (isAdmin || isSuperAdmin)) {
           setIsEditMode(true);
-        }
-        else if (accessStructure) {
+        } else {
           setIsEditMode(false);
-          
-          // Check if there are any drip settings in the structure
+        }
+        
+        // Reset access method based on drip settings
+        if (accessStructure) {
           const hasDripSettings = (node: any): boolean => {
             if (node.accessDelay?.value > 0) return true;
             if (node.children) {
@@ -216,10 +218,9 @@ export function AccessStructureView({
             return false;
           };
           
-          // Set access method based on whether drip settings exist
-          if (hasDripSettings(accessStructure)) {
-            setAccessMethod('drip');
-          }
+          setAccessMethod(hasDripSettings(accessStructure) ? 'drip' : 'instant');
+        } else {
+          setAccessMethod('instant');
         }
 
         const rootNode = await fetchNodeDetails(selectedId, selectedType);
@@ -234,6 +235,9 @@ export function AccessStructureView({
       }
     }
 
+    // Reset states when selectedId changes
+    setSelectedNode(null);
+    setExpandedNodes(new Set());
     fetchStructure();
   }, [selectedId, selectedType, targetUserId, isAdmin, isSuperAdmin]);
 
