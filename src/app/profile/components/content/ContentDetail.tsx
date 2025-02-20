@@ -7,7 +7,7 @@ import { markdownComponents } from '@/app/ai/components/embed/output/MarkdownSty
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { AddAccessModal } from '../content/AddAccessModal';
-import { AccessStructureView } from './access-structure/AccessStructureView';
+import { AccessStructureEditor } from './access-structure/AccessStructureEditor';
 
 interface ContentDetailProps {
   item: AIItem;
@@ -271,9 +271,11 @@ export function ContentDetail({
 
       {/* Access Structure View */}
       {showAccessModal && selectedAccessType && selectedAccessId && (
-        <AccessStructureView
+        <AccessStructureEditor
           selectedType={selectedAccessType}
           selectedId={selectedAccessId}
+          isAdmin={isAdmin}
+          isNewAccess={true}
         />
       )}
     </>

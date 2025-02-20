@@ -58,27 +58,15 @@ export function StructureNode({
   const isMediaGroup = node.type === 'media' && hasChildren;
 
   const getAccessStatusColor = (node: StructureNodeType, isNodeInEditMode: boolean = false) => {
-    // First check for no access
+    // Content level uses foreground color (white/black based on theme)
+    if (node.type === 'content') return 'bg-[var(--foreground)]';
+
+    // First check for explicit locked status (via eye icon)
     if (node.hasAccess === false) return 'bg-red-500';
 
-    // Check for drip delay
-    const hasNodeOrDescendantsWithDelay = (checkNode: StructureNodeType): boolean => {
-      const delayValue = checkNode.accessDelay?.value;
-      if (delayValue !== undefined && delayValue > 0) {
-        return true;
-      }
-      
-      if (checkNode.children) {
-        return checkNode.children.some(child => hasNodeOrDescendantsWithDelay(child));
-      }
-      
-      return false;
-    };
-
-    const hasDelay = hasNodeOrDescendantsWithDelay(node);
-    
-    // If in drip mode and has delay, show as blue (pending)
-    if (accessMethod === 'drip' && hasDelay) {
+    // Check for drip delay - if in drip mode and has any delay settings, show as blue
+    const delayValue = node.accessDelay?.value;
+    if (accessMethod === 'drip' && typeof delayValue === 'number' && delayValue > 0) {
       return 'bg-blue-500';
     }
 
@@ -105,9 +93,10 @@ export function StructureNode({
           }
         }}
         className={cn(
-          "group relative flex items-center py-3 px-4 border border-[var(--border-color)] rounded-lg",
+          "group relative flex items-center py-3 px-4 rounded-lg",
           "bg-[var(--background)] transition-colors",
-          level === 0 && "shadow-sm mb-4",
+          level > 0 && "border border-[var(--border-color)]",
+          level === 0 && "mb-4",
           hasNoAccess && "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
           isMediaGroup && "cursor-pointer hover:bg-[var(--muted)]/50"
         )}

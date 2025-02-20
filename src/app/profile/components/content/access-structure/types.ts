@@ -7,7 +7,7 @@ export interface StructureNode {
     value: number;
     unit: 'days' | 'weeks' | 'months';
   };
-  hasAccess?: boolean;
+  hasAccess: boolean;
   order: number;
   mediaType?: string;
   isHidden?: boolean;
@@ -42,4 +42,22 @@ export interface TransformedNode {
   };
   mediaType?: string;
   children: TransformedNode[];
+}
+
+export interface AccessNode {
+  id: string;
+  name: string;
+  type: 'content' | 'module' | 'media';
+  has_access: boolean;
+  order?: number;
+  access_delay?: {
+    value: number;
+    unit: string;
+  };
+  children?: AccessNode[];
+  mediaType?: string;
+  debug_info?: {
+    access_starts_at: string | null;
+    access_overrides: Record<string, any>;
+  };
 } 

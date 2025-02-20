@@ -2,6 +2,7 @@ import { Eye, EyeOff, Plus, X, Lock } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { TimeUnitDropdown } from './TimeUnitDropdown';
 import { StructureNode, AccessMethod } from './types';
+import { useRef, useEffect, useState } from 'react';
 
 interface AccessControlsProps {
   node: StructureNode;
@@ -13,6 +14,19 @@ interface AccessControlsProps {
   onToggleAccess: () => void;
 }
 
+interface AccessOverride {
+  status: 'locked' | 'pending';
+  delay?: {
+    value: number;
+    unit: 'days' | 'weeks' | 'months';
+  };
+}
+
+interface AccessOverrides {
+  modules?: Record<string, AccessOverride>;
+  media?: Record<string, AccessOverride>;
+}
+
 export function AccessControls({ 
   node, 
   isEditMode, 
@@ -22,11 +36,32 @@ export function AccessControls({
   onRemoveDrip,
   onToggleAccess
 }: AccessControlsProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const shouldFocusRef = useRef(false);
+  const [inputValue, setInputValue] = useState(node.accessDelay?.value?.toString() || '');
+
+  useEffect(() => {
+    if (shouldFocusRef.current && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+      shouldFocusRef.current = false;
+    }
+  }, [node.accessDelay]);
+
+  useEffect(() => {
+    setInputValue(node.accessDelay?.value?.toString() || '');
+  }, [node.accessDelay?.value]);
+
   if (!isEditMode || (node.type === 'media' && node.mediaType)) {
     return null;
   }
 
-  // Content level nodes should show access controls
+  // For content level, show nothing - no controls at all
+  if (node.type === 'content') {
+    return null;
+  }
+
+  // Base controls for toggling access (only for modules and media)
   const baseControls = (
     <button
       onClick={(e) => {
@@ -47,35 +82,19 @@ export function AccessControls({
     </button>
   );
 
-  // For content level, only show base controls
-  if (node.type === 'content') {
-    return (
-      <div className="flex items-center gap-2 ml-auto">
-        {baseControls}
-      </div>
-    );
-  }
-
   const findParentWithDrip = (targetNode: StructureNode, tree: StructureNode | null): boolean => {
-    if (!tree) return false;
+    if (!tree || !tree.children) return false;
 
-    const findParentRecursive = (parent: StructureNode, targetId: string): boolean => {
-      if (parent.id === targetId) return false;
-      
-      if (parent.children) {
-        for (const child of parent.children) {
-          if (child.id === targetId) {
-            return parent.accessDelay !== undefined;
-          }
-          if (findParentRecursive(child, targetId)) {
-            return true;
-          }
-        }
+    for (const child of tree.children) {
+      if (child.id === targetNode.id) {
+        return child.type === 'module' || child.type === 'media' ? false : true;
       }
-      return false;
-    };
-
-    return findParentRecursive(tree, targetNode.id);
+      if (child.children) {
+        const found = findParentWithDrip(targetNode, child);
+        if (found) return true;
+      }
+    }
+    return false;
   };
 
   const findParentModule = (targetNode: StructureNode, tree: StructureNode | null): StructureNode | null => {
@@ -114,32 +133,63 @@ export function AccessControls({
     );
   }
 
-  const handleAddDrip = () => {
-    onUpdateNodeAccessDelay(node.id, 0, 'days');
+  const handleAddDrip = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    shouldFocusRef.current = true;
+    // Just set the delay unit without a value
+    onUpdateNodeAccessDelay(node.id, undefined as any, 'days');
+    setInputValue('');
   };
 
   if (accessMethod === 'drip' && hasDripSettings) {
     return (
-      <div className="flex items-center gap-2 ml-auto">
+      <div className="flex items-center gap-2 ml-auto" onClick={(e) => e.stopPropagation()}>
         <input
+          ref={inputRef}
           type="number"
-          min="1"
-          max="99"
-          value={node.accessDelay?.value || ''}
+          value={inputValue}
           onChange={(e) => {
             const value = e.target.value;
-            onUpdateNodeAccessDelay(
-              node.id, 
-              value === '' ? 0 : Math.max(0, Math.min(99, parseInt(value) || 0)), 
-              node.accessDelay?.unit || 'days'
-            );
+            setInputValue(value);
+            
+            // Only update the node if we have a valid number
+            const numValue = parseInt(value);
+            if (!isNaN(numValue)) {
+              onUpdateNodeAccessDelay(
+                node.id, 
+                numValue,
+                node.accessDelay?.unit || 'days'
+              );
+            }
           }}
-          className="w-8 text-base text-right bg-transparent text-[var(--foreground)] focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          onBlur={(e) => {
+            const value = e.target.value;
+            const numValue = parseInt(value);
+            
+            // On blur, enforce min/max values
+            if (isNaN(numValue) || numValue < 1) {
+              onUpdateNodeAccessDelay(node.id, 1, node.accessDelay?.unit || 'days');
+            } else if (numValue > 99) {
+              onUpdateNodeAccessDelay(node.id, 99, node.accessDelay?.unit || 'days');
+            }
+          }}
+          onFocus={(e) => e.target.select()}
+          className={cn(
+            "w-8 text-base text-right bg-transparent focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none",
+            inputValue === '' || isNaN(parseInt(inputValue)) ? "text-red-500" : "text-[var(--foreground)]"
+          )}
         />
         <TimeUnitDropdown
           value={node.accessDelay?.unit || 'days'}
-          onChange={(unit) => onUpdateNodeAccessDelay(node.id, node.accessDelay?.value || 0, unit)}
-          inputValue={node.accessDelay?.value || 0}
+          onChange={(unit) => {
+            const numValue = parseInt(inputValue);
+            onUpdateNodeAccessDelay(
+              node.id, 
+              isNaN(numValue) ? 1 : numValue,
+              unit
+            );
+          }}
+          inputValue={parseInt(inputValue) || 0}
         />
         <button
           onClick={(e) => {
@@ -158,10 +208,7 @@ export function AccessControls({
     <div className="flex items-center gap-2 ml-auto">
       {accessMethod === 'drip' && (
         <button
-          onClick={(e) => {
-            e.stopPropagation();
-            handleAddDrip();
-          }}
+          onClick={handleAddDrip}
           className="p-1 hover:bg-[var(--muted)] rounded-full transition-colors"
         >
           <Plus className="w-4 h-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]" />

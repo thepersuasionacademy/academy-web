@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { ChevronRight, ChevronDown, Clock, Film, Book, FileText, Wrench, HelpCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { AddAccessModal } from '../content/AddAccessModal';
+import { AccessStructureEditor } from '../content/access-structure/AccessStructureEditor';
 import { AccessStructureView } from '../content/access-structure/AccessStructureView';
-import { NewAccessStructureView } from '../content/access-structure/NewAccessStructureView';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface ContentGroup {
@@ -260,12 +260,13 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
       {/* Right Column - Details */}
       <div className="col-span-7">
         {selectedAccessType && selectedAccessId ? (
-          <NewAccessStructureView
+          <AccessStructureEditor
             selectedType={selectedAccessType}
             selectedId={selectedAccessId}
             targetUserId={userId}
             isAdmin={isAdmin}
             isSuperAdmin={isAdmin}
+            isNewAccess={true}
             onRefreshContentHistory={() => {
               // Refresh content groups
               if (userId) {
@@ -287,16 +288,6 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
             targetUserId={userId}
             isAdmin={isAdmin}
             isSuperAdmin={isAdmin}
-            onRefreshContentHistory={() => {
-              // Refresh content groups
-              if (userId) {
-                supabase.rpc('get_user_content_groups', {
-                  p_user_id: userId
-                }).then(({ data }) => {
-                  if (data) setContentGroups(data);
-                });
-              }
-            }}
           />
         ) : (
           <div className="rounded-xl border border-[var(--border-color)] bg-[var(--background)] p-8">
