@@ -117,7 +117,7 @@ export default function SignupView({ onBack }: SignupViewProps) {
   }
 
   return (
-    <>
+    <div className="overflow-y-auto max-h-[calc(100vh-4rem)] px-1">
       {/* Logo */}
       <div className="flex flex-col items-center mb-12">
         <Image
@@ -254,6 +254,6 @@ export default function SignupView({ onBack }: SignupViewProps) {
           </button>
         </div>
       )}
-    </>
+    </div>
   )
 } 

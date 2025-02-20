@@ -261,25 +261,43 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center">
+    <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden">
       {/* Animated Background */}
       <div className="absolute inset-0">
-        <div className="absolute inset-0 animate-[flow_18s_ease-in-out_infinite] scale-[1.02]">
+        <div className="absolute inset-0 animate-[flow_24s_ease-in-out_infinite] scale-[1.02]">
           <img 
             src="https://thepersuasionacademycdn.b-cdn.net/Images/thepowerark_black_background_magic_4k_wallpaper_background_burg_8b1627cb-2a30-4594-9766-7512a94c2a31%20(1).jpeg"
             alt="Background"
-            className="w-full h-full object-cover animate-[wave_22s_ease-in-out_infinite] scale-[1.15]"
+            className="w-full h-full object-cover animate-[wave_30s_ease-in-out_infinite] scale-[1.15] will-change-transform"
           />
         </div>
+        <div className="absolute inset-0 bg-gradient-radial from-transparent via-black/10 to-transparent animate-pulse" />
       </div>
       
       {/* Auth Container - pure glass effect */}
-      <div className="relative z-10 w-full max-w-md p-8 bg-black/20 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-all duration-300">
+      <div className="relative z-10 w-full max-w-md p-8 bg-black/20 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-all duration-300 my-8">
         {renderView()}
       </div>
 
       {/* Update the global styles */}
       <style jsx global>{`
+        @tailwind base;
+        @tailwind components;
+        @tailwind utilities;
+
+        @layer utilities {
+          .bg-gradient-radial {
+            background-image: radial-gradient(circle at center, var(--tw-gradient-from) 0%, var(--tw-gradient-via) 50%, var(--tw-gradient-to) 100%);
+          }
+        }
+
+        body {
+          overflow: hidden;
+          height: 100vh;
+          position: fixed;
+          width: 100%;
+        }
+
         .relative .flex .justify-center .text-sm span {
           background: transparent;
           backdrop-filter: blur-xl;
@@ -315,18 +333,48 @@ export default function LoginPage() {
 
       <style jsx>{`
         @keyframes wave {
-          0% { transform: scale(1.15) skew(0deg, 0deg); }
-          20% { transform: scale(1.16) skew(2deg, 1deg); }
-          40% { transform: scale(1.15) skew(-1deg, -1.5deg); }
-          60% { transform: scale(1.17) skew(-2deg, 1deg); }
-          80% { transform: scale(1.15) skew(1deg, -1deg); }
-          100% { transform: scale(1.15) skew(0deg, 0deg); }
+          0% { 
+            transform: scale(1.15) perspective(500px) rotateX(0deg) rotateY(0deg) translateZ(0px);
+            filter: brightness(1);
+          }
+          25% { 
+            transform: scale(1.16) perspective(500px) rotateX(1deg) rotateY(-1deg) translateZ(10px);
+            filter: brightness(1.1);
+          }
+          50% { 
+            transform: scale(1.15) perspective(500px) rotateX(-1deg) rotateY(1deg) translateZ(20px);
+            filter: brightness(1.05);
+          }
+          75% { 
+            transform: scale(1.17) perspective(500px) rotateX(1deg) rotateY(-0.5deg) translateZ(10px);
+            filter: brightness(1.1);
+          }
+          100% { 
+            transform: scale(1.15) perspective(500px) rotateX(0deg) rotateY(0deg) translateZ(0px);
+            filter: brightness(1);
+          }
         }
         @keyframes flow {
-          0%, 100% { transform: scale(1.02) rotate(0deg) translateY(0px); }
-          25% { transform: scale(1.04) rotate(1deg) translateY(-5px); }
-          50% { transform: scale(1.03) rotate(-1deg) translateY(5px); }
-          75% { transform: scale(1.04) rotate(0.5deg) translateY(-3px); }
+          0% { 
+            transform: scale(1.02) translate3d(0px, 0px, 0px);
+            filter: contrast(1);
+          }
+          25% { 
+            transform: scale(1.04) translate3d(-5px, -5px, 10px);
+            filter: contrast(1.1);
+          }
+          50% { 
+            transform: scale(1.03) translate3d(5px, 5px, -10px);
+            filter: contrast(1.05);
+          }
+          75% { 
+            transform: scale(1.04) translate3d(-3px, 3px, 5px);
+            filter: contrast(1.1);
+          }
+          100% { 
+            transform: scale(1.02) translate3d(0px, 0px, 0px);
+            filter: contrast(1);
+          }
         }
       `}</style>
     </div>

@@ -38,7 +38,32 @@ export default function RootLayout({
 
   // Initialize Intercom
   useEffect(() => {
-    initializeIntercom();
+    // Don't initialize Intercom on auth pages
+    const isAuthPage = window.location.pathname.startsWith('/auth/');
+    if (isAuthPage) {
+      if (window.Intercom) {
+        window.Intercom('shutdown');
+      }
+      return;
+    }
+
+    // Check for session before initializing
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const timestamp = Math.floor(new Date(session.user.created_at).getTime() / 1000);
+        initializeIntercom({
+          user_id: session.user.id,
+          email: session.user.email,
+          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+          created_at: timestamp
+        });
+      } else {
+        if (window.Intercom) {
+          window.Intercom('shutdown');
+        }
+      }
+    });
+
     return () => {
       if (window.Intercom) {
         window.Intercom('shutdown');
@@ -59,20 +84,6 @@ export default function RootLayout({
         });
       } else if (event === 'SIGNED_OUT') {
         shutdownIntercom();
-        initializeIntercom();
-      }
-    });
-
-    // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const timestamp = Math.floor(new Date(session.user.created_at).getTime() / 1000);
-        updateIntercomUser({
-          user_id: session.user.id,
-          email: session.user.email,
-          name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
-          created_at: timestamp
-        });
       }
     });
 
