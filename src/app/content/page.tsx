@@ -636,12 +636,9 @@ export default function Page(): React.JSX.Element {
 
         {/* Content Viewer */}
         {selectedContent && (
-          <div className="fixed inset-0 z-50 bg-[var(--background)] flex justify-end">
-            <div className={cn(
-              "flex-1 h-full border-r border-[var(--border-color)]",
-              showMediaPlayer && selectedMediaItem ? "bg-[var(--background)]" : "bg-transparent border-transparent"
-            )}>
-              {showMediaPlayer && selectedMediaItem && (
+          <div className="fixed inset-0 z-50 flex justify-end">
+            {showMediaPlayer && selectedMediaItem ? (
+              <div className="flex-1 h-full border-r border-[var(--border-color)] bg-[var(--background)]">
                 <MediaPlayer
                   title={selectedContent?.name || ''}
                   description={selectedContent?.description || ''}
@@ -653,10 +650,10 @@ export default function Page(): React.JSX.Element {
                   onMediaSelect={() => {}}
                   selectedMediaItem={selectedMediaItem}
                 />
-              )}
-            </div>
+              </div>
+            ) : null}
             
-            <div className="w-[400px] flex-shrink-0">
+            <div className="w-[400px] flex-shrink-0 bg-[var(--background)]">
               <SuiteView
                 isOpen={!!selectedContent}
                 onClose={handleCloseContent}
