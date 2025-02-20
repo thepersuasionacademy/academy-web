@@ -332,6 +332,7 @@ export default function Page(): React.JSX.Element {
   const [accessStructure, setAccessStructure] = useState<RawAccessStructure | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<any>(null);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
 
   // Get session without redirecting (middleware handles auth)
   useEffect(() => {
@@ -560,6 +561,7 @@ export default function Page(): React.JSX.Element {
   const handlePlayMedia = (moduleId: string, mediaItem: MediaItem) => {
     try {
       console.log('🟡 Playing media:', { moduleId, mediaItem });
+      setSelectedItemId(mediaItem.id);
       
       // First get the media content from the RPC
       supabase.rpc('get_media_content', { p_media_id: mediaItem.id })
@@ -667,6 +669,7 @@ export default function Page(): React.JSX.Element {
                 onPlay={handlePlayMedia}
                 thumbnailUrl={selectedContent?.thumbnail_url}
                 activeMediaItem={selectedItem}
+                selectedItemId={selectedItemId}
               />
             </div>
           </div>

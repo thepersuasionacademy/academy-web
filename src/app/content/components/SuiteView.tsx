@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Play, X, ChevronRight } from 'lucide-react';
+import { Play, X } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -39,18 +39,13 @@ interface SuiteViewProps {
           value: number;
         };
       }>;
-      modules?: Record<string, {
-        status: 'locked' | 'pending';
-        delay?: {
-          unit: 'days' | 'weeks' | 'months';
-          value: number;
-        };
-      }>;
+      modules?: Record<string, any>;
     };
   } | null;
   onPlay: (moduleId: string, mediaItem: MediaItem) => void;
   thumbnailUrl?: string;
   activeMediaItem?: MediaItem | null;
+  selectedItemId?: string | null;
 }
 
 const calculateTimeRemaining = (accessStartsAt: string, delay: { value: number; unit: 'days' | 'weeks' | 'months' }) => {
@@ -99,6 +94,7 @@ export const SuiteView = ({
   onPlay,
   thumbnailUrl,
   activeMediaItem,
+  selectedItemId,
 }: SuiteViewProps) => {
   const supabase = createClientComponentClient();
 
@@ -134,6 +130,7 @@ export const SuiteView = ({
         // If it's pending, check the delay
         if (override.status === 'pending' && override.delay) {
           const now = new Date();
+          now.setHours(0, 0, 0, 0); // Set to start of day
           const accessStartDate = new Date(userAccess.access_starts_at);
           const releaseDate = new Date(accessStartDate);
           
@@ -149,6 +146,8 @@ export const SuiteView = ({
               releaseDate.setMonth(releaseDate.getMonth() + override.delay.value);
               break;
           }
+          
+          releaseDate.setHours(0, 0, 0, 0); // Set to start of day
 
           console.log('⏰ Module release date check:', {
             now: now.toISOString(),
@@ -156,7 +155,7 @@ export const SuiteView = ({
             releaseDate: releaseDate.toISOString()
           });
           
-          // If the release date hasn't passed, it's still pending
+          // If the release date hasn't arrived yet, it's still pending
           if (now < releaseDate) {
             return {
               isAccessible: false,
@@ -166,6 +165,14 @@ export const SuiteView = ({
               releaseDate: releaseDate.toISOString()
             };
           }
+          
+          // If we get here, the release date has passed, so grant access
+          return { isAccessible: true };
+        }
+        
+        // If it's locked, no access
+        if (override.status === 'locked') {
+          return { isAccessible: false };
         }
       }
 
@@ -200,6 +207,7 @@ export const SuiteView = ({
         // If it's pending, check the delay
         if (override.status === 'pending' && override.delay) {
           const now = new Date();
+          now.setHours(0, 0, 0, 0); // Set to start of day
           const accessStartDate = new Date(userAccess.access_starts_at);
           const releaseDate = new Date(accessStartDate);
           
@@ -215,6 +223,8 @@ export const SuiteView = ({
               releaseDate.setMonth(releaseDate.getMonth() + override.delay.value);
               break;
           }
+          
+          releaseDate.setHours(0, 0, 0, 0); // Set to start of day
 
           console.log('⏰ Release date check:', {
             now: now.toISOString(),
@@ -222,7 +232,7 @@ export const SuiteView = ({
             releaseDate: releaseDate.toISOString()
           });
           
-          // If the release date hasn't passed, it's still pending
+          // If the release date hasn't arrived yet, it's still pending
           if (now < releaseDate) {
             return {
               isAccessible: false,
@@ -232,6 +242,14 @@ export const SuiteView = ({
               releaseDate: releaseDate.toISOString()
             };
           }
+          
+          // If we get here, the release date has passed, so grant access
+          return { isAccessible: true };
+        }
+        
+        // If it's locked, no access
+        if (override.status === 'locked') {
+          return { isAccessible: false };
         }
       }
 
@@ -339,16 +357,15 @@ export const SuiteView = ({
                         }}
                         className={cn(
                           "relative w-full flex items-start flex-col py-4 transition-all duration-200",
-                          moduleAccess.isAccessible && module.media.some(m => getMediaAccess(m.id).isAccessible) && "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]",
-                          !moduleAccess.isAccessible && "bg-black/5",
-                          activeMediaItem && module.media.some(m => m.id === activeMediaItem.id) && "bg-[var(--hover-bg)]"
+                          !moduleAccess.isAccessible && "opacity-50",
+                          moduleAccess.isAccessible && "hover:bg-[var(--hover-bg)]",
+                          activeMediaItem?.module_id === module.id && selectedItemId === activeMediaItem?.id && "bg-[var(--hover-bg)]"
                         )}
                       >
                         {/* Access status indicator */}
                         <div className={cn(
                           "absolute inset-y-0 left-0 w-1",
-                          moduleAccess.isAccessible && "bg-[var(--accent)]",
-                          activeMediaItem && module.media.some(m => m.id === activeMediaItem.id) && "bg-[var(--accent)]"
+                          moduleAccess.isAccessible && "bg-[var(--accent)]"
                         )} />
                         
                         <div className="flex flex-col gap-1 px-6 w-full">
@@ -359,9 +376,6 @@ export const SuiteView = ({
                             )}>
                               {module.title || `Module ${index + 1}`}
                             </span>
-                            {moduleAccess.isAccessible && module.media.some(m => getMediaAccess(m.id).isAccessible) && !module.media.some(m => m.id === activeMediaItem?.id) && (
-                              <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
-                            )}
                           </div>
                           
                           {/* Show release date for pending modules */}
@@ -388,16 +402,15 @@ export const SuiteView = ({
                         onClick={() => access.isAccessible && handleMediaClick(sortedModules[0].id, mediaItem)}
                         className={cn(
                           "relative w-full text-left py-4 transition-all duration-200",
-                          access.isAccessible && "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]",
-                          !access.isAccessible && "bg-black/5",
-                          activeMediaItem?.id === mediaItem.id && "bg-[var(--hover-bg)]"
+                          !access.isAccessible && "opacity-50",
+                          access.isAccessible && "hover:bg-[var(--hover-bg)]",
+                          selectedItemId === mediaItem.id && "bg-[var(--hover-bg)]"
                         )}
                       >
                         {/* Access status indicator */}
                         <div className={cn(
                           "absolute inset-y-0 left-0 w-1",
-                          access.isAccessible && "bg-[var(--accent)]",
-                          activeMediaItem?.id === mediaItem.id && "bg-[var(--accent)]"
+                          access.isAccessible && "bg-[var(--accent)]"
                         )} />
                         
                         <div className="flex flex-col gap-1 px-6">
@@ -408,9 +421,6 @@ export const SuiteView = ({
                             )}>
                               {mediaItem.title || `Item ${index + 1}`}
                             </span>
-                            {access.isAccessible && activeMediaItem?.id !== mediaItem.id && (
-                              <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
-                            )}
                           </div>
                           
                           {/* Show release date for pending media items */}
