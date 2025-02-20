@@ -11,38 +11,14 @@ interface MediaItem {
   id: string;
   title: string;
   order: number;
-  hasAccess: boolean;
-  accessDelay?: {
-    value: number;
-    unit: 'days' | 'weeks' | 'months';
-  };
+  module_id: string;
   mediaType?: string;
-  video?: {
-    id: string;
-    video_id: string;
-    title: string;
-  };
-  text?: {
-    id: string;
-    content_text: string;
-    title: string;
-  };
-  ai?: {
-    id: string;
-    tool_id: string;
-    title: string;
-  };
 }
 
 interface Module {
   id: string;
   title: string;
   order: number;
-  hasAccess: boolean;
-  accessDelay?: {
-    value: number;
-    unit: 'days' | 'weeks' | 'months';
-  };
   media: MediaItem[];
 }
 
@@ -52,29 +28,47 @@ interface SuiteViewProps {
   title: string;
   description: string;
   modules: Module[];
-  accessStartsAt: string; // When the user was first granted access
+  userAccess: {
+    access_starts_at: string;
+    access_overrides?: {
+      media?: Record<string, {
+        status: 'locked' | 'pending';
+        delay?: {
+          unit: 'days' | 'weeks' | 'months';
+          value: number;
+        };
+      }>;
+    };
+  } | null;
   onPlay: (moduleId: string, mediaItem: MediaItem) => void;
   thumbnailUrl?: string;
   activeMediaItem?: MediaItem | null;
 }
 
-const calculateTimeRemaining = (delay: { value: number; unit: 'days' | 'weeks' | 'months' }) => {
+const calculateTimeRemaining = (accessStartsAt: string, delay: { value: number; unit: 'days' | 'weeks' | 'months' }) => {
   const now = new Date();
-  const future = new Date();
+  const accessDate = new Date(accessStartsAt);
   
+  // Add delay to access start date
   switch (delay.unit) {
     case 'days':
-      future.setDate(future.getDate() + delay.value);
+      accessDate.setDate(accessDate.getDate() + delay.value);
       break;
     case 'weeks':
-      future.setDate(future.getDate() + (delay.value * 7));
+      accessDate.setDate(accessDate.getDate() + (delay.value * 7));
       break;
     case 'months':
-      future.setMonth(future.getMonth() + delay.value);
+      accessDate.setMonth(accessDate.getMonth() + delay.value);
       break;
   }
   
-  const diffTime = Math.abs(future.getTime() - now.getTime());
+  // Check if the access date is in the future
+  if (now >= accessDate) {
+    return 'Now';
+  }
+  
+  // Calculate the time difference (without Math.abs since we want future dates only)
+  const diffTime = accessDate.getTime() - now.getTime();
   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   
   if (diffDays > 30) {
@@ -93,7 +87,7 @@ export const SuiteView = ({
   title,
   description,
   modules,
-  accessStartsAt,
+  userAccess,
   onPlay,
   thumbnailUrl,
   activeMediaItem,
@@ -108,48 +102,98 @@ export const SuiteView = ({
     };
   }, [isOpen]);
 
+  // Sort modules by order
   const sortedModules = [...modules].sort((a, b) => (a.order || 0) - (b.order || 0));
   const hasMultipleModules = modules.length > 1;
 
-  // Get library ID from environment variable
-  const libraryId = process.env.NEXT_PUBLIC_BUNNY_LIBRARY_ID || '376351';
-  const playerUrl = activeMediaItem?.video?.video_id ? 
-    `https://iframe.mediadelivery.net/embed/${libraryId}/${activeMediaItem.video.video_id}?autoplay=false&preload=metadata&quality=1080p&enabledTransforms=hls` : 
-    null;
+  // Helper to check media access
+  const getMediaAccess = (mediaId: string) => {
+    console.log('🔍 Checking access for media:', mediaId, {
+      hasUserAccess: !!userAccess,
+      accessStartsAt: userAccess?.access_starts_at,
+      override: userAccess?.access_overrides?.media?.[mediaId]
+    });
 
-  const renderContent = () => {
-    const contentFrame = (children: React.ReactNode) => (
-      <div className="relative flex-1 bg-[var(--background)]">
-        {children}
-      </div>
-    );
-
-    console.log('Current activeType:', activeMediaItem?.mediaType);
-    console.log('Selected Media Item:', activeMediaItem);
-
-    switch (activeMediaItem?.mediaType) {
-      case 'video':
-        if (playerUrl) {
-          return contentFrame(
-            <iframe 
-              src={playerUrl}
-              loading="lazy"
-              className="absolute inset-0 w-full h-full"
-              style={{ border: 'none' }}
-              allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen;"
-              allowFullScreen
-              title={title}
-            />
-          );
-        }
-        break;
-      default:
-        return contentFrame(
-          <div className="flex items-center justify-center h-full">
-            {/* Placeholder for other media types */}
-          </div>
-        );
+    // If there's no user access record, they have full access
+    if (!userAccess) {
+      console.log('✅ No user access record - full access granted');
+      return { isAccessible: true };
     }
+
+    // Check if this media has an override
+    const override = userAccess.access_overrides?.media?.[mediaId];
+    
+    // If there's an override with any status, it means access is restricted
+    if (override) {
+      // If it's locked, no access
+      if (override.status === 'locked') {
+        console.log('🔒 Media is locked');
+        return { isAccessible: false };
+      }
+      
+      // If it's pending, calculate release date
+      if (override.status === 'pending') {
+        console.log('⏳ Media is pending');
+        
+        // If no delay specified, it's just pending indefinitely
+        if (!override.delay) {
+          return { 
+            isAccessible: false,
+            isPending: true
+          };
+        }
+
+        const now = new Date();
+        const accessStartDate = new Date(userAccess.access_starts_at);
+        const releaseDate = new Date(accessStartDate);
+        
+        // Add delay to get release date
+        switch (override.delay.unit) {
+          case 'days':
+            releaseDate.setDate(releaseDate.getDate() + override.delay.value);
+            break;
+          case 'weeks':
+            releaseDate.setDate(releaseDate.getDate() + (override.delay.value * 7));
+            break;
+          case 'months':
+            releaseDate.setMonth(releaseDate.getMonth() + override.delay.value);
+            break;
+        }
+
+        console.log('⏰ Release date check:', {
+          now: now.toISOString(),
+          accessStartDate: accessStartDate.toISOString(),
+          releaseDate: releaseDate.toISOString()
+        });
+        
+        // If the release date has passed, they have access
+        if (now >= releaseDate) {
+          return { isAccessible: true };
+        }
+        
+        // Otherwise they're still pending
+        return {
+          isAccessible: false,
+          isPending: true,
+          delay: override.delay,
+          accessStartsAt: userAccess.access_starts_at,
+          releaseDate: releaseDate.toISOString()
+        };
+      }
+    }
+
+    // No override means it's accessible
+    console.log('✅ No override - media is accessible');
+    return { isAccessible: true };
+  };
+
+  const formatReleaseDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
+    });
   };
 
   return (
@@ -160,12 +204,7 @@ export const SuiteView = ({
           animate={{ x: 0 }}
           exit={{ x: 400 }}
           transition={{ duration: 0.2 }}
-          className={cn(
-            "fixed inset-y-0 right-0 z-50 w-[400px]",
-            "bg-[var(--background)] text-[var(--foreground)]",
-            "border-l border-[var(--border-color)]",
-            "shadow-[-8px_0_30px_-15px_rgba(0,0,0,0.3)]"
-          )}
+          className="fixed inset-y-0 right-0 z-50 w-[400px] bg-[var(--background)] text-[var(--foreground)] border-l border-[var(--border-color)] shadow-[-8px_0_30px_-15px_rgba(0,0,0,0.3)]"
         >
           <div className="relative h-full overflow-auto">
             <button 
@@ -199,41 +238,35 @@ export const SuiteView = ({
                 sortedModules.map((module, index) => (
                   <div key={module.id}>
                     <button
-                      onClick={() => hasEffectiveAccess(module) && module.media[0] && onPlay(module.id, module.media[0])}
+                      onClick={() => {
+                        // Find first accessible media item in module
+                        const firstAccessibleMedia = module.media.find(m => getMediaAccess(m.id).isAccessible);
+                        if (firstAccessibleMedia) {
+                          onPlay(module.id, firstAccessibleMedia);
+                        }
+                      }}
                       className={cn(
-                        "relative w-full flex items-center justify-between py-4 transition-all duration-200 px-6",
-                        hasEffectiveAccess(module) ? "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]" : "",
-                        !hasEffectiveAccess(module) && module.accessDelay ? "dark:bg-black/40 bg-gray-200" : "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
-                        activeMediaItem?.id === module.media[0]?.id ? "bg-[var(--hover-bg)] shadow-md" : ""
+                        "relative w-full flex items-start flex-col py-4 transition-all duration-200",
+                        module.media.some(m => getMediaAccess(m.id).isAccessible) && "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]",
+                        activeMediaItem && module.media.some(m => m.id === activeMediaItem.id) && "bg-[var(--hover-bg)]"
                       )}
                     >
-                      <AccessStatus 
-                        item={{
-                          hasAccess: module.hasAccess,
-                          accessStartsAt: accessStartsAt,
-                          accessDelay: module.accessDelay
-                        }}
-                        showMessage={false}
-                        className="absolute left-0 top-0 bottom-0" 
-                      />
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="flex flex-col">
-                          <span className={cn(
-                            "font-medium text-lg truncate",
-                            !hasEffectiveAccess(module) && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
-                          )}>{module.title || `Module ${index + 1}`}</span>
+                      {/* Access status indicator */}
+                      <div className={cn(
+                        "absolute inset-y-0 left-0 w-1",
+                        module.media.some(m => getMediaAccess(m.id).isAccessible) && "bg-[var(--accent)]",
+                        activeMediaItem && module.media.some(m => m.id === activeMediaItem.id) && "bg-[var(--accent)]"
+                      )} />
+                      
+                      <div className="flex flex-col gap-1 px-6 w-full">
+                        <div className="flex items-center justify-between gap-3 w-full">
+                          <span className="font-medium text-lg truncate">
+                            {module.title || `Module ${index + 1}`}
+                          </span>
+                          {module.media.some(m => getMediaAccess(m.id).isAccessible) && !module.media.some(m => m.id === activeMediaItem?.id) && (
+                            <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
+                          )}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {module.accessDelay && (
-                          <AccessDelayStatus
-                            accessStartsAt={accessStartsAt}
-                            accessDelay={module.accessDelay}
-                          />
-                        )}
-                        {hasEffectiveAccess(module) && activeMediaItem?.id !== module.media[0]?.id && (
-                          <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
-                        )}
                       </div>
                     </button>
                     {index < sortedModules.length - 1 && (
@@ -243,54 +276,59 @@ export const SuiteView = ({
                 ))
               ) : (
                 // Show media items directly when there's only one module
-                sortedModules[0]?.media.map((mediaItem: MediaItem, index: number) => (
-                  <div key={mediaItem.id || index}>
-                    <button
-                      onClick={() => hasEffectiveAccess(mediaItem) && onPlay(sortedModules[0].id, mediaItem)}
-                      className={cn(
-                        "relative w-full text-left py-4 transition-all duration-200 px-6",
-                        hasEffectiveAccess(mediaItem) ? "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]" : "",
-                        !hasEffectiveAccess(mediaItem) && mediaItem.accessDelay ? "dark:bg-black/40 bg-gray-200" : "dark:bg-[var(--muted)]/30 bg-[var(--muted)]",
-                        activeMediaItem?.id === mediaItem.id ? "bg-[var(--hover-bg)] shadow-md" : ""
-                      )}
-                    >
-                      <AccessStatus 
-                        item={{
-                          hasAccess: mediaItem.hasAccess,
-                          accessStartsAt: accessStartsAt,
-                          accessDelay: mediaItem.accessDelay
-                        }}
-                        showMessage={false}
-                        className="absolute left-0 top-0 bottom-0" 
-                      />
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="flex flex-col">
-                          <span className={cn(
-                            "font-medium text-lg truncate",
-                            !hasEffectiveAccess(mediaItem) && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
-                          )}>{mediaItem.title || `Item ${index + 1}`}</span>
+                sortedModules[0]?.media.map((mediaItem, index) => {
+                  const access = getMediaAccess(mediaItem.id);
+                  console.log('📝 Media item access:', {
+                    title: mediaItem.title,
+                    access
+                  });
+                  return (
+                    <div key={mediaItem.id}>
+                      <button
+                        onClick={() => access.isAccessible && onPlay(sortedModules[0].id, mediaItem)}
+                        className={cn(
+                          "relative w-full text-left py-4 transition-all duration-200",
+                          access.isAccessible && "hover:bg-[var(--hover-bg)] hover:shadow-md hover:translate-y-[-1px]",
+                          !access.isAccessible && "bg-black/5",
+                          activeMediaItem?.id === mediaItem.id && "bg-[var(--hover-bg)]"
+                        )}
+                      >
+                        {/* Access status indicator - now spans full height and aligns to the left edge */}
+                        <div className={cn(
+                          "absolute inset-y-0 left-0 w-1",
+                          access.isAccessible && "bg-[var(--accent)]",
+                          activeMediaItem?.id === mediaItem.id && "bg-[var(--accent)]"
+                        )} />
+                        
+                        <div className="flex flex-col gap-1 px-6">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className={cn(
+                              "font-medium text-lg truncate",
+                              !access.isAccessible && "text-[var(--muted-foreground)]/70"
+                            )}>
+                              {mediaItem.title || `Item ${index + 1}`}
+                            </span>
+                            {access.isAccessible && activeMediaItem?.id !== mediaItem.id && (
+                              <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
+                            )}
+                          </div>
+                          
+                          {/* Only show release date for THIS specific media item if it's pending */}
+                          {!access.isAccessible && access.isPending && access.releaseDate && (
+                            <div className="text-sm text-[var(--muted-foreground)]/70">
+                              Available on {formatReleaseDate(access.releaseDate)}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {mediaItem.accessDelay && (
-                          <AccessDelayStatus
-                            accessStartsAt={accessStartsAt}
-                            accessDelay={mediaItem.accessDelay}
-                          />
-                        )}
-                        {hasEffectiveAccess(mediaItem) && activeMediaItem?.id !== mediaItem.id && (
-                          <ChevronRight className="w-5 h-5 text-[var(--text-secondary)]" />
-                        )}
-                      </div>
-                    </button>
-                    {index < (sortedModules[0]?.media.length || 0) - 1 && (
-                      <div className="h-px bg-[var(--border-color)]" />
-                    )}
-                  </div>
-                ))
+                      </button>
+                      {index < (sortedModules[0]?.media.length || 0) - 1 && (
+                        <div className="h-px bg-[var(--border-color)]" />
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
-            {renderContent()}
           </div>
         </motion.div>
       )}

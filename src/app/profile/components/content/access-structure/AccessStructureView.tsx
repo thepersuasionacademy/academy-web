@@ -14,6 +14,44 @@ interface AccessStructureViewProps {
   isSuperAdmin?: boolean;
 }
 
+interface RawModule {
+  id: string;
+  title: string;
+  order: number;
+  content_id: string;
+}
+
+interface RawMedia {
+  id: string;
+  title: string;
+  order: number;
+  module_id: string;
+  content_id: string;
+}
+
+const formatReleaseDate = (accessStartsAt: string, delay: { value: number; unit: string }) => {
+  const accessDate = new Date(accessStartsAt);
+  
+  // Add delay to access start date
+  switch (delay.unit) {
+    case 'days':
+      accessDate.setDate(accessDate.getDate() + delay.value);
+      break;
+    case 'weeks':
+      accessDate.setDate(accessDate.getDate() + (delay.value * 7));
+      break;
+    case 'months':
+      accessDate.setMonth(accessDate.getMonth() + delay.value);
+      break;
+  }
+  
+  return accessDate.toLocaleDateString('en-US', { 
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+};
+
 export function AccessStructureView({ 
   selectedType, 
   selectedId, 
@@ -34,15 +72,68 @@ export function AccessStructureView({
         setIsLoading(true);
         setError(null);
 
-        const { data, error } = await supabase
+        const { data: rawData } = await supabase
           .rpc('get_content_access_structure', {
             p_content_id: selectedId,
             p_user_id: targetUserId
           });
 
-        if (error) throw error;
+        if (!rawData) throw new Error('No data received');
 
-        setStructure(data);
+        // Transform raw data into AccessNode structure
+        const transformedStructure: AccessNode = {
+          id: rawData.content.id,
+          name: rawData.content.title,
+          type: 'content',
+          has_access: true,
+          order: 0,
+          debug_info: {
+            access_starts_at: rawData.user_access?.access_starts_at || null,
+            access_overrides: rawData.user_access?.access_overrides || {}
+          },
+          children: rawData.modules
+            .sort((a: RawModule, b: RawModule) => (a.order || 0) - (b.order || 0))
+            .map((module: RawModule) => {
+              // Get all media items for this module
+              const moduleMedia = rawData.media
+                .filter((m: RawMedia) => m.module_id === module.id)
+                .sort((a: RawMedia, b: RawMedia) => (a.order || 0) - (b.order || 0));
+
+              return {
+                id: module.id,
+                name: module.title,
+                type: 'module' as const,
+                has_access: true, // Modules inherit from content
+                order: module.order || 0,
+                children: moduleMedia.map((media: RawMedia) => {
+                  // Check for media overrides
+                  const override = rawData.user_access?.access_overrides?.media?.[media.id];
+                  const isLocked = override?.status === 'locked';
+                  const isPending = override?.status === 'pending';
+
+                  return {
+                    id: media.id,
+                    name: media.title,
+                    type: 'media' as const,
+                    has_access: !isLocked && !isPending,
+                    order: media.order || 0,
+                    debug_info: {
+                      access_starts_at: rawData.user_access?.access_starts_at || null,
+                      access_overrides: { [media.id]: override } || {}
+                    },
+                    ...(isPending && override?.delay ? {
+                      access_delay: {
+                        value: override.delay.value,
+                        unit: override.delay.unit
+                      }
+                    } : {})
+                  };
+                })
+              };
+            })
+        };
+
+        setStructure(transformedStructure);
       } catch (err) {
         console.error('Error fetching access structure:', err);
         setError('Failed to load access structure');
@@ -97,7 +188,7 @@ export function AccessStructureView({
       if (node.type === 'content') return 'bg-[var(--foreground)]';
 
       // Check for drip delay first - this indicates a pending state
-      if (node.access_delay?.value) return 'bg-blue-500';
+      if (!node.has_access && node.access_delay?.value) return 'bg-blue-500';
 
       // Then check for explicit locked status
       if (!node.has_access) return 'bg-red-500';
@@ -165,10 +256,10 @@ export function AccessStructureView({
                   !node.has_access && "dark:text-[var(--muted-foreground)]/70 text-[var(--muted-foreground)]"
                 )}>{node.name}</span>
               </div>
-              {node.access_delay?.value && (
-                <div className="flex items-center gap-1 text-sm text-blue-500">
+              {!node.has_access && node.access_delay?.value && node.debug_info?.access_starts_at && (
+                <div className="flex items-center gap-1 text-sm text-[var(--muted-foreground)]/70">
                   <Clock className="w-3 h-3" />
-                  <span>Available in {node.access_delay.value} {node.access_delay.unit}</span>
+                  <span>Available on {formatReleaseDate(node.debug_info.access_starts_at, node.access_delay)}</span>
                 </div>
               )}
             </div>
@@ -205,8 +296,6 @@ export function AccessStructureView({
         isAdmin={isAdmin}
         isSuperAdmin={isSuperAdmin}
         isNewAccess={false}
-        onCancel={() => setIsEditMode(false)}
-        initialStructure={structure}
       />
     );
   }

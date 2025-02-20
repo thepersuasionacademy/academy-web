@@ -15,13 +15,10 @@ interface AccessStatusProps {
 }
 
 export const getAccessStatusColor = (item: { hasAccess: boolean; accessDelay?: { value: number; unit: string } }) => {
-  // If they have a delay, they don't have access yet - show no color
-  if (item.accessDelay) return 'bg-transparent';
-  
-  // If they have access (and no delay), show accent color
+  // If they have access, show accent color
   if (item.hasAccess) return 'bg-[var(--accent)]';
   
-  // Otherwise (no access, no delay), it's hidden
+  // Otherwise (no access), it's hidden
   return 'hidden';
 };
 
@@ -34,8 +31,6 @@ export const getAccessMessage = (item: { hasAccess: boolean; accessDelay?: { val
 };
 
 export const hasEffectiveAccess = (item: { hasAccess: boolean; accessDelay?: { value: number; unit: string } }) => {
-  // If there's a delay, they don't have access yet, regardless of hasAccess value
-  if (item.accessDelay) return false;
   return item.hasAccess;
 };
 

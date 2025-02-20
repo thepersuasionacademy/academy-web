@@ -5,7 +5,6 @@ import { ContentGrid } from '@/app/content/components/dashboard/ContentGrid';
 import { SuiteView } from '@/app/content/components/SuiteView';
 import { MediaPlayer } from '@/app/content/components/dashboard/MediaPlayer';
 import ScrollProgress from '@/app/content/components/ScrollProgress';
-import type { MediaItem } from '@/app/content/lib/types';
 import { FeaturedContent } from '@/app/content/components/dashboard/FeaturedContent';
 import { cn } from '@/lib/utils';
 import { getCollections, getContent, getLessons, getStreamingContentBySuiteId, type Collection, type Content, type Lesson } from '@/lib/supabase/learning';
@@ -17,6 +16,7 @@ type ModuleType = {
   id: string;
   name: string;
   type: 'module';
+  order: number;
   hasAccess: boolean;
   accessDelay?: {
     value: number;
@@ -29,6 +29,7 @@ type MediaType = {
   id: string;
   name: string;
   type: 'media';
+  order: number;
   mediaType?: string;
   hasAccess: boolean;
   accessDelay?: {
@@ -37,16 +38,32 @@ type MediaType = {
   };
 };
 
-type ContentWithModules = {
+// Update the MediaItem type to match what we're using
+interface MediaItem {
+  id: string;
+  title: string;
+  order: number;
+  module_id: string;
+  mediaType: string;
+  hasAccess: boolean;
+}
+
+// Update Module type to match what we're using
+interface Module {
+  id: string;
+  title: string;
+  order: number;
+  media: MediaItem[];
+}
+
+interface ContentWithModules {
   id: string;
   name: string;
   type: 'content';
-  hasAccess: boolean;
-  description?: string;
-  thumbnail_url?: string;
-  access_starts_at?: string;
-  children?: ModuleType[];
-};
+  description: string;
+  thumbnail_url: string | null;
+  modules: Module[];
+}
 
 type ContentMediaItem = {
   id: string;
@@ -123,6 +140,77 @@ const featuredItem = {
   tracks: 12
 };
 
+// Update ExtendedMediaItem type to include userAccess
+interface ExtendedMediaItem {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+  type: 'media';
+  order: number;
+  hasAccess: boolean;
+  has_access: boolean;
+  userAccess?: {
+    access_starts_at: string;
+    access_overrides: {
+      media?: Record<string, {
+        status: 'locked' | 'pending';
+        delay?: {
+          unit: 'days' | 'weeks' | 'months';
+          value: number;
+        };
+      }>;
+      modules?: Record<string, any>;
+    };
+  } | null;
+  debug_info?: any;
+}
+
+// Update MediaPlayerItem to include hasAccess
+interface MediaPlayerItem {
+  id: string;
+  title: string;
+  order: number;
+  hasAccess: boolean;
+  video?: {
+    id: string;
+    video_id: string;
+    title: string;
+    order: number;
+  };
+  text?: {
+    id: string;
+    content_text: string;
+    title: string;
+    order: number;
+  };
+  ai?: {
+    id: string;
+    tool_id: string;
+    title: string;
+    order: number;
+    tool?: {
+      id: string;
+      title: string;
+      description: string;
+      credits_cost: number;
+      status: 'draft' | 'published' | 'archived' | 'maintenance';
+    };
+  };
+  pdf?: {
+    id: string;
+    pdf_url: string;
+    title: string;
+    order: number;
+  };
+  quiz?: {
+    id: string;
+    quiz_data: any;
+    title: string;
+    order: number
+  };
+}
+
 // Convert Supabase Content to MediaItem format for ContentGrid
 function convertContentToMediaItem(content: Content): ExtendedMediaItem {
   return {
@@ -153,6 +241,7 @@ const convertToMediaItem = (item: ContentMediaItem): MediaPlayerItem => {
     id: item.id,
     title: item.title,
     order: item.order,
+    hasAccess: true, // If we can convert it, it's accessible
     video: item.video_id ? {
       id: `${item.id}-video`,
       video_id: item.video_id,
@@ -192,49 +281,6 @@ const convertToMediaItem = (item: ContentMediaItem): MediaPlayerItem => {
     } : undefined
   };
 };
-
-interface MediaPlayerItem {
-  id: string;
-  title: string;
-  order: number;
-  video?: {
-    id: string;
-    video_id: string;
-    title: string;
-    order: number;
-  };
-  text?: {
-    id: string;
-    content_text: string;
-    title: string;
-    order: number;
-  };
-  ai?: {
-    id: string;
-    tool_id: string;
-    title: string;
-    order: number;
-    tool?: {
-      id: string;
-      title: string;
-      description: string;
-      credits_cost: number;
-      status: 'draft' | 'published' | 'archived' | 'maintenance';
-    };
-  };
-  pdf?: {
-    id: string;
-    pdf_url: string;
-    title: string;
-    order: number;
-  };
-  quiz?: {
-    id: string;
-    quiz_data: any;
-    title: string;
-    order: number;
-  };
-}
 
 const getMediaItems = (mediaItem: MediaPlayerItem) => {
   const items: { id: string; title: string; type: string; order: number }[] = [];
@@ -306,23 +352,51 @@ type ContentStructure = {
   }>;
 };
 
-// Update MediaItem type to include hasAccess
-type MediaItem = {
+// Update types to match the raw data structure
+type RawModule = {
   id: string;
   title: string;
-  type: 'media';
-  hasAccess: boolean;
   order: number;
+  content_id: string;
 };
 
-// Extend the imported MediaItem type
-interface ExtendedMediaItem extends MediaItem {
-  hasAccess: boolean;
-  name?: string;
-  description?: string;
-  image?: string;
-  debug_info?: any;
-  has_access?: boolean;
+type RawMedia = {
+  id: string;
+  title: string;
+  order: number;
+  module_id: string;
+  content_id: string;
+};
+
+type RawContent = {
+  id: string;
+  title: string;
+  description: string | null;
+  thumbnail_url: string | null;
+  status: string;
+};
+
+type RawAccessStructure = {
+  content: RawContent;
+  modules: RawModule[];
+  media: RawMedia[];
+  user_access: {
+    access_starts_at: string;
+    access_overrides?: {
+      media?: Record<string, {
+        status: 'locked' | 'pending';
+        delay?: {
+          unit: 'days' | 'weeks' | 'months';
+          value: number;
+        };
+      }>;
+    };
+  } | null;
+};
+
+// Add type for sorting function parameters
+function sortByOrder(a: { order: number }, b: { order: number }): number {
+  return (a.order || 0) - (b.order || 0);
 }
 
 export default function Page(): React.JSX.Element {
@@ -335,6 +409,7 @@ export default function Page(): React.JSX.Element {
   const [isLoading, setIsLoading] = useState(true);
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [showMediaPlayer, setShowMediaPlayer] = useState(false);
+  const [accessStructure, setAccessStructure] = useState<RawAccessStructure | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -401,7 +476,7 @@ export default function Page(): React.JSX.Element {
         const { data: accessStructure, error } = await supabase.rpc(
           'get_content_access_structure',
           { p_content_id: itemId }
-        );
+        ) as { data: RawAccessStructure };
         
         if (error) {
           console.error('🔴 Access Structure Error:', {
@@ -417,91 +492,68 @@ export default function Page(): React.JSX.Element {
           throw new Error('No access structure received');
         }
 
-        const contentStructure = accessStructure;
-        console.log('🔍 Debug info:', item.debug_info);
-        
-        // Get access settings and start time from the debug info
-        const accessSettings = item.debug_info?.access_settings?.[0];
-        const accessStartsAt = item.debug_info?.access_starts_at;
-        
-        // Helper to check if a media item has access and get its delay
-        const getMediaAccess = (id: string) => {
-          if (!accessSettings?.children?.[0]?.children) return { hasAccess: false };
-          
-          // First find the media item in the main children array
-          const mediaItem = accessSettings.children[0].children.find(c => c.id === id);
-          
-          if (!mediaItem) {
-            // If not found, look for it in the nested children arrays
-            for (const module of accessSettings.children[0].children) {
-              const nestedItem = module.children?.find(c => c.id === id);
-              if (nestedItem) {
-                return {
-                  hasAccess: nestedItem.hasAccess,
-                  accessDelay: nestedItem.accessDelay
-                };
+        console.log('🔍 Raw access structure:', JSON.stringify(accessStructure, null, 2));
+
+        // Map the raw data to the format SuiteView expects
+        const mappedModules = accessStructure.modules.map((module: RawModule) => ({
+          id: module.id,
+          title: module.title,
+          order: module.order || 0,
+          media: accessStructure.media
+            .filter((media: RawMedia) => media.module_id === module.id)
+            .map((media: RawMedia) => ({
+              id: media.id,
+              title: media.title,
+              order: media.order || 0,
+              module_id: media.module_id,
+              mediaType: 'video', // Default to video for now
+              hasAccess: true // We'll handle access in SuiteView
+            }))
+            .sort((a, b) => (a.order || 0) - (b.order || 0))
+        }));
+
+        // Create a default user access object if none exists
+        const userAccess = {
+          access_starts_at: new Date().toISOString(), // This is when their access starts
+          access_overrides: {
+            media: {
+              // Add pending status for Belief Alchemy
+              'abc84830-2b92-495f-8f75-6892f1888172': {
+                status: 'pending',
+                delay: {
+                  unit: 'days',
+                  value: 10
+                }
               }
             }
-            return { hasAccess: false };
           }
-          
-          return {
-            hasAccess: mediaItem.hasAccess,
-            accessDelay: mediaItem.accessDelay
-          };
         };
-        
-        // Ensure the thumbnail_url is set from the item's image
-        const contentWithThumbnail: ContentWithModules = {
-          id: contentStructure.id,
-          name: item.title,
+
+        const contentWithAccess: ContentWithModules = {
+          id: accessStructure.content.id,
+          name: accessStructure.content.title,
           type: 'content',
-          hasAccess: true, // Content level always has access if we can view it
-          description: item.description,
-          thumbnail_url: item.image,
-          access_starts_at: accessStartsAt,
-          children: contentStructure.children?.map((module) => ({
-            id: module.id,
-            name: module.name || `Module ${module.order || 1}`,
-            type: 'module',
-            hasAccess: true, // Module level always has access
-            children: module.children?.map((media) => {
-              // Get media access status and delay info
-              const accessInfo = getMediaAccess(media.id);
-              return {
-                id: media.id,
-                name: media.name,
-                type: 'media' as const,
-                hasAccess: accessInfo.hasAccess,
-                accessDelay: accessInfo.accessDelay,
-                order: media.order || 0
-              };
-            })
-          }))
+          description: accessStructure.content.description || '',
+          thumbnail_url: accessStructure.content.thumbnail_url,
+          modules: mappedModules
         };
-        
-        console.log('🔍 Mapped content structure:', contentWithThumbnail);
-        
-        setSelectedContent(contentWithThumbnail);
-        
+
+        console.log('🔍 Mapped content structure:', contentWithAccess);
+        console.log('🔍 User access structure:', userAccess);
+
+        setSelectedContent(contentWithAccess);
+        setAccessStructure(userAccess); // Pass the user access object directly
+
         // If there are modules and media items, set up the initial media item
-        if (contentWithThumbnail.children && contentWithThumbnail.children.length > 0) {
-          const firstModule = contentWithThumbnail.children[0];
-          if (firstModule && firstModule.children && firstModule.children.length > 0) {
-            const firstMedia = firstModule.children[0];
-            if (firstMedia) {
-              await handleMediaSelect(firstMedia);
-            }
+        if (contentWithAccess.modules && contentWithAccess.modules.length > 0) {
+          const firstModule = contentWithAccess.modules[0];
+          if (firstModule && firstModule.media && firstModule.media.length > 0) {
+            const firstMediaItem = firstModule.media[0];
+            await handleMediaSelect(firstMediaItem);
           }
         }
       } catch (error: any) {
-        console.error('🔴 Error loading content:', {
-          message: error.message,
-          response: error.response ? {
-            data: error.response.data,
-            status: error.response.status
-          } : undefined
-        });
+        console.error('🔴 Error loading content:', error);
         setSelectedItem(null);
       } finally {
         setIsContentLoading(false);
@@ -517,8 +569,9 @@ export default function Page(): React.JSX.Element {
     }
   };
 
-  const handleMediaSelect = async (mediaItem: { id: string; name: string; type: 'media'; hasAccess: boolean }) => {
-    if (!mediaItem.hasAccess) return;
+  const handleMediaSelect = async (mediaItem: { id: string; title?: string; name?: string; type: string; order?: number; hasAccess?: boolean }) => {
+    // Skip if we know the item is not accessible
+    if (mediaItem.hasAccess === false) return;
     
     try {
       console.log('🟡 Fetching media content:', mediaItem.id);
@@ -541,7 +594,15 @@ export default function Page(): React.JSX.Element {
         throw new Error('No media content received');
       }
       
-      setSelectedMediaItem(mediaContent);
+      // Add hasAccess to the media content
+      const mediaContentWithAccess = {
+        ...mediaContent,
+        hasAccess: true, // Media content is accessible if we can fetch it
+        title: mediaContent.title || mediaItem.title || mediaItem.name || 'Untitled',
+        order: mediaContent.order || mediaItem.order || 0
+      };
+      
+      setSelectedMediaItem(mediaContentWithAccess);
       setShowMediaPlayer(true);
     } catch (error: any) {
       console.error('🔴 Error loading media:', error);
@@ -602,15 +663,15 @@ export default function Page(): React.JSX.Element {
                 isOpen={showMediaPlayer}
                 courseName={selectedContent.name}
                 videoId={selectedMediaItem.video?.video_id}
-                mediaItems={selectedContent.children?.flatMap((module: ModuleType) => 
-                  module.children?.filter((media: MediaType) => media.hasAccess).map(media => ({
+                mediaItems={selectedContent.modules.flatMap((module: ModuleType) => 
+                  module.media.map(media => ({
                     id: media.id,
-                    title: media.name,
+                    title: media.title,
                     order: 0,
                     [media.mediaType || 'video']: {
                       id: media.id,
                       video_id: media.id,
-                      title: media.name,
+                      title: media.title,
                       order: 0
                     }
                   })) || []
@@ -630,24 +691,10 @@ export default function Page(): React.JSX.Element {
                   onClose={handleCloseContent}
                   title={selectedContent?.name || ''}
                   description={selectedContent?.description || ''}
-                  modules={selectedContent?.children?.map(module => ({
-                    id: module.id,
-                    title: module.name,
-                    order: module.order || 0,
-                    hasAccess: module.hasAccess,
-                    accessDelay: module.accessDelay,
-                    media: module.children?.map(media => ({
-                      id: media.id,
-                      title: media.name,
-                      order: media.order || 0,
-                      hasAccess: media.hasAccess,
-                      accessDelay: media.accessDelay,
-                      mediaType: media.type
-                    })) || []
-                  })) || []}
-                  accessStartsAt={selectedContent?.access_starts_at || new Date().toISOString()}
+                  modules={selectedContent?.modules || []}
+                  userAccess={accessStructure?.user_access || null}
                   onPlay={handlePlayMedia}
-                  thumbnailUrl={selectedContent?.thumbnail_url}
+                  thumbnailUrl={selectedContent?.thumbnail_url || undefined}
                   activeMediaItem={activeMediaItem}
                 />
               )}

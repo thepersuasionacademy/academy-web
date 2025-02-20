@@ -10,7 +10,7 @@ interface BentoCardProps {
   className?: string;
   image?: string;
   onClick?: (event: React.MouseEvent) => void;
-  hasAccess?: boolean;
+  has_access: boolean;
 }
 
 export function BentoCard({
@@ -19,7 +19,7 @@ export function BentoCard({
   className,
   image,
   onClick,
-  hasAccess = false
+  has_access
 }: BentoCardProps) {
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -27,13 +27,6 @@ export function BentoCard({
       onClick(e);
     }
   };
-
-  // Debug log only in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log(`BentoCard ${title}: ${hasAccess ? 'unlocked' : 'locked'}`);
-  }
-
-  const isLocked = !hasAccess;
 
   return (
     <div
@@ -65,7 +58,7 @@ export function BentoCard({
                 fill
                 className={cn(
                   "object-cover group-hover:scale-105 transition-transform duration-500",
-                  isLocked && "filter grayscale blur-[4px]"
+                  !has_access && "filter grayscale blur-[4px]"
                 )}
               />
               
@@ -98,7 +91,7 @@ export function BentoCard({
         </div>
 
         {/* Lock icon - only show when locked */}
-        {isLocked && (
+        {!has_access && (
           <div className="absolute inset-x-0 top-0 h-[calc(100%-52px)] flex items-center justify-center z-20">
             <svg 
               width="80" 

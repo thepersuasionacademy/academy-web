@@ -36,7 +36,7 @@ const ContentCard = ({ item, onClick }: {
       description={item.description}
       image={item.image}
       onClick={(e) => onClick(item.id, e)}
-      hasAccess={Boolean(item.has_access)}
+      has_access={item.has_access}
     />
   );
 };
