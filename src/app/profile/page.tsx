@@ -35,7 +35,6 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
   // State
   const [isLoading, setIsLoading] = useState(true);
   const [aiItems, setAiItems] = useState<AIItem[]>([]);
-  const [contentItems, setContentItems] = useState<any[]>([]);
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
@@ -173,57 +172,6 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
     fetchData();
   }, [supabase, userId]);
 
-  // Fetch content items
-  useEffect(() => {
-    async function fetchContentData() {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        const targetUserId = userId || session?.user?.id;
-
-        if (!targetUserId) return;
-
-        console.log('Fetching content for user:', targetUserId);
-        
-        // Get all access records with content info in a single query
-        const { data: accessRecords, error: accessError } = await supabase
-          .from('access.user_access')
-          .select(`
-            *,
-            content:content_id (
-              *,
-              collection:collection_id (*),
-              modules (
-                *,
-                media (*)
-              )
-            ),
-            streaming:content_id (
-              streaming_content:get_streaming_content(*)
-            )
-          `)
-          .eq('user_id', targetUserId);
-
-        if (accessError) {
-          console.error('Error fetching access records:', accessError);
-          return;
-        }
-
-        // Transform the data to include streaming content
-        const validContent = accessRecords.map(record => ({
-          ...record,
-          streamingData: record.streaming?.streaming_content
-        })).filter(item => item !== null);
-
-        console.log('Content data:', validContent);
-        setContentItems(validContent || []);
-      } catch (error) {
-        console.error('Error in fetchContentData:', error);
-      }
-    }
-
-    fetchContentData();
-  }, [supabase, userId]);
-
   const handleUpdateUser = async (updates: Partial<{ firstName: string; lastName: string; email: string }>) => {
     try {
       const targetUserId = userId || (await supabase.auth.getSession()).data.session?.user?.id;
@@ -289,7 +237,6 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
         isAdmin={isAdmin}
         userId={userId}
         aiItems={aiItems}
-        contentItems={contentItems}
       />
       {toast && toast.position === 'bottom-right' && (
         <Toast

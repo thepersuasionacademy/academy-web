@@ -637,8 +637,11 @@ export default function Page(): React.JSX.Element {
         {/* Content Viewer */}
         {selectedContent && (
           <div className="fixed inset-0 z-50 bg-[var(--background)] flex justify-end">
-            {showMediaPlayer && selectedMediaItem ? (
-              <div className="flex-1 h-full border-r border-[var(--border-color)]">
+            <div className={cn(
+              "flex-1 h-full border-r border-[var(--border-color)]",
+              showMediaPlayer && selectedMediaItem ? "bg-[var(--background)]" : "bg-transparent border-transparent"
+            )}>
+              {showMediaPlayer && selectedMediaItem && (
                 <MediaPlayer
                   title={selectedContent?.name || ''}
                   description={selectedContent?.description || ''}
@@ -650,12 +653,8 @@ export default function Page(): React.JSX.Element {
                   onMediaSelect={() => {}}
                   selectedMediaItem={selectedMediaItem}
                 />
-              </div>
-            ) : (
-              <div className="flex-1 h-full flex items-center justify-center text-[var(--text-secondary)] border-r border-[var(--border-color)]">
-                Select a media item to begin
-              </div>
-            )}
+              )}
+            </div>
             
             <div className="w-[400px] flex-shrink-0">
               <SuiteView

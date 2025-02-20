@@ -9,20 +9,19 @@ interface TabsContainerProps {
   isAdmin: boolean;
   userId?: string;
   aiItems: AIItem[];
-  contentItems: any[];
 }
 
-type TabType = 'credits' | 'content' | 'billing';
+type TabType = 'ai' | 'content' | 'billing';
 
-export function TabsContainer({ isAdmin, userId, aiItems, contentItems }: TabsContainerProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('credits');
+export function TabsContainer({ isAdmin, userId, aiItems }: TabsContainerProps) {
+  const [activeTab, setActiveTab] = useState<TabType>('ai');
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'credits':
+      case 'ai':
         return <AICreditsTab aiItems={aiItems} />;
       case 'content':
-        return <ContentTab isAdmin={isAdmin} contentItems={contentItems} userId={userId} />;
+        return <ContentTab isAdmin={isAdmin} userId={userId} />;
       case 'billing':
         return <BillingTab userId={userId} />;
       default:
@@ -36,10 +35,10 @@ export function TabsContainer({ isAdmin, userId, aiItems, contentItems }: TabsCo
       <div className="flex justify-center mb-8">
         <div className="inline-flex items-center gap-2 p-1 rounded-lg bg-[var(--card-bg)] border border-[var(--border-color)]">
           <button 
-            onClick={() => setActiveTab('credits')}
+            onClick={() => setActiveTab('ai')}
             className={cn(
               "px-6 py-3 rounded-md text-lg font-medium transition-all",
-              activeTab === 'credits' 
+              activeTab === 'ai' 
                 ? "bg-[var(--accent)] text-white" 
                 : "hover:bg-[var(--hover-bg)]"
             )}>
@@ -69,7 +68,9 @@ export function TabsContainer({ isAdmin, userId, aiItems, contentItems }: TabsCo
       </div>
 
       {/* Tab content */}
-      {renderTabContent()}
+      <div>
+        {renderTabContent()}
+      </div>
     </div>
   );
 } 

@@ -247,7 +247,7 @@ export const MediaPlayer = ({
   
   // Construct the player URL with security token and timestamp
   const playerUrl = videoId ? 
-    `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?token=${securityToken}&t=${Date.now()}` : 
+    `https://iframe.mediadelivery.net/embed/${libraryId}/${videoId}?token=${securityToken}&t=${Date.now()}&autoplay=false` : 
     null;
 
   const renderContent = () => {

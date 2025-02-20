@@ -13,6 +13,7 @@ interface ContentGroup {
   collection_name: string | null;
   granted_at: string;
   access_starts_at: string;
+  has_access: boolean;
 }
 
 interface StructureNode {
@@ -88,35 +89,15 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
       if (!userId) return;
 
       try {
-        // Get all access records for the user with content and collection info
+        // Use the get_content_groups RPC function
         const { data, error } = await supabase
-          .from('access.user_access')
-          .select(`
-            *,
-            content:content_id (
-              title,
-              collection:collection_id (
-                id,
-                name
-              )
-            )
-          `)
-          .eq('user_id', userId)
-          .order('granted_at', { ascending: false });
+          .rpc('get_content_groups', {
+            p_user_id: userId
+          });
 
         if (error) throw error;
 
-        // Transform the data to match ContentGroup interface
-        const groups = (data || []).map(record => ({
-          content_id: record.content_id,
-          content_title: record.content?.title || '',
-          collection_id: record.content?.collection?.id || null,
-          collection_name: record.content?.collection?.name || null,
-          granted_at: record.granted_at,
-          access_starts_at: record.access_starts_at
-        }));
-
-        setContentGroups(groups);
+        setContentGroups(data || []);
       } catch (error) {
         console.error('Error fetching content groups:', error);
       } finally {
@@ -135,81 +116,53 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
       try {
         setIsLoading(true);
         
-        // Get all content info in a single query
-        const { data: content, error: contentError } = await supabase
-          .from('access.user_access')
-          .select(`
-            *,
-            content:content_id (
-              id,
-              title,
-              modules (
-                id,
-                title,
-                order,
-                media (
-                  id,
-                  title,
-                  order,
-                  module_id,
-                  media_type:media_id (
-                    video:videos (id),
-                    text:text_content (id),
-                    tool:ai_content (id),
-                    pdf:pdf_content (id),
-                    quiz:quiz_content (id)
-                  )
-                )
-              )
-            )
-          `)
-          .eq('user_id', userId)
-          .eq('content_id', selectedGroup.content_id)
-          .single();
+        // Use the get_content_access_structure RPC function
+        const { data: accessStructure, error } = await supabase
+          .rpc('get_content_access_structure', {
+            p_content_id: selectedGroup.content_id,
+            p_user_id: userId
+          });
 
-        if (contentError) throw contentError;
+        if (error) throw error;
 
-        if (content) {
+        if (accessStructure) {
           // Transform the data to match the structure we need
           const transformedStructure: StructureNode = {
-            id: content.content.id,
-            name: content.content.title,
+            id: accessStructure.content.id,
+            name: accessStructure.content.title,
             type: 'content',
             order: 0,
             hasAccess: true,
-            children: content.content.modules?.map((module: any) => ({
+            children: accessStructure.modules?.map((module: any) => ({
               id: module.id,
               name: module.title,
               type: 'module' as const,
               order: module.order,
               hasAccess: !(
-                content.access_overrides?.modules?.[module.id]?.status === 'locked' ||
+                accessStructure.user_access?.access_overrides?.modules?.[module.id]?.status === 'locked' ||
                 (
-                  content.access_overrides?.modules?.[module.id]?.status === 'pending' &&
-                  content.access_overrides?.modules?.[module.id]?.delay
+                  accessStructure.user_access?.access_overrides?.modules?.[module.id]?.status === 'pending' &&
+                  accessStructure.user_access?.access_overrides?.modules?.[module.id]?.delay
                 )
               ),
-              accessDelay: content.access_overrides?.modules?.[module.id]?.delay,
-              children: module.media?.map((media: any) => ({
-                id: media.id,
-                name: media.title,
-                type: 'media' as const,
-                order: media.order,
-                hasAccess: !(
-                  content.access_overrides?.media?.[media.id]?.status === 'locked' ||
-                  (
-                    content.access_overrides?.media?.[media.id]?.status === 'pending' &&
-                    content.access_overrides?.media?.[media.id]?.delay
-                  )
-                ),
-                accessDelay: content.access_overrides?.media?.[media.id]?.delay,
-                mediaType: media.media_type?.video ? 'video' :
-                          media.media_type?.text ? 'text' :
-                          media.media_type?.tool ? 'tool' :
-                          media.media_type?.pdf ? 'pdf' :
-                          media.media_type?.quiz ? 'quiz' : null,
-                children: []
-              }))
+              accessDelay: accessStructure.user_access?.access_overrides?.modules?.[module.id]?.delay,
+              children: accessStructure.media
+                ?.filter((media: any) => media.module_id === module.id)
+                ?.map((media: any) => ({
+                  id: media.id,
+                  name: media.title,
+                  type: 'media' as const,
+                  order: media.order,
+                  hasAccess: !(
+                    accessStructure.user_access?.access_overrides?.media?.[media.id]?.status === 'locked' ||
+                    (
+                      accessStructure.user_access?.access_overrides?.media?.[media.id]?.status === 'pending' &&
+                      accessStructure.user_access?.access_overrides?.media?.[media.id]?.delay
+                    )
+                  ),
+                  accessDelay: accessStructure.user_access?.access_overrides?.media?.[media.id]?.delay,
+                  children: []
+                }))
             }))
           };
           setContentStructure(transformedStructure);
