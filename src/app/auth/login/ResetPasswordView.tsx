@@ -20,9 +20,7 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
     setIsSending(true)
     setNotification('')
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${location.origin}/auth/callback`,
-    })
+    const { error } = await supabase.auth.resetPasswordForEmail(email)
 
     if (error) {
       setNotification(error.message)
@@ -39,22 +37,39 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
     setIsSending(true)
     setNotification('')
 
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: otp,
-      type: 'recovery'
-    })
+    try {
+      // First verify the OTP and update password in one step
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: otp,
+        type: 'recovery',
+      })
 
-    if (error) {
-      setNotification(error.message)
-    } else {
+      if (error) {
+        setNotification(error.message)
+        return
+      }
+
+      // After OTP is verified, update the password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+
+      if (updateError) {
+        setNotification(updateError.message)
+        return
+      }
+
       setNotification('Password updated successfully!')
       setTimeout(() => {
         onBack()
       }, 2000)
+    } catch (err) {
+      setNotification('An error occurred during password reset')
+      console.error('Password reset error:', err)
+    } finally {
+      setIsSending(false)
     }
-
-    setIsSending(false)
   }
 
   return (

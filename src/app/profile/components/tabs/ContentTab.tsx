@@ -47,13 +47,24 @@ interface ContentMedia {
 }
 
 interface ContentRecord {
+  id: string;
   content_id: string;
-  content_title: string;
-  content_type: string;
-  collection_name: string;
   granted_at: string;
   access_starts_at: string;
-  modules: ContentModule[];
+  content: {
+    title: string;
+    collection: {
+      id: string;
+      name: string;
+    } | null;
+  };
+}
+
+interface MediaNode {
+  id: string;
+  title: string;
+  order: number;
+  module_id: string;
 }
 
 interface ContentTabProps {
@@ -77,12 +88,35 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
       if (!userId) return;
 
       try {
-        const { data, error } = await supabase.rpc('get_user_content_groups', {
-          p_user_id: userId
-        });
+        // Get all access records for the user with content and collection info
+        const { data, error } = await supabase
+          .from('access.user_access')
+          .select(`
+            *,
+            content:content_id (
+              title,
+              collection:collection_id (
+                id,
+                name
+              )
+            )
+          `)
+          .eq('user_id', userId)
+          .order('granted_at', { ascending: false });
 
         if (error) throw error;
-        setContentGroups(data || []);
+
+        // Transform the data to match ContentGroup interface
+        const groups = (data || []).map(record => ({
+          content_id: record.content_id,
+          content_title: record.content?.title || '',
+          collection_id: record.content?.collection?.id || null,
+          collection_name: record.content?.collection?.name || null,
+          granted_at: record.granted_at,
+          access_starts_at: record.access_starts_at
+        }));
+
+        setContentGroups(groups);
       } catch (error) {
         console.error('Error fetching content groups:', error);
       } finally {
@@ -100,42 +134,80 @@ export function ContentTab({ isAdmin, userId }: ContentTabProps) {
 
       try {
         setIsLoading(true);
-        const { data, error } = await supabase.rpc('get_user_content', {
-          p_user_id: userId
-        });
+        
+        // Get all content info in a single query
+        const { data: content, error: contentError } = await supabase
+          .from('access.user_access')
+          .select(`
+            *,
+            content:content_id (
+              id,
+              title,
+              modules (
+                id,
+                title,
+                order,
+                media (
+                  id,
+                  title,
+                  order,
+                  module_id,
+                  media_type:media_id (
+                    video:videos (id),
+                    text:text_content (id),
+                    tool:ai_content (id),
+                    pdf:pdf_content (id),
+                    quiz:quiz_content (id)
+                  )
+                )
+              )
+            )
+          `)
+          .eq('user_id', userId)
+          .eq('content_id', selectedGroup.content_id)
+          .single();
 
-        if (error) throw error;
+        if (contentError) throw contentError;
 
-        // Find the selected content in the returned data
-        const selectedContent = data?.find((item: ContentRecord) => item.content_id === selectedGroup.content_id);
-        if (selectedContent) {
+        if (content) {
           // Transform the data to match the structure we need
           const transformedStructure: StructureNode = {
-            id: selectedContent.content_id,
-            name: selectedContent.content_title,
+            id: content.content.id,
+            name: content.content.title,
             type: 'content',
             order: 0,
             hasAccess: true,
-            children: selectedContent.modules?.map((module: ContentModule) => ({
+            children: content.content.modules?.map((module: any) => ({
               id: module.id,
               name: module.title,
               type: 'module' as const,
               order: module.order,
-              hasAccess: module.has_access,
-              accessDelay: module.access_date ? {
-                value: Math.ceil((new Date(module.access_date).getTime() - new Date(selectedContent.access_starts_at).getTime()) / (1000 * 60 * 60 * 24)),
-                unit: 'days' as const
-              } : undefined,
-              children: module.media?.map((media: ContentMedia) => ({
+              hasAccess: !(
+                content.access_overrides?.modules?.[module.id]?.status === 'locked' ||
+                (
+                  content.access_overrides?.modules?.[module.id]?.status === 'pending' &&
+                  content.access_overrides?.modules?.[module.id]?.delay
+                )
+              ),
+              accessDelay: content.access_overrides?.modules?.[module.id]?.delay,
+              children: module.media?.map((media: any) => ({
                 id: media.id,
                 name: media.title,
                 type: 'media' as const,
                 order: media.order,
-                hasAccess: media.has_access,
-                accessDelay: media.access_date ? {
-                  value: Math.ceil((new Date(media.access_date).getTime() - new Date(selectedContent.access_starts_at).getTime()) / (1000 * 60 * 60 * 24)),
-                  unit: 'days' as const
-                } : undefined,
+                hasAccess: !(
+                  content.access_overrides?.media?.[media.id]?.status === 'locked' ||
+                  (
+                    content.access_overrides?.media?.[media.id]?.status === 'pending' &&
+                    content.access_overrides?.media?.[media.id]?.delay
+                  )
+                ),
+                accessDelay: content.access_overrides?.media?.[media.id]?.delay,
+                mediaType: media.media_type?.video ? 'video' :
+                          media.media_type?.text ? 'text' :
+                          media.media_type?.tool ? 'tool' :
+                          media.media_type?.pdf ? 'pdf' :
+                          media.media_type?.quiz ? 'quiz' : null,
                 children: []
               }))
             }))

@@ -469,13 +469,11 @@ export const MediaPlayer = ({
 
   return (
     <div className={cn(
-      "h-full flex flex-col z-50 flex-1",
-      "bg-[var(--background)]",
-      "transform transition-transform duration-300 ease-out",
-      isOpen ? "translate-x-0" : "-translate-x-full"
+      "h-full flex flex-col",
+      "bg-[var(--background)]"
     )}>
       {/* Top Navigation Bar */}
-      <div className="flex justify-between items-center py-5 px-6 bg-[var(--background)]">
+      <div className="flex justify-between items-center py-5 px-6 bg-[var(--background)] border-b border-[var(--border-color)]">
         {/* Breadcrumb Navigation */}
         <div className="text-sm text-[var(--text-secondary)]">
           <div className="flex items-center gap-2">

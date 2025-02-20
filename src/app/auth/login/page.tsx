@@ -47,8 +47,16 @@ export default function LoginPage() {
     try {
       setError(null) // Clear any existing errors
       const redirectUrl = process.env.NODE_ENV === 'production'
-        ? 'https://app.thepersuasionacademy.com/api/auth-callback'
-        : `${window.location.origin}/api/auth-callback`
+        ? 'https://app.thepersuasionacademy.com/auth/callback'
+        : `${window.location.origin}/auth/callback`
+
+      // Get the redirectTo parameter
+      const params = new URLSearchParams(window.location.search)
+      const redirectTo = params.get('redirectTo')
+      if (redirectTo) {
+        // Store the redirectTo in localStorage to use after callback
+        localStorage.setItem('redirectTo', redirectTo)
+      }
 
       console.log('Redirect URL:', redirectUrl)
       
@@ -91,8 +99,10 @@ export default function LoginPage() {
 
       if (data?.user) {
         console.log('Sign in successful, redirecting...')
-        // Redirect to the dashboard or home page after successful sign in
-        router.push('/app' as any)
+        // Get the redirectTo parameter or default to /content
+        const params = new URLSearchParams(window.location.search)
+        const redirectTo = params.get('redirectTo') || '/content'
+        router.push(redirectTo as any)
       }
     } catch (err) {
       console.error('Sign in error:', err)

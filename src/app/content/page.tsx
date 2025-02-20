@@ -10,126 +10,78 @@ import { cn } from '@/lib/utils';
 import { getCollections, getContent, getLessons, getStreamingContentBySuiteId, type Collection, type Content, type Lesson } from '@/lib/supabase/learning';
 import { ExtendedContent } from '@/types/extended';
 import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
-// Update ContentWithModules type to match access structure
-type ModuleType = {
-  id: string;
-  name: string;
-  type: 'module';
-  order: number;
-  hasAccess: boolean;
-  accessDelay?: {
-    value: number;
-    unit: 'days' | 'weeks' | 'months';
-  };
-  children?: MediaType[];
-};
-
-type MediaType = {
-  id: string;
-  name: string;
-  type: 'media';
-  order: number;
-  mediaType?: string;
-  hasAccess: boolean;
-  accessDelay?: {
-    value: number;
-    unit: 'days' | 'weeks' | 'months';
-  };
-};
-
-// Update the MediaItem type to match what we're using
-interface MediaItem {
+// Update types at the top to be simpler
+type MediaItem = {
   id: string;
   title: string;
   order: number;
   module_id: string;
-  mediaType: string;
-  hasAccess: boolean;
-}
+};
 
-// Update Module type to match what we're using
-interface Module {
+type Module = {
   id: string;
   title: string;
   order: number;
   media: MediaItem[];
-}
+};
 
-interface ContentWithModules {
+type ContentWithModules = {
   id: string;
   name: string;
-  type: 'content';
+  type: string;
   description: string;
-  thumbnail_url: string | null;
+  thumbnail_url: string;
   modules: Module[];
-}
+  collection?: {
+    id: string;
+    name: string;
+    description: string;
+  };
+};
 
-type ContentMediaItem = {
-  id: string;
-  title: string;
-  video_id?: string | null;
-  video_name?: string | null;
-  content_text?: string | null;
-  text_title?: string | null;
-  tool_id?: string | null;
-  tool?: {
+type RawAccessStructure = {
+  user_access: {
+    id: string;
+    user_id: string;
+    content_id: string;
+    granted_by: string;
+    granted_at: string;
+    access_starts_at: string;
+    access_overrides: {
+      media?: Record<string, {
+        status: 'locked' | 'pending';
+        delay?: {
+          unit: 'days' | 'weeks' | 'months';
+          value: number;
+        };
+      }>;
+    };
+  } | null;
+  content: {
     id: string;
     title: string;
     description: string;
-    credits_cost: number;
-    collection_title: string | null;
-    suite_title: string | null;
-  } | null;
-  pdf_url?: string | null;
-  pdf_title?: string | null;
-  quiz_data?: Record<string, any> | null;
-  quiz_title?: string | null;
-  order: number;
+    thumbnail_url: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    collection_id: string;
+  };
+  modules: Array<{
+    id: string;
+    title: string;
+    order: number;
+  }>;
+  media: Array<{
+    id: string;
+    title: string;
+    order: number;
+    module_id: string;
+  }>;
 };
-
-interface MediaPlayerMediaItem {
-  id: string;
-  title: string;
-  order: number;
-  video?: {
-    id: string;
-    video_id: string;
-    title: string;
-    order: number;
-  };
-  text?: {
-    id: string;
-    content_text: string;
-    title: string;
-    order: number;
-  };
-  ai?: {
-    id: string;
-    tool_id: string;
-    title: string;
-    order: number;
-    tool?: {
-      id: string;
-      title: string;
-      description: string;
-      credits_cost: number;
-      status: 'draft' | 'published' | 'archived' | 'maintenance';
-    };
-  };
-  pdf?: {
-    id: string;
-    pdf_url: string;
-    title: string;
-    order: number;
-  };
-  quiz?: {
-    id: string;
-    quiz_data: any;
-    title: string;
-    order: number;
-  };
-}
 
 // Featured content that matches the design
 const featuredItem = {
@@ -166,50 +118,19 @@ interface ExtendedMediaItem {
   debug_info?: any;
 }
 
-// Update MediaPlayerItem to include hasAccess
-interface MediaPlayerItem {
-  id: string;
-  title: string;
-  order: number;
-  hasAccess: boolean;
-  video?: {
-    id: string;
-    video_id: string;
-    title: string;
-    order: number;
+// Update the type definitions at the top
+type UserAccess = {
+  access_starts_at: string;
+  access_overrides?: {
+    media?: Record<string, {
+      status: 'locked' | 'pending';
+      delay?: {
+        unit: 'days' | 'weeks' | 'months';
+        value: number;
+      };
+    }>;
   };
-  text?: {
-    id: string;
-    content_text: string;
-    title: string;
-    order: number;
-  };
-  ai?: {
-    id: string;
-    tool_id: string;
-    title: string;
-    order: number;
-    tool?: {
-      id: string;
-      title: string;
-      description: string;
-      credits_cost: number;
-      status: 'draft' | 'published' | 'archived' | 'maintenance';
-    };
-  };
-  pdf?: {
-    id: string;
-    pdf_url: string;
-    title: string;
-    order: number;
-  };
-  quiz?: {
-    id: string;
-    quiz_data: any;
-    title: string;
-    order: number
-  };
-}
+};
 
 // Convert Supabase Content to MediaItem format for ContentGrid
 function convertContentToMediaItem(content: Content): ExtendedMediaItem {
@@ -376,30 +297,29 @@ type RawContent = {
   status: string;
 };
 
-type RawAccessStructure = {
-  content: RawContent;
-  modules: RawModule[];
-  media: RawMedia[];
-  user_access: {
-    access_starts_at: string;
-    access_overrides?: {
-      media?: Record<string, {
-        status: 'locked' | 'pending';
-        delay?: {
-          unit: 'days' | 'weeks' | 'months';
-          value: number;
-        };
-      }>;
-    };
-  } | null;
-};
-
 // Add type for sorting function parameters
 function sortByOrder(a: { order: number }, b: { order: number }): number {
   return (a.order || 0) - (b.order || 0);
 }
 
+type MediaPlayerItem = {
+  id: string;
+  title: string;
+  url?: string;
+  type?: string;
+  thumbnail_url?: string;
+  description?: string;
+  order: number;
+  module_id?: string;
+  hasAccess?: boolean;
+  [key: string]: any; // Allow any additional properties
+};
+
+type ContentMediaItem = MediaPlayerItem; // Use the same type for simplicity
+
 export default function Page(): React.JSX.Element {
+  const router = useRouter();
+  const supabase = createClientComponentClient();
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const [selectedLesson, setSelectedLesson] = useState<Lesson | null>(null);
   const [collections, setCollections] = useState<Collection[]>([]);
@@ -410,6 +330,21 @@ export default function Page(): React.JSX.Element {
   const [isContentLoading, setIsContentLoading] = useState(false);
   const [showMediaPlayer, setShowMediaPlayer] = useState(false);
   const [accessStructure, setAccessStructure] = useState<RawAccessStructure | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<any>(null);
+
+  // Get session without redirecting (middleware handles auth)
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      setSession(currentSession);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
 
   useEffect(() => {
     async function loadData() {
@@ -455,35 +390,70 @@ export default function Page(): React.JSX.Element {
   }, [collections, contentByCollection]);
 
   const handleItemClick = async (itemId: string) => {
+    setError(null);
     console.log('🔵 Starting content load for item:', itemId);
-    const item = categories
-      .flatMap(cat => cat.items)
-      .find(item => item.id === itemId);
     
-    if (item) {
-      console.log('🟢 Found item:', {
-        id: item.id,
-        title: item.title,
-        has_access: item.has_access,
-        debug_info: item.debug_info
-      });
-      setSelectedItem(item);
-      setSelectedLesson(null);
+    const foundItem = categories.flatMap(cat => cat.items).find(item => item.id === itemId);
+    
+    if (foundItem) {
       setIsContentLoading(true);
+      console.log('Found item:', foundItem);
       
       try {
+        // First verify access using our test function
+        console.log('🟡 Checking access record for:', {
+          content_id: itemId,
+          user_id: session.user.id
+        });
+
+        const { data: accessRecord, error: accessError } = await supabase.rpc(
+          'test_get_user_access',
+          { p_content_id: itemId }
+        );
+
+        if (accessError) {
+          console.error('🔴 Access Check Error:', {
+            message: accessError.message,
+            details: accessError.details,
+            hint: accessError.hint
+          });
+          throw accessError;
+        }
+
+        console.log('🟢 Access check raw response:', accessRecord);
+
+        // Since it returns a table/array, check if we got any records
+        if (!accessRecord || !Array.isArray(accessRecord) || accessRecord.length === 0) {
+          console.error('🔴 No access record found:', {
+            content_id: itemId,
+            user_id: session.user.id,
+            response: accessRecord
+          });
+          throw new Error('You do not have access to this content');
+        }
+
+        // Use the first access record (should only be one per user per content)
+        const userAccess = accessRecord[0];
+        console.log('🟢 Found user access record:', {
+          id: userAccess.id,
+          content_id: userAccess.content_id,
+          granted_at: userAccess.granted_at,
+          access_starts_at: userAccess.access_starts_at,
+          has_overrides: !!userAccess.access_overrides
+        });
+
         console.log('🟡 Fetching access structure...');
-        const { data: accessStructure, error } = await supabase.rpc(
+        const { data: accessStructure, error: rpcError } = await supabase.rpc(
           'get_content_access_structure',
           { p_content_id: itemId }
-        ) as { data: RawAccessStructure };
+        ) as { data: RawAccessStructure; error: any };
         
-        if (error) {
+        if (rpcError) {
           console.error('🔴 Access Structure Error:', {
-            message: error.message,
-            details: error.details
+            message: rpcError.message,
+            details: rpcError.details
           });
-          throw error;
+          throw rpcError;
         }
         
         console.log('🟢 Received access structure:', JSON.stringify(accessStructure, null, 2));
@@ -495,39 +465,20 @@ export default function Page(): React.JSX.Element {
         console.log('🔍 Raw access structure:', JSON.stringify(accessStructure, null, 2));
 
         // Map the raw data to the format SuiteView expects
-        const mappedModules = accessStructure.modules.map((module: RawModule) => ({
+        const mappedModules = accessStructure.modules.map((module) => ({
           id: module.id,
           title: module.title,
           order: module.order || 0,
           media: accessStructure.media
-            .filter((media: RawMedia) => media.module_id === module.id)
-            .map((media: RawMedia) => ({
+            .filter((media) => media.module_id === module.id)
+            .map((media) => ({
               id: media.id,
               title: media.title,
               order: media.order || 0,
-              module_id: media.module_id,
-              mediaType: 'video', // Default to video for now
-              hasAccess: true // We'll handle access in SuiteView
+              module_id: media.module_id
             }))
             .sort((a, b) => (a.order || 0) - (b.order || 0))
         }));
-
-        // Create a default user access object if none exists
-        const userAccess = {
-          access_starts_at: new Date().toISOString(), // This is when their access starts
-          access_overrides: {
-            media: {
-              // Add pending status for Belief Alchemy
-              'abc84830-2b92-495f-8f75-6892f1888172': {
-                status: 'pending',
-                delay: {
-                  unit: 'days',
-                  value: 10
-                }
-              }
-            }
-          }
-        };
 
         const contentWithAccess: ContentWithModules = {
           id: accessStructure.content.id,
@@ -535,14 +486,18 @@ export default function Page(): React.JSX.Element {
           type: 'content',
           description: accessStructure.content.description || '',
           thumbnail_url: accessStructure.content.thumbnail_url,
-          modules: mappedModules
+          modules: mappedModules,
+          collection: accessStructure.content.collection_id ? {
+            id: accessStructure.content.collection_id,
+            name: '', // We'll need to fetch this if needed
+            description: ''
+          } : undefined
         };
 
         console.log('🔍 Mapped content structure:', contentWithAccess);
-        console.log('🔍 User access structure:', userAccess);
 
         setSelectedContent(contentWithAccess);
-        setAccessStructure(userAccess); // Pass the user access object directly
+        setAccessStructure(accessStructure);
 
         // If there are modules and media items, set up the initial media item
         if (contentWithAccess.modules && contentWithAccess.modules.length > 0) {
@@ -554,25 +509,22 @@ export default function Page(): React.JSX.Element {
         }
       } catch (error: any) {
         console.error('🔴 Error loading content:', error);
+        setError(error.message || 'Error loading content');
         setSelectedItem(null);
       } finally {
         setIsContentLoading(false);
       }
     } else {
       console.log('🔴 Item not found in categories:', itemId);
+      setError('Content not found');
     }
   };
 
-  const handleModuleSelect = async (moduleId: string, mediaItem: { id: string; name: string; type: 'media'; hasAccess: boolean }) => {
-    if (mediaItem.hasAccess) {
-      await handleMediaSelect(mediaItem);
-    }
+  const handleModuleSelect = async (moduleId: string, mediaItem: MediaItem) => {
+    await handleMediaSelect(mediaItem);
   };
 
-  const handleMediaSelect = async (mediaItem: { id: string; title?: string; name?: string; type: string; order?: number; hasAccess?: boolean }) => {
-    // Skip if we know the item is not accessible
-    if (mediaItem.hasAccess === false) return;
-    
+  const handleMediaSelect = async (mediaItem: MediaItem) => {
     try {
       console.log('🟡 Fetching media content:', mediaItem.id);
       const { data: mediaContent, error } = await supabase.rpc(
@@ -594,16 +546,7 @@ export default function Page(): React.JSX.Element {
         throw new Error('No media content received');
       }
       
-      // Add hasAccess to the media content
-      const mediaContentWithAccess = {
-        ...mediaContent,
-        hasAccess: true, // Media content is accessible if we can fetch it
-        title: mediaContent.title || mediaItem.title || mediaItem.name || 'Untitled',
-        order: mediaContent.order || mediaItem.order || 0
-      };
-      
-      setSelectedMediaItem(mediaContentWithAccess);
-      setShowMediaPlayer(true);
+      setSelectedItem(mediaItem);
     } catch (error: any) {
       console.error('🔴 Error loading media:', error);
     }
@@ -612,16 +555,48 @@ export default function Page(): React.JSX.Element {
   const handleCloseContent = () => {
     setSelectedItem(null);
     setSelectedContent(null);
-    setSelectedMediaItem(null);
-    setShowMediaPlayer(false);
   };
 
-  const handlePlayMedia = (moduleId: string) => {
-    // Implement the logic to handle playing media
-    console.log('Playing media:', moduleId);
-  };
+  const handlePlayMedia = (moduleId: string, mediaItem: MediaItem) => {
+    try {
+      console.log('🟡 Playing media:', { moduleId, mediaItem });
+      
+      // First get the media content from the RPC
+      supabase.rpc('get_media_content', { p_media_id: mediaItem.id })
+        .then(({ data: mediaContent, error }) => {
+          if (error) {
+            console.error('🔴 Media Content Error:', error);
+            return;
+          }
+          
+          console.log('🟢 Received media content:', mediaContent);
+          
+          if (!mediaContent) {
+            console.error('No media content received');
+            return;
+          }
 
-  const activeMediaItem = selectedMediaItem as MediaPlayerItem;
+          // Convert the media content to the format expected by MediaPlayer
+          const convertedMediaItem = {
+            ...mediaContent,
+            id: mediaContent.id,
+            title: mediaContent.title,
+            order: mediaContent.order,
+            video: mediaContent.video,
+            text: mediaContent.text,
+            ai: mediaContent.ai,
+            pdf: mediaContent.pdf,
+            quiz: mediaContent.quiz
+          };
+          
+          // Set the selected media item and show the media player
+          setSelectedMediaItem(convertedMediaItem);
+          setShowMediaPlayer(true);
+        });
+    } catch (error) {
+      console.error('🔴 Error playing media:', error);
+    }
+  };
 
   return (
     <div className="min-h-screen text-[color:var(--foreground)]" style={{ background: 'var(--background)' }}>
@@ -629,6 +604,12 @@ export default function Page(): React.JSX.Element {
       
       <main className="relative">
         <div className="px-[5px]">
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-lg">
+              {error}
+            </div>
+          )}
+          
           <FeaturedContent 
             content={featuredItem}
             onPlay={() => console.log('Play featured')}
@@ -655,49 +636,42 @@ export default function Page(): React.JSX.Element {
 
         {/* Content Viewer */}
         {selectedContent && (
-          <div className="fixed inset-0 z-50 flex">
-            {selectedMediaItem && (
-              <MediaPlayer
-                title={selectedContent.name}
-                description={selectedContent.description || ''}
-                isOpen={showMediaPlayer}
-                courseName={selectedContent.name}
-                videoId={selectedMediaItem.video?.video_id}
-                mediaItems={selectedContent.modules.flatMap((module: ModuleType) => 
-                  module.media.map(media => ({
-                    id: media.id,
-                    title: media.title,
-                    order: 0,
-                    [media.mediaType || 'video']: {
-                      id: media.id,
-                      video_id: media.id,
-                      title: media.title,
-                      order: 0
-                    }
-                  })) || []
-                ) || []}
-                onMediaSelect={handleMediaSelect}
-                selectedMediaItem={selectedMediaItem as MediaPlayerItem}
-              />
-            )}
-            <div className="w-[400px] overflow-hidden">
-              {isContentLoading ? (
-                <div className="h-full flex items-center justify-center">
-                  <div className="text-[var(--text-secondary)]">Loading content...</div>
-                </div>
-              ) : (
-                <SuiteView
-                  isOpen={!!selectedContent}
-                  onClose={handleCloseContent}
+          <div className="fixed inset-0 z-50 bg-[var(--background)] flex justify-end">
+            {showMediaPlayer && selectedMediaItem ? (
+              <div className="flex-1 h-full border-r border-[var(--border-color)]">
+                <MediaPlayer
                   title={selectedContent?.name || ''}
                   description={selectedContent?.description || ''}
-                  modules={selectedContent?.modules || []}
-                  userAccess={accessStructure?.user_access || null}
-                  onPlay={handlePlayMedia}
-                  thumbnailUrl={selectedContent?.thumbnail_url || undefined}
-                  activeMediaItem={activeMediaItem}
+                  isOpen={showMediaPlayer}
+                  category={selectedContent?.collection?.name}
+                  videoId={selectedMediaItem?.video?.video_id}
+                  courseName={selectedContent?.name}
+                  mediaItems={[selectedMediaItem]}
+                  onMediaSelect={() => {}}
+                  selectedMediaItem={selectedMediaItem}
                 />
-              )}
+              </div>
+            ) : (
+              <div className="flex-1 h-full flex items-center justify-center text-[var(--text-secondary)] border-r border-[var(--border-color)]">
+                Select a media item to begin
+              </div>
+            )}
+            
+            <div className="w-[400px] flex-shrink-0">
+              <SuiteView
+                isOpen={!!selectedContent}
+                onClose={handleCloseContent}
+                title={selectedContent?.name || ''}
+                description={selectedContent?.description || ''}
+                modules={selectedContent?.modules || []}
+                userAccess={accessStructure?.user_access ? {
+                  access_starts_at: accessStructure.user_access.access_starts_at,
+                  access_overrides: accessStructure.user_access.access_overrides
+                } : null}
+                onPlay={handlePlayMedia}
+                thumbnailUrl={selectedContent?.thumbnail_url}
+                activeMediaItem={selectedItem}
+              />
             </div>
           </div>
         )}

@@ -114,9 +114,16 @@ export default function Header() {
   }, []);
 
   const handleLogout = async () => {
-    const supabase = createClientComponentClient();
-    await supabase.auth.signOut();
-    window.location.href = '/';
+    try {
+      const supabase = createClientComponentClient();
+      await supabase.auth.signOut();
+      // Clear any stored auth data
+      localStorage.clear();
+      // Use window.location.href to force a full page reload
+      window.location.href = '/auth/login';
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   };
 
   const headerClassName = cn(

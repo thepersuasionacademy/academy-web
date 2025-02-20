@@ -8,6 +8,7 @@ export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
   const error = requestUrl.searchParams.get('error')
+  const redirectTo = requestUrl.searchParams.get('redirectTo')
 
   if (error) {
     return NextResponse.redirect(`${requestUrl.origin}/auth/login?error=${encodeURIComponent(error)}`)
@@ -26,7 +27,9 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${requestUrl.origin}/auth/login?error=${encodeURIComponent(authError.message)}`)
     }
 
-    return NextResponse.redirect(`${requestUrl.origin}/content`)
+    // If there's a redirectTo parameter, use it, otherwise default to /content
+    const redirectPath = redirectTo || '/content'
+    return NextResponse.redirect(`${requestUrl.origin}${redirectPath}`)
 
   } catch (err) {
     console.error('Unexpected callback error:', err)

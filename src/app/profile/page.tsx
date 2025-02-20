@@ -184,38 +184,35 @@ export default function ProfilePage({ userId }: ProfilePageProps) {
 
         console.log('Fetching content for user:', targetUserId);
         
-        // First get the user's content access
-        const { data: userContent, error: accessError } = await supabase
-          .rpc('get_user_content', {
-            p_user_id: targetUserId
-          });
+        // Get all access records with content info in a single query
+        const { data: accessRecords, error: accessError } = await supabase
+          .from('access.user_access')
+          .select(`
+            *,
+            content:content_id (
+              *,
+              collection:collection_id (*),
+              modules (
+                *,
+                media (*)
+              )
+            ),
+            streaming:content_id (
+              streaming_content:get_streaming_content(*)
+            )
+          `)
+          .eq('user_id', targetUserId);
 
         if (accessError) {
-          console.error('Error fetching content access:', accessError);
+          console.error('Error fetching access records:', accessError);
           return;
         }
 
-        // Then fetch detailed streaming content for each content item
-        const contentPromises = userContent.map(async (content: any) => {
-          const { data: streamingContent, error: streamingError } = await supabase
-            .rpc('get_streaming_content', {
-              p_content_id: content.content_id
-            });
-
-          if (streamingError) {
-            console.error('Error fetching streaming content:', streamingError);
-            return null;
-          }
-
-          // Merge the access information with the streaming content
-          return {
-            ...content,
-            streamingData: streamingContent
-          };
-        });
-
-        const resolvedContent = await Promise.all(contentPromises);
-        const validContent = resolvedContent.filter(item => item !== null);
+        // Transform the data to include streaming content
+        const validContent = accessRecords.map(record => ({
+          ...record,
+          streamingData: record.streaming?.streaming_content
+        })).filter(item => item !== null);
 
         console.log('Content data:', validContent);
         setContentItems(validContent || []);
