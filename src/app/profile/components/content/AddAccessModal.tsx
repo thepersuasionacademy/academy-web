@@ -29,6 +29,17 @@ interface Content {
   collection_id: string;
 }
 
+interface SearchResult {
+  id: string;
+  title: string;
+  description: string | null;
+  collection_id: string | null;
+  thumbnail_url: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export function AddAccessModal({ onSubmit, onCancel }: AddAccessModalProps) {
   const [selectedType, setSelectedType] = useState<AccessType>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,31 +63,29 @@ export function AddAccessModal({ onSubmit, onCancel }: AddAccessModalProps) {
 
       setIsLoading(true);
       try {
-        let data;
-        let error;
+        let data: ContentItem[] = [];
+        let error = null;
 
         if (selectedType === 'bundle') {
           // Placeholder for future bundle implementation
           data = [];
           error = null;
         } else if (selectedType === 'content') {
-          // First get all collections
-          const { data: collections, error: collectionsError } = await supabase
-            .rpc('get_content_collections');
-            
-          if (collectionsError) {
-            console.error('Error fetching collections:', collectionsError);
+          const { data: searchResults, error: searchError } = await supabase
+            .rpc('search_content', { p_search_query: searchQuery });
+          
+          if (searchError) {
+            console.error('Error searching content:', searchError);
             return;
           }
 
-          // Then get content for each collection
-          const contentPromises = (collections as Collection[]).map(collection =>
-            supabase.rpc('get_content_by_collection', { p_collection_id: collection.id })
-          );
-
-          const contentResults = await Promise.all(contentPromises);
-          data = contentResults.flatMap(result => result.data || []) as Content[];
-          error = contentResults.find(result => result.error)?.error;
+          // Transform the results to match our ContentItem format
+          data = (searchResults as SearchResult[] || []).map(item => ({
+            id: item.id,
+            name: item.title,
+            description: item.description || undefined
+          }));
+          error = null;
         }
 
         if (error) {
@@ -84,22 +93,7 @@ export function AddAccessModal({ onSubmit, onCancel }: AddAccessModalProps) {
           return;
         }
 
-        // Filter results based on search query
-        const filteredData = (data || []).filter((item: Collection | Content) => 
-          'name' in item 
-            ? item.name?.toLowerCase().includes(searchQuery.toLowerCase())
-            : item.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-              item.description?.toLowerCase().includes(searchQuery.toLowerCase())
-        ) as (Collection | Content)[];
-
-        // Transform to ContentItem format
-        const transformedResults = filteredData.map(item => ({
-          id: item.id,
-          name: 'name' in item ? item.name : item.title,
-          description: item.description
-        }));
-
-        setSearchResults(transformedResults);
+        setSearchResults(data);
       } catch (error) {
         console.error('Error in searchContent:', error);
       } finally {
