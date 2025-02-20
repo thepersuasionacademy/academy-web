@@ -11,8 +11,8 @@ export default function ClientLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  // Only hide header on specific paths
-  const hideHeader = pathname?.startsWith('/ai/tools/');
+  // Hide header on auth pages and AI tool pages
+  const hideHeader = pathname?.startsWith('/auth/') || pathname?.startsWith('/ai/tools/');
 
   return (
     <>

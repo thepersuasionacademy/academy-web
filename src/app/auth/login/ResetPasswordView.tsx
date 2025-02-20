@@ -1,6 +1,7 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
 import { useState } from 'react'
+import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid'
 
 interface ResetPasswordViewProps {
   onBack: () => void;
@@ -14,6 +15,7 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
   const [isSending, setIsSending] = useState(false)
   const [notification, setNotification] = useState('')
   const [showOtpInput, setShowOtpInput] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,17 +79,18 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
       {/* Logo */}
       <div className="flex flex-col items-center mb-12">
         <Image
-          src="https://wltjkhsmqhospeezdgga.supabase.co/storage/v1/object/public/Public%20Images//The%20TPA%20Logo%20New%20Black.png"
-          alt="Logo"
-          width={100}
-          height={100}
-          className="mb-4"
+          src="https://thepersuasionacademycdn.b-cdn.net/Images/TPA%20The%20Power%20Ark%20Logo%20New.png"
+          alt="The Power Ark Logo"
+          width={120}
+          height={120}
+          className="mb-4 drop-shadow-2xl filter brightness-0 invert"
         />
-        <span className="text-gray-900 text-3xl font-light">The Persuasion Academy</span>
+        <span className="text-white text-3xl font-light tracking-wide drop-shadow-lg">The Persuasion Academy</span>
+        <span className="text-white/80 text-xl font-light mt-1">Reset Your Password</span>
       </div>
 
       {notification && (
-        <div className="p-4 rounded-md bg-green-50 text-green-700 text-sm mb-6">
+        <div className="text-white bg-green-500/20 border border-green-500/30 p-4 rounded-lg mt-4 backdrop-blur-sm">
           {notification}
         </div>
       )}
@@ -100,19 +103,26 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
             placeholder="Email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-4 py-2.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-700 text-gray-900"
+            className="w-full bg-white/5 text-lg py-4 px-4 
+              border-b border-white/20 
+              text-white placeholder-white/50
+              focus:outline-none focus:border-white/40
+              transition-all duration-300"
           />
           <button
             type="submit"
             disabled={isSending}
-            className="w-full px-4 py-2.5 bg-[#B22222] text-white rounded-md hover:bg-[#8B0000] transition-colors disabled:opacity-50"
+            className="w-full px-6 py-3 text-xl font-medium bg-white/10 text-white rounded-lg 
+              border border-white/20 hover:bg-white/20 
+              focus:outline-none focus:ring-2 focus:ring-white/20
+              transition-all duration-300 backdrop-blur-sm disabled:opacity-50"
           >
             {isSending ? 'Sending...' : 'Send Reset Instructions'}
           </button>
           <button
             type="button"
             onClick={onBack}
-            className="w-full text-blue-600 hover:underline text-sm"
+            className="w-full text-white/70 hover:text-white text-sm font-medium transition-colors hover:underline decoration-white/30"
           >
             Back to Sign In
           </button>
@@ -126,27 +136,51 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
               placeholder="Enter verification code"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-700 text-gray-900"
+              className="w-full bg-white/5 text-lg py-4 px-4 
+                border-b border-white/20 
+                text-white placeholder-white/50
+                focus:outline-none focus:border-white/40
+                transition-all duration-300"
             />
-            <input
-              type="password"
-              placeholder="New password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-700 text-gray-900"
-            />
+            <div className="relative">
+              <input
+                type={showPassword ? "text" : "password"}
+                placeholder="New password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full bg-white/5 text-lg py-4 px-4 
+                  border-b border-white/20 
+                  text-white placeholder-white/50
+                  focus:outline-none focus:border-white/40
+                  transition-all duration-300"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
+              >
+                {showPassword ? (
+                  <EyeSlashIcon className="h-5 w-5" />
+                ) : (
+                  <EyeIcon className="h-5 w-5" />
+                )}
+              </button>
+            </div>
           </div>
           <button
             type="submit"
             disabled={isSending}
-            className="w-full px-4 py-2.5 bg-[#B22222] text-white rounded-md hover:bg-[#8B0000] transition-colors disabled:opacity-50"
+            className="w-full px-6 py-3 text-xl font-medium bg-[#B22222]/80 text-white rounded-lg 
+              backdrop-blur-sm hover:bg-[#B22222] 
+              focus:outline-none focus:ring-2 focus:ring-[#B22222]/50
+              transition-all duration-300 disabled:opacity-50"
           >
             {isSending ? 'Updating...' : 'Update Password'}
           </button>
           <button
             type="button"
             onClick={() => setShowOtpInput(false)}
-            className="w-full text-blue-600 hover:underline text-sm"
+            className="w-full text-white/70 hover:text-white text-sm font-medium transition-colors hover:underline decoration-white/30"
           >
             Try Different Email
           </button>

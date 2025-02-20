@@ -131,7 +131,7 @@ export default function LoginPage() {
           <>
             {/* Show error message if exists */}
             {error && (
-              <div className="text-red-500 p-4 border rounded-lg mt-4">
+              <div className="text-white bg-red-500/20 border border-red-500/30 p-4 rounded-lg mt-4 backdrop-blur-sm">
                 <strong>Authentication Error:</strong> {error}
               </div>
             )}
@@ -139,49 +139,30 @@ export default function LoginPage() {
             {/* Logo */}
             <div className="flex flex-col items-center mb-12">
               <Image
-                src={process.env.NEXT_PUBLIC_LOGO_BLACK_URL!}
-                alt="Logo"
-                width={100}
-                height={100}
-                className="mb-4"
+                src="https://thepersuasionacademycdn.b-cdn.net/Images/TPA%20The%20Power%20Ark%20Logo%20New.png"
+                alt="The Power Ark Logo"
+                width={120}
+                height={120}
+                className="mb-4 drop-shadow-2xl filter brightness-0 invert"
               />
-              <span className="text-gray-900 text-3xl font-light">The Persuasion Academy</span>
+              <span className="text-white text-3xl font-light tracking-wide drop-shadow-lg">The Persuasion Academy</span>
+              <span className="text-white/80 text-xl font-light mt-1">Sign In or Sign Up</span>
             </div>
 
             {/* Auth Form */}
             <div className="space-y-6">
-              {/* Google Sign In */}
-              <button
-                onClick={handleGoogleSignIn}
-                className="flex items-center justify-center w-full gap-2 px-4 py-2.5 border border-gray-200 rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
-              >
-                <Image
-                  src="https://authjs.dev/img/providers/google.svg"
-                  alt="Google"
-                  width={20}
-                  height={20}
-                />
-                Sign in with Google
-              </button>
-
-              {/* Divider */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-200"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 text-gray-500 bg-white">or</span>
-                </div>
-              </div>
-
-              <form onSubmit={handleEmailSignIn} className="space-y-4">
+              <form onSubmit={handleEmailSignIn} className="space-y-6">
                 <div className="space-y-4">
                   <input
                     type="email"
                     placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-700 text-gray-900"
+                    className="w-full bg-white/5 text-lg py-4 px-4 
+                      border-b border-white/20 
+                      text-white placeholder-white/50
+                      focus:outline-none focus:border-white/40
+                      transition-all duration-300"
                   />
                   <div className="space-y-1">
                     <div className="relative">
@@ -190,12 +171,16 @@ export default function LoginPage() {
                         placeholder="Password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-md focus:outline-none focus:ring-2 focus:ring-red-100 focus:border-red-700 text-gray-900"
+                        className="w-full bg-white/5 text-lg py-4 px-4 
+                          border-b border-white/20 
+                          text-white placeholder-white/50
+                          focus:outline-none focus:border-white/40
+                          transition-all duration-300"
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white transition-colors"
                       >
                         {showPassword ? (
                           <EyeSlashIcon className="h-5 w-5" />
@@ -207,30 +192,68 @@ export default function LoginPage() {
                     <button 
                       onClick={() => setView('reset')}
                       type="button"
-                      className="text-[#3B82F6] hover:underline text-sm font-semibold"
+                      className="text-white/70 hover:text-white text-sm font-medium transition-colors mt-2 hover:underline decoration-white/30"
                     >
                       Forgot password?
                     </button>
                   </div>
                 </div>
-                <button
-                  type="submit"
-                  className="w-full px-4 py-2.5 bg-[#B22222] text-white rounded-md hover:bg-[#8B0000] transition-colors"
-                >
-                  Sign in
-                </button>
-              </form>
 
-              <div className="text-sm pt-4">
-                <button
-                  onClick={() => setView('signup')}
-                  type="button" 
-                  className="text-gray-600 hover:underline text-sm"
-                >
-                  Don&apos;t have an account?{' '}
-                  <span className="text-[#3B82F6] font-semibold">Sign up</span>
-                </button>
-              </div>
+                <div className="space-y-4">
+                  <button
+                    type="submit"
+                    className="w-full px-6 py-3 text-xl font-medium bg-white/10 text-white rounded-lg 
+                      border border-white/20 hover:bg-white/20 
+                      focus:outline-none focus:ring-2 focus:ring-white/20
+                      transition-all duration-300 backdrop-blur-sm"
+                  >
+                    Sign In
+                  </button>
+
+                  {/* Divider */}
+                  <div className="relative py-2">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-white/20"></div>
+                    </div>
+                    <div className="relative flex justify-center text-sm">
+                      <span className="px-4 text-white/50 bg-transparent backdrop-blur-sm">or</span>
+                    </div>
+                  </div>
+
+                  {/* Google Sign In */}
+                  <button
+                    onClick={handleGoogleSignIn}
+                    className="flex items-center justify-center w-full gap-3 px-6 py-3 text-lg 
+                      bg-white/5 text-white rounded-lg border border-white/20 
+                      hover:bg-white/10 backdrop-blur-sm
+                      focus:outline-none focus:ring-2 focus:ring-white/20
+                      transition-all duration-300"
+                  >
+                    <Image
+                      src="https://authjs.dev/img/providers/google.svg"
+                      alt="Google"
+                      width={20}
+                      height={20}
+                      className="filter brightness-0 invert"
+                    />
+                    Sign in with Google
+                  </button>
+
+                  <div className="pt-6 text-center text-white/70 text-sm">
+                    Don&apos;t Have An Account?
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setView('signup')}
+                    className="w-full px-6 py-3 text-xl font-medium bg-[#B22222]/80 text-white rounded-lg 
+                      backdrop-blur-sm hover:bg-[#B22222] 
+                      focus:outline-none focus:ring-2 focus:ring-[#B22222]/50
+                      transition-all duration-300"
+                  >
+                    Sign Up
+                  </button>
+                </div>
+              </form>
             </div>
           </>
         );
@@ -239,20 +262,73 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center">
-      {/* Background Image with blur */}
-      <Image
-        src={process.env.NEXT_PUBLIC_BACKGROUND_IMAGE_URL!}
-        alt="Background"
-        fill
-        className="object-cover blur-[2px]"
-        priority
-        quality={100}
-      />
+      {/* Animated Background */}
+      <div className="absolute inset-0">
+        <div className="absolute inset-0 animate-[flow_18s_ease-in-out_infinite] scale-[1.02]">
+          <img 
+            src="https://thepersuasionacademycdn.b-cdn.net/Images/thepowerark_black_background_magic_4k_wallpaper_background_burg_8b1627cb-2a30-4594-9766-7512a94c2a31%20(1).jpeg"
+            alt="Background"
+            className="w-full h-full object-cover animate-[wave_22s_ease-in-out_infinite] scale-[1.15]"
+          />
+        </div>
+      </div>
       
-      {/* Auth Container - increased border radius */}
-      <div className="relative z-10 w-full max-w-md p-8 bg-white rounded-2xl shadow-lg">
+      {/* Auth Container - pure glass effect */}
+      <div className="relative z-10 w-full max-w-md p-8 bg-black/20 backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] transition-all duration-300">
         {renderView()}
       </div>
+
+      {/* Update the global styles */}
+      <style jsx global>{`
+        .relative .flex .justify-center .text-sm span {
+          background: transparent;
+          backdrop-filter: blur-xl;
+          padding: 0 12px;
+        }
+
+        /* Enhance scrollbar for glass theme */
+        ::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+          background: rgba(255, 255, 255, 0.3);
+          border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+          background: rgba(255, 255, 255, 0.4);
+        }
+
+        /* Selection style */
+        ::selection {
+          background: rgba(255, 255, 255, 0.2);
+          color: white;
+        }
+      `}</style>
+
+      <style jsx>{`
+        @keyframes wave {
+          0% { transform: scale(1.15) skew(0deg, 0deg); }
+          20% { transform: scale(1.16) skew(2deg, 1deg); }
+          40% { transform: scale(1.15) skew(-1deg, -1.5deg); }
+          60% { transform: scale(1.17) skew(-2deg, 1deg); }
+          80% { transform: scale(1.15) skew(1deg, -1deg); }
+          100% { transform: scale(1.15) skew(0deg, 0deg); }
+        }
+        @keyframes flow {
+          0%, 100% { transform: scale(1.02) rotate(0deg) translateY(0px); }
+          25% { transform: scale(1.04) rotate(1deg) translateY(-5px); }
+          50% { transform: scale(1.03) rotate(-1deg) translateY(5px); }
+          75% { transform: scale(1.04) rotate(0.5deg) translateY(-3px); }
+        }
+      `}</style>
     </div>
   )
 }
