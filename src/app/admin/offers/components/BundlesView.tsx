@@ -1,5 +1,6 @@
 import React from 'react';
 import { cn } from "@/lib/utils";
+import { AccessBundleModal } from './AccessBundleModal';
 
 interface Bundle {
   id: string;
@@ -20,9 +21,12 @@ interface Bundle {
 
 interface BundlesViewProps {
   searchQuery: string;
+  isModalOpen: boolean;
+  onModalClose: () => void;
+  onBundleClick: (bundle?: Bundle) => void;
 }
 
-export default function BundlesView({ searchQuery }: BundlesViewProps) {
+export default function BundlesView({ searchQuery, isModalOpen, onModalClose, onBundleClick }: BundlesViewProps) {
   // Mock bundles data
   const bundles: Bundle[] = [
     {
@@ -100,50 +104,60 @@ export default function BundlesView({ searchQuery }: BundlesViewProps) {
   );
 
   return (
-    <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      {filteredBundles.map((bundle) => (
-        <div
-          key={bundle.id}
-          className={cn(
-            "group relative rounded-2xl p-6",
-            "border border-[var(--border-color)]",
-            "transition-all duration-300",
-            "bg-[#fafafa] hover:bg-white dark:bg-[var(--card-bg)]",
-            "hover:scale-[1.02] hover:shadow-lg",
-            "hover:border-[var(--accent)]",
-            "cursor-pointer",
-            "flex flex-col min-h-[220px]"
-          )}
-        >
-          <div className="space-y-4">
-            <h3 className="text-2xl font-bold text-[var(--foreground)] transition-colors">
-              {bundle.name}
-            </h3>
-            <p className="text-lg text-[var(--text-secondary)] line-clamp-2 group-hover:text-[var(--foreground)] transition-colors">
-              {bundle.description}
-            </p>
-          </div>
+    <>
+      {/* Bundles Grid */}
+      <div className="p-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredBundles.map((bundle) => (
+          <div
+            key={bundle.id}
+            onClick={() => onBundleClick(bundle)}
+            className={cn(
+              "group relative rounded-2xl p-6",
+              "border border-[var(--border-color)]",
+              "transition-all duration-300",
+              "bg-[#fafafa] hover:bg-white dark:bg-[var(--card-bg)]",
+              "hover:scale-[1.02] hover:shadow-lg",
+              "hover:border-[var(--accent)]",
+              "cursor-pointer",
+              "flex flex-col min-h-[220px]"
+            )}
+          >
+            <div className="space-y-4">
+              <h3 className="text-2xl font-bold text-[var(--foreground)] transition-colors">
+                {bundle.name}
+              </h3>
+              <p className="text-lg text-[var(--text-secondary)] line-clamp-2 group-hover:text-[var(--foreground)] transition-colors">
+                {bundle.description}
+              </p>
+            </div>
 
-          <div className="mt-auto pt-6">
-            <div className="flex flex-wrap gap-2">
-              {bundle.variations.map((variation) => (
-                <div
-                  key={variation.id}
-                  className={cn(
-                    "px-3 py-1 rounded-lg text-sm font-medium",
-                    "border border-[var(--text-secondary)] bg-[var(--card-bg)]",
-                    "text-[var(--text-secondary)]",
-                    "group-hover:border-[var(--accent)]",
-                    "transition-colors"
-                  )}
-                >
-                  {variation.name}
-                </div>
-              ))}
+            <div className="mt-auto pt-6">
+              <div className="flex flex-wrap gap-2">
+                {bundle.variations.map((variation) => (
+                  <div
+                    key={variation.id}
+                    className={cn(
+                      "px-3 py-1 rounded-lg text-sm font-medium",
+                      "border border-[var(--text-secondary)] bg-[var(--card-bg)]",
+                      "text-[var(--text-secondary)]",
+                      "group-hover:border-[var(--accent)]",
+                      "transition-colors"
+                    )}
+                  >
+                    {variation.name}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+
+      {/* Access Bundle Modal */}
+      <AccessBundleModal
+        isOpen={isModalOpen}
+        onClose={onModalClose}
+      />
+    </>
   );
 } 

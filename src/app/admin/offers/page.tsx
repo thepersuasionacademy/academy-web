@@ -18,6 +18,13 @@ export default function OffersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<'active' | 'draft' | 'all'>('all');
   const [selectedView, setSelectedView] = useState<ViewType>('offers');
+  const [isBundleModalOpen, setIsBundleModalOpen] = useState(false);
+  const [selectedBundle, setSelectedBundle] = useState<any>(null);
+
+  const handleBundleClick = (bundle?: any) => {
+    setSelectedBundle(bundle || null);
+    setIsBundleModalOpen(true);
+  };
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
@@ -36,7 +43,10 @@ export default function OffersPage() {
                 {selectedView === 'offers' ? 'Offers' : 'Access Bundles'}
               </h1>
             </div>
-            <button className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2">
+            <button 
+              onClick={() => selectedView === 'bundles' ? handleBundleClick() : undefined}
+              className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-2"
+            >
               <Plus className="w-5 h-5" />
               <span>{selectedView === 'offers' ? 'New Offer' : 'New Bundle'}</span>
             </button>
@@ -99,7 +109,15 @@ export default function OffersPage() {
             onStatusChange={setSelectedStatus}
           />
         ) : (
-          <BundlesView searchQuery={searchQuery} />
+          <BundlesView
+            searchQuery={searchQuery}
+            isModalOpen={isBundleModalOpen}
+            onModalClose={() => {
+              setIsBundleModalOpen(false);
+              setSelectedBundle(null);
+            }}
+            onBundleClick={handleBundleClick}
+          />
         )}
       </div>
     </div>
