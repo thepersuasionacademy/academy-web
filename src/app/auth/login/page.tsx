@@ -2,13 +2,12 @@
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ResetPasswordView from './ResetPasswordView'
 import SignupView from './SignupView'
 import './styles.css'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid'
-import HCaptcha from '@hcaptcha/react-hcaptcha'
 
 export default function LoginPage() {
   // Add debugging before client creation
@@ -32,8 +31,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(searchParams.get('error') || null)
   const [isSending, setIsSending] = useState(false)
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
-  const captchaRef = useRef<HCaptcha>(null)
 
   useEffect(() => {
     // Check for error parameter in URL
@@ -90,32 +87,7 @@ export default function LoginPage() {
     setIsSending(true)
     setError(null)
 
-    if (!captchaToken) {
-      setError('Please complete the captcha verification')
-      setIsSending(false)
-      captchaRef.current?.resetCaptcha()
-      return
-    }
-
     try {
-      // First verify the captcha
-      const verifyResponse = await fetch('/api/verify-captcha', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: captchaToken })
-      })
-
-      const verifyData = await verifyResponse.json()
-      
-      if (!verifyResponse.ok || !verifyData.success) {
-        setError('Captcha verification failed. Please try again.')
-        setIsSending(false)
-        captchaRef.current?.resetCaptcha()
-        return
-      }
-
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -124,7 +96,6 @@ export default function LoginPage() {
       if (error) {
         console.error('Sign in error:', error)
         setError(error.message)
-        captchaRef.current?.resetCaptcha()
         return
       }
 
@@ -138,7 +109,6 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Sign in error:', err)
       setError(err instanceof Error ? err.message : 'An error occurred during sign in')
-      captchaRef.current?.resetCaptcha()
     } finally {
       setIsSending(false)
     }
@@ -231,17 +201,6 @@ export default function LoginPage() {
                       Forgot password?
                     </button>
                   </div>
-                </div>
-
-                <div className="flex justify-center my-4">
-                  <HCaptcha
-                    ref={captchaRef}
-                    sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || ''}
-                    onVerify={(token) => setCaptchaToken(token)}
-                    onExpire={() => setCaptchaToken(null)}
-                    theme="dark"
-                    size="normal"
-                  />
                 </div>
 
                 <div className="space-y-4">

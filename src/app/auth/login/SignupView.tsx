@@ -2,7 +2,6 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
 import { useState, useRef } from 'react'
 import { User, Camera } from 'lucide-react'
-import HCaptcha from '@hcaptcha/react-hcaptcha'
 
 interface SignupViewProps {
   onBack: () => void;
@@ -19,9 +18,7 @@ export default function SignupView({ onBack }: SignupViewProps) {
   const [isSending, setIsSending] = useState(false)
   const [notification, setNotification] = useState('')
   const [showVerification, setShowVerification] = useState(false)
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const captchaRef = useRef<HCaptcha>(null)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -46,31 +43,7 @@ export default function SignupView({ onBack }: SignupViewProps) {
     setIsSending(true)
     setNotification('')
 
-    if (!captchaToken) {
-      setNotification('Please complete the captcha verification')
-      setIsSending(false)
-      return
-    }
-
     try {
-      // Verify the captcha token using our API route
-      const verifyResponse = await fetch('/api/verify-captcha', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token: captchaToken })
-      })
-
-      const verifyData = await verifyResponse.json()
-      
-      if (!verifyResponse.ok || !verifyData.success) {
-        setNotification('Captcha verification failed. Please try again.')
-        setIsSending(false)
-        captchaRef.current?.resetCaptcha()
-        return
-      }
-
       // 1. Sign up the user
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -79,8 +52,7 @@ export default function SignupView({ onBack }: SignupViewProps) {
           emailRedirectTo: `${location.origin}/auth/callback`,
           data: {
             first_name: firstName,
-            last_name: lastName,
-            verified_captcha: true // Add a flag to indicate captcha was verified
+            last_name: lastName
           }
         }
       })
@@ -136,9 +108,6 @@ export default function SignupView({ onBack }: SignupViewProps) {
 
       setNotification('Check your email for the verification link')
       setShowVerification(true)
-      
-      // Reset captcha after successful signup
-      captchaRef.current?.resetCaptcha()
     } catch (error) {
       setNotification('An error occurred during signup')
       console.error('Signup error:', error)
@@ -255,17 +224,6 @@ export default function SignupView({ onBack }: SignupViewProps) {
                 className="hidden"
               />
             </div>
-          </div>
-
-          <div className="flex justify-center my-4">
-            <HCaptcha
-              ref={captchaRef}
-              sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || ''}
-              onVerify={(token) => setCaptchaToken(token)}
-              onExpire={() => setCaptchaToken(null)}
-              theme="dark"
-              size="normal"
-            />
           </div>
 
           <button
