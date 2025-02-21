@@ -2,6 +2,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
 import { useState, useRef } from 'react'
 import { User, Camera } from 'lucide-react'
+import HCaptcha from '@hcaptcha/react-hcaptcha'
 
 interface SignupViewProps {
   onBack: () => void;
@@ -18,7 +19,9 @@ export default function SignupView({ onBack }: SignupViewProps) {
   const [isSending, setIsSending] = useState(false)
   const [notification, setNotification] = useState('')
   const [showVerification, setShowVerification] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const captchaRef = useRef<HCaptcha>(null)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -43,7 +46,31 @@ export default function SignupView({ onBack }: SignupViewProps) {
     setIsSending(true)
     setNotification('')
 
+    if (!captchaToken) {
+      setNotification('Please complete the captcha verification')
+      setIsSending(false)
+      return
+    }
+
     try {
+      // Verify the captcha token using our API route
+      const verifyResponse = await fetch('/api/verify-captcha', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: captchaToken })
+      })
+
+      const verifyData = await verifyResponse.json()
+      
+      if (!verifyResponse.ok || !verifyData.success) {
+        setNotification('Captcha verification failed. Please try again.')
+        setIsSending(false)
+        captchaRef.current?.resetCaptcha()
+        return
+      }
+
       // 1. Sign up the user
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
@@ -53,6 +80,7 @@ export default function SignupView({ onBack }: SignupViewProps) {
           data: {
             first_name: firstName,
             last_name: lastName,
+            verified_captcha: true // Add a flag to indicate captcha was verified
           }
         }
       })
@@ -108,150 +136,152 @@ export default function SignupView({ onBack }: SignupViewProps) {
 
       setNotification('Check your email for the verification link')
       setShowVerification(true)
+      
+      // Reset captcha after successful signup
+      captchaRef.current?.resetCaptcha()
     } catch (error) {
-      console.error('Signup error:', error)
       setNotification('An error occurred during signup')
+      console.error('Signup error:', error)
+    } finally {
+      setIsSending(false)
     }
-
-    setIsSending(false)
   }
 
   return (
-    <div className="overflow-y-auto max-h-[calc(100vh-4rem)] px-1">
-      {/* Logo */}
-      <div className="flex flex-col items-center mb-12">
-        <Image
-          src="https://thepersuasionacademycdn.b-cdn.net/Images/TPA%20The%20Power%20Ark%20Logo%20New.png"
-          alt="The Power Ark Logo"
-          width={120}
-          height={120}
-          className="mb-4 drop-shadow-2xl filter brightness-0 invert"
-        />
-        <span className="text-white text-3xl font-light tracking-wide drop-shadow-lg">The Persuasion Academy</span>
-        <span className="text-white/80 text-xl font-light mt-1">Create Your Profile</span>
-      </div>
+    <div className="w-full max-w-md mx-auto p-6">
+      <button
+        onClick={onBack}
+        className="mb-4 text-gray-600 hover:text-gray-800 transition-colors"
+      >
+        ← Back to Login
+      </button>
 
       {notification && (
-        <div className="text-white bg-green-500/20 border border-green-500/30 p-4 rounded-lg mt-4 backdrop-blur-sm">
+        <div className={`p-4 mb-4 rounded-lg ${showVerification ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
           {notification}
         </div>
       )}
 
       {!showVerification ? (
-        <form onSubmit={handleSignup} className="space-y-6">
-          <div className="space-y-4">
-            {/* Profile Section */}
-            <div className="flex items-center space-x-6 p-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
-              {/* Avatar */}
-              <div 
-                className="relative w-24 h-24 rounded-full bg-white/10 flex items-center justify-center overflow-hidden cursor-pointer border border-white/20 hover:border-white/40 transition-colors"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {previewUrl ? (
-                  <Image
-                    src={previewUrl}
-                    alt="Profile Preview"
-                    fill
-                    className="object-cover"
-                  />
-                ) : (
-                  <User className="w-12 h-12 text-white/50" />
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                  ref={fileInputRef}
-                  className="hidden"
-                />
-                <div className="absolute inset-0 bg-black/0 hover:bg-black/20 transition-colors flex items-center justify-center">
-                  <Camera className="w-8 h-8 text-white opacity-0 hover:opacity-100 transition-opacity" />
-                </div>
-              </div>
-              
-              {/* Name Fields */}
-              <div className="flex-1 space-y-4">
-                <input
-                  type="text"
-                  placeholder="First Name"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  required
-                  className="w-full bg-white/5 text-lg py-4 px-4 
-                    border-b border-white/20 
-                    text-white placeholder-white/50
-                    focus:outline-none focus:border-white/40
-                    transition-all duration-300"
-                />
-                <input
-                  type="text"
-                  placeholder="Last Name"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  required
-                  className="w-full bg-white/5 text-lg py-4 px-4 
-                    border-b border-white/20 
-                    text-white placeholder-white/50
-                    focus:outline-none focus:border-white/40
-                    transition-all duration-300"
-                />
-              </div>
-            </div>
-
+        <form onSubmit={handleSignup} className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
+              First Name
+            </label>
             <input
+              id="firstName"
+              type="text"
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">
+              Last Name
+            </label>
+            <input
+              id="lastName"
+              type="text"
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              Email
+            </label>
+            <input
+              id="email"
               type="email"
-              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-white/5 text-lg py-4 px-4 
-                border-b border-white/20 
-                text-white placeholder-white/50
-                focus:outline-none focus:border-white/40
-                transition-all duration-300"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              Password
+            </label>
             <input
+              id="password"
               type="password"
-              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full bg-white/5 text-lg py-4 px-4 
-                border-b border-white/20 
-                text-white placeholder-white/50
-                focus:outline-none focus:border-white/40
-                transition-all duration-300"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
             />
           </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Profile Picture (Optional)
+            </label>
+            <div className="flex items-center space-x-4">
+              <div className="relative w-20 h-20 border-2 border-gray-300 rounded-full overflow-hidden">
+                {previewUrl ? (
+                  <Image
+                    src={previewUrl}
+                    alt="Profile preview"
+                    fill
+                    style={{ objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                    <User className="w-8 h-8 text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                <Camera className="w-5 h-5 mr-2" />
+                Upload
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-center my-4">
+            <HCaptcha
+              ref={captchaRef}
+              sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || ''}
+              onVerify={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+            />
+          </div>
+
           <button
             type="submit"
-            disabled={isSending || !firstName || !lastName || !email || !password}
-            className="w-full px-6 py-3 text-xl font-medium bg-[#B22222]/80 text-white rounded-lg 
-              backdrop-blur-sm hover:bg-[#B22222] 
-              focus:outline-none focus:ring-2 focus:ring-[#B22222]/50
-              transition-all duration-300 disabled:opacity-50"
+            disabled={isSending}
+            className={`w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+              isSending ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
           >
             {isSending ? 'Creating Account...' : 'Create Account'}
           </button>
-          <button
-            type="button"
-            onClick={onBack}
-            className="w-full text-white/70 hover:text-white text-sm font-medium transition-colors hover:underline decoration-white/30"
-          >
-            Back to Sign In
-          </button>
         </form>
       ) : (
-        <div className="space-y-6">
-          <p className="text-center text-white/80">
-            Please check your email to verify your account. Once verified, you can sign in.
+        <div className="text-center">
+          <h3 className="text-xl font-semibold mb-2">Verification Email Sent</h3>
+          <p className="text-gray-600">
+            Please check your email to verify your account.
           </p>
-          <button
-            onClick={onBack}
-            className="w-full text-white/70 hover:text-white text-sm font-medium transition-colors hover:underline decoration-white/30"
-          >
-            Return to Sign In
-          </button>
         </div>
       )}
     </div>

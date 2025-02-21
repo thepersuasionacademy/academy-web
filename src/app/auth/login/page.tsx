@@ -2,12 +2,13 @@
 
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ResetPasswordView from './ResetPasswordView'
 import SignupView from './SignupView'
 import './styles.css'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid'
+import HCaptcha from '@hcaptcha/react-hcaptcha'
 
 export default function LoginPage() {
   // Add debugging before client creation
@@ -30,6 +31,9 @@ export default function LoginPage() {
   const [view, setView] = useState<'login' | 'reset' | 'signup'>('login')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(searchParams.get('error') || null)
+  const [isSending, setIsSending] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const captchaRef = useRef<HCaptcha>(null)
 
   useEffect(() => {
     // Check for error parameter in URL
@@ -83,17 +87,43 @@ export default function LoginPage() {
 
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSending(true)
+    setError(null)
+
+    if (!captchaToken) {
+      setError('Please complete the captcha verification')
+      setIsSending(false)
+      return
+    }
+
     try {
+      // First verify the captcha
+      const verifyResponse = await fetch('/api/verify-captcha', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: captchaToken })
+      })
+
+      const verifyData = await verifyResponse.json()
+      
+      if (!verifyResponse.ok || !verifyData.success) {
+        setError('Captcha verification failed. Please try again.')
+        setIsSending(false)
+        captchaRef.current?.resetCaptcha()
+        return
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
       })
 
-      console.log('Sign in response:', { data, error })
-
       if (error) {
         console.error('Sign in error:', error)
         setError(error.message)
+        captchaRef.current?.resetCaptcha()
         return
       }
 
@@ -107,6 +137,9 @@ export default function LoginPage() {
     } catch (err) {
       console.error('Sign in error:', err)
       setError(err instanceof Error ? err.message : 'An error occurred during sign in')
+      captchaRef.current?.resetCaptcha()
+    } finally {
+      setIsSending(false)
     }
   }
 
@@ -199,15 +232,25 @@ export default function LoginPage() {
                   </div>
                 </div>
 
+                <div className="flex justify-center my-4">
+                  <HCaptcha
+                    ref={captchaRef}
+                    sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || ''}
+                    onVerify={(token) => setCaptchaToken(token)}
+                    onExpire={() => setCaptchaToken(null)}
+                  />
+                </div>
+
                 <div className="space-y-4">
                   <button
                     type="submit"
+                    disabled={isSending}
                     className="w-full px-6 py-3 text-xl font-medium bg-white/10 text-white rounded-lg 
                       border border-white/20 hover:bg-white/20 
                       focus:outline-none focus:ring-2 focus:ring-white/20
-                      transition-all duration-300 backdrop-blur-sm"
+                      transition-all duration-300 backdrop-blur-sm disabled:opacity-50"
                   >
-                    Sign In
+                    {isSending ? 'Signing in...' : 'Sign In'}
                   </button>
 
                   {/* Divider */}
@@ -222,6 +265,7 @@ export default function LoginPage() {
 
                   {/* Google Sign In */}
                   <button
+                    type="button"
                     onClick={handleGoogleSignIn}
                     className="flex items-center justify-center w-full gap-3 px-6 py-3 text-lg 
                       bg-white/5 text-white rounded-lg border border-white/20 
