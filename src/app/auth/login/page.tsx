@@ -93,6 +93,7 @@ export default function LoginPage() {
     if (!captchaToken) {
       setError('Please complete the captcha verification')
       setIsSending(false)
+      captchaRef.current?.resetCaptcha()
       return
     }
 
@@ -238,6 +239,8 @@ export default function LoginPage() {
                     sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || ''}
                     onVerify={(token) => setCaptchaToken(token)}
                     onExpire={() => setCaptchaToken(null)}
+                    theme="dark"
+                    size="normal"
                   />
                 </div>
 
