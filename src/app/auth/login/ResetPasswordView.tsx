@@ -217,7 +217,7 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
                     value={digit}
                     onChange={(e) => handleDigitChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
-                    className="w-12 h-20 text-center bg-white/5 text-lg
+                    className="w-12 h-12 text-center bg-white/5 text-lg
                       border-b border-white/20 
                       text-white placeholder-white/50
                       focus:outline-none focus:border-white/40

@@ -116,10 +116,22 @@ export default function Header() {
   const handleLogout = async () => {
     try {
       const supabase = createClientComponentClient();
+      
+      // Sign out from Supabase
       await supabase.auth.signOut();
-      // Clear any stored auth data
+      
+      // Clear all storage
       localStorage.clear();
-      // Use window.location.href to force a full page reload
+      sessionStorage.clear();
+      
+      // Clear cookies
+      document.cookie.split(";").forEach((c) => {
+        document.cookie = c
+          .replace(/^ +/, "")
+          .replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+      });
+      
+      // Force reload and redirect
       window.location.href = '/auth/login';
     } catch (error) {
       console.error('Error during logout:', error);
