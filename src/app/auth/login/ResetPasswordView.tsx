@@ -1,7 +1,8 @@
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import Image from 'next/image'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid'
+import HCaptcha from '@hcaptcha/react-hcaptcha'
 
 interface ResetPasswordViewProps {
   onBack: () => void;
@@ -16,22 +17,54 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
   const [notification, setNotification] = useState('')
   const [showOtpInput, setShowOtpInput] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null)
+  const captchaRef = useRef<HCaptcha>(null)
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSending(true)
     setNotification('')
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email)
-
-    if (error) {
-      setNotification(error.message)
-    } else {
-      setNotification('Check your email for the verification code')
-      setShowOtpInput(true)
+    if (!captchaToken) {
+      setNotification('Please complete the captcha verification')
+      setIsSending(false)
+      return
     }
 
-    setIsSending(false)
+    try {
+      // First verify the captcha
+      const verifyResponse = await fetch('/api/verify-captcha', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: captchaToken })
+      })
+
+      const verifyData = await verifyResponse.json()
+      
+      if (!verifyResponse.ok || !verifyData.success) {
+        setNotification('Captcha verification failed. Please try again.')
+        setIsSending(false)
+        captchaRef.current?.resetCaptcha()
+        return
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email)
+
+      if (error) {
+        setNotification(error.message)
+        captchaRef.current?.resetCaptcha()
+      } else {
+        setNotification('Check your email for the verification code')
+        setShowOtpInput(true)
+      }
+    } catch (error) {
+      setNotification('An error occurred while sending reset instructions')
+      captchaRef.current?.resetCaptcha()
+    } finally {
+      setIsSending(false)
+    }
   }
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
@@ -95,7 +128,7 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
         </div>
       )}
 
-      {!showOtpInput ? (
+      {!showOtpInput ?
         // Email Input Form
         <form onSubmit={handleSendOTP} className="space-y-6">
           <input
@@ -109,6 +142,18 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
               focus:outline-none focus:border-white/40
               transition-all duration-300"
           />
+
+          <div className="flex justify-center my-4">
+            <HCaptcha
+              ref={captchaRef}
+              sitekey={process.env.NEXT_PUBLIC_HCAPTCHA_SITE_KEY || ''}
+              onVerify={(token) => setCaptchaToken(token)}
+              onExpire={() => setCaptchaToken(null)}
+              theme="dark"
+              size="normal"
+            />
+          </div>
+
           <button
             type="submit"
             disabled={isSending}
@@ -127,7 +172,7 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
             Back to Sign In
           </button>
         </form>
-      ) : (
+      :
         // OTP and New Password Form
         <form onSubmit={handleVerifyOTP} className="space-y-6">
           <div className="space-y-4">
@@ -185,7 +230,7 @@ export default function ResetPasswordView({ onBack }: ResetPasswordViewProps) {
             Try Different Email
           </button>
         </form>
-      )}
+      }
     </>
   )
 } 
