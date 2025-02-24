@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server';
 import TelegramBot, { Update } from 'node-telegram-bot-api';
 import OpenAI from 'openai';
 
+// Basic security check for Telegram
+function isValidTelegramRequest(request: Request): boolean {
+  // You could add additional security checks here if needed
+  return request.headers.get('content-type')?.includes('application/json') ?? false;
+}
+
 // Initialize OpenAI client
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -62,6 +68,11 @@ async function summarizeText(text: string): Promise<string> {
 }
 
 export async function POST(req: Request) {
+  // Basic security check
+  if (!isValidTelegramRequest(req)) {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
+  }
+
   try {
     const body = await req.json();
     const { message } = body;
@@ -99,7 +110,7 @@ export async function POST(req: Request) {
   }
 }
 
-// Optionally handle GET requests for webhook setup verification
-export async function GET() {
+// Handle GET requests for webhook setup verification
+export async function GET(req: Request) {
   return NextResponse.json({ ok: true });
 } 

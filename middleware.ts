@@ -16,10 +16,16 @@ export async function middleware(req: NextRequest) {
     // Check if the request is for an auth route
     const isAuthRoute = req.nextUrl.pathname.startsWith('/auth')
     const isApiRoute = req.nextUrl.pathname.startsWith('/api')
+    const isTelegramWebhook = req.nextUrl.pathname === '/api/telegram-bot'
 
     // If the user is signed in and trying to access auth routes, redirect to app
     if (session && isAuthRoute) {
       return NextResponse.redirect(new URL('/content', req.url))
+    }
+
+    // Allow Telegram webhook without authentication
+    if (isTelegramWebhook) {
+      return NextResponse.next()
     }
 
     // If user is not signed in and trying to access protected routes, redirect to login
@@ -56,7 +62,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all routes except static files and api routes
-    '/((?!_next/static|_next/image|favicon.ico|public|assets).*)',
+    // Match all routes except static files, api routes, and webhook
+    '/((?!_next/static|_next/image|favicon.ico|public|assets|webhook/telegram).*)',
   ],
 } 
