@@ -2,54 +2,88 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Cache the session check results for 1 minute
+const sessionCache = new Map<string, { session: any; timestamp: number }>()
+const CACHE_TTL = 60 * 1000 // 1 minute
+
+// Track redirect attempts to prevent loops
+const redirectAttempts = new Map<string, number>()
+const MAX_REDIRECTS = 2
+const REDIRECT_WINDOW = 5000 // 5 seconds
+
 export async function middleware(req: NextRequest) {
+  // Early return for static assets and API routes
+  if (
+    req.nextUrl.pathname.startsWith('/_next') ||
+    req.nextUrl.pathname.startsWith('/api') ||
+    req.nextUrl.pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|woff|woff2)$/)
+  ) {
+    return NextResponse.next()
+  }
+
+  console.log('Middleware processing request for:', req.nextUrl.pathname)
+
   try {
     // Create a response and supabase client
     const res = NextResponse.next()
     const supabase = createMiddlewareClient({ req, res })
 
-    // Get the session
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    // Check if the request is for an auth route
     const isAuthRoute = req.nextUrl.pathname.startsWith('/auth')
-    const isApiRoute = req.nextUrl.pathname.startsWith('/api')
-    const isTelegramWebhook = req.nextUrl.pathname === '/api/telegram-bot'
+    const isPublicRoute = req.nextUrl.pathname.match(/^\/(public|favicon\.ico|robots\.txt|sitemap\.xml)/)
 
-    // If the user is signed in and trying to access auth routes, redirect to app
-    if (session && isAuthRoute) {
-      return NextResponse.redirect(new URL('/content', req.url))
+    if (isPublicRoute) {
+      return res
     }
 
-    // Allow Telegram webhook without authentication
-    if (isTelegramWebhook) {
-      return NextResponse.next()
-    }
+    // Only check auth for actual page requests
+    if (req.method === 'GET' && req.headers.get('accept')?.includes('text/html')) {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.log('Auth error for path:', req.nextUrl.pathname, 'Error:', error)
+          if (error.status === 400 && error.message.includes('expired')) {
+            res.cookies.delete('sb-access-token')
+            res.cookies.delete('sb-refresh-token')
+            
+            if (!isAuthRoute) {
+              return NextResponse.redirect(new URL('/auth/login', req.url))
+            }
+          }
+          return res
+        }
 
-    // If user is not signed in and trying to access protected routes, redirect to login
-    if (!session && !isAuthRoute && !isApiRoute) {
-      const redirectUrl = new URL('/auth/login', req.url)
-      // Add the original URL as a query parameter to redirect back after login
-      redirectUrl.searchParams.set('redirectTo', req.nextUrl.pathname)
-      return NextResponse.redirect(redirectUrl)
-    }
+        // Handle auth routes
+        if (session && isAuthRoute) {
+          return NextResponse.redirect(new URL('/content', req.url))
+        }
 
-    // Check if this is an admin route
-    if (req.nextUrl.pathname.startsWith('/admin')) {
-      if (!session) {
-        return NextResponse.redirect(new URL('/auth/login', req.url))
-      }
+        // Handle protected routes
+        if (!session && !isAuthRoute) {
+          const redirectUrl = new URL('/auth/login', req.url)
+          redirectUrl.searchParams.set('redirectTo', req.nextUrl.pathname)
+          return NextResponse.redirect(redirectUrl)
+        }
 
-      // Check if user is admin or super admin
-      const [{ data: isAdmin }, { data: isSuperAdmin }] = await Promise.all([
-        supabase.rpc('is_admin'),
-        supabase.rpc('is_super_admin')
-      ])
+        // Handle admin routes
+        if (req.nextUrl.pathname.startsWith('/admin')) {
+          if (!session) {
+            return NextResponse.redirect(new URL('/auth/login', req.url))
+          }
 
-      if (!isAdmin && !isSuperAdmin) {
-        return NextResponse.redirect(new URL('/', req.url))
+          const [{ data: isAdmin }, { data: isSuperAdmin }] = await Promise.all([
+            supabase.rpc('is_admin'),
+            supabase.rpc('is_super_admin')
+          ])
+
+          if (!isAdmin && !isSuperAdmin) {
+            return NextResponse.redirect(new URL('/', req.url))
+          }
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error)
+        // Continue without auth on error
+        return res
       }
     }
 
@@ -62,7 +96,13 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    // Match all routes except static files, api routes, and webhook
-    '/((?!_next/static|_next/image|favicon.ico|public|assets|webhook/telegram).*)',
-  ],
+    // Only match GET requests to pages, exclude static files and API routes
+    {
+      source: '/((?!_next/static|_next/image|favicon.ico|public|assets|images|fonts|api).*)',
+      missing: [
+        { type: 'header', key: 'next-router-prefetch' },
+        { type: 'header', key: 'purpose', value: 'prefetch' }
+      ]
+    }
+  ]
 } 

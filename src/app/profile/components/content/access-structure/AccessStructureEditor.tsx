@@ -7,9 +7,12 @@ import { StructureNode as StructureNodeType, AccessStructureViewProps, AccessMet
 import { StructureNode } from './StructureNode';
 import { Header } from './Header';
 import { AccessStructureView } from './AccessStructureView';
+import { SaveTemplateModal } from './SaveTemplateModal';
+import { TemplateList } from './TemplateList';
 
 interface AccessStructureEditorProps extends Omit<AccessStructureViewProps, 'onAccessGranted'> {
   isNewAccess?: boolean;
+  initialStructure?: StructureNodeType;
 }
 
 interface AccessOverride {
@@ -31,6 +34,7 @@ interface HeaderProps {
   onEditModeToggle: () => void;
   onAccessMethodChange: (method: AccessMethod) => void;
   onSave: () => void;
+  onSaveTemplate: () => void;
   onPreview: () => void;
   isAdmin: boolean;
   isSuperAdmin: boolean;
@@ -45,10 +49,11 @@ export function AccessStructureEditor({
   onRefreshContentHistory,
   isAdmin = false,
   isSuperAdmin = false,
-  isNewAccess = false
+  isNewAccess = false,
+  initialStructure
 }: AccessStructureEditorProps) {
-  const [structure, setStructure] = useState<StructureNodeType | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [structure, setStructure] = useState<StructureNodeType | null>(initialStructure || null);
+  const [isLoading, setIsLoading] = useState(!initialStructure);
   const [error, setError] = useState<string | null>(null);
   const [accessMethod, setAccessMethod] = useState<AccessMethod>('instant');
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -61,6 +66,7 @@ export function AccessStructureEditor({
   const [showToast, setShowToast] = useState(false);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
 
   // Function to calculate content level access based on children
   const calculateContentAccess = (node: StructureNodeType): boolean => {
@@ -102,126 +108,48 @@ export function AccessStructureEditor({
   const fetchNodeDetails = async (nodeId: string, nodeType: StructureNodeType['type']) => {
     try {
       if (nodeType === 'content') {
-        // For existing access, fetch current access structure
-        let accessStructure = null;
-        if (!isNewAccess) {
-          const { data, error: accessError } = await supabase
-            .rpc('get_content_access_structure', {
-              p_user_id: targetUserId || (await supabase.auth.getUser()).data.user?.id,
-              p_content_id: nodeId
-            });
-          if (accessError) throw accessError;
-          accessStructure = data;
-        }
-
-        const { data: streamingContent, error: streamingError } = await supabase
-          .rpc('get_streaming_content', {
-            p_content_id: nodeId
+        // Get the full access structure including drip settings
+        const { data: accessData, error: accessError } = await supabase
+          .rpc('get_content_access_structure', {
+            p_content_id: nodeId,
+            p_user_id: targetUserId || (await supabase.auth.getUser()).data.user?.id
           });
 
-        if (streamingError) {
-          console.error('Error fetching streaming content:', streamingError);
-          return null;
-        }
+        if (accessError) throw accessError;
+        if (!accessData) return null;
 
+        // Transform raw data into structure with drip settings
         const contentNode: StructureNodeType = {
-          id: streamingContent.content.id,
-          name: streamingContent.content.title,
+          id: accessData.content.id,
+          name: accessData.content.title,
           type: 'content',
           order: 0,
-          hasAccess: isNewAccess ? true : accessStructure?.hasAccess ?? true,
-          ...(accessStructure?.accessDelay ? { accessDelay: accessStructure.accessDelay } : {}),
-          isHidden: streamingContent.content.is_hidden ?? false,
-          children: streamingContent.modules?.map((module: any, index: number) => {
-            const moduleAccess = accessStructure?.children?.find((m: any) => m.id === module.id);
+          hasAccess: true,
+          children: accessData.modules?.map((module: any, index: number) => {
+            const moduleOverride = accessData.user_access?.access_overrides?.modules?.[module.id];
+            const moduleAccess = moduleOverride?.status !== 'locked';
+            const moduleDelay = moduleOverride?.status === 'pending' ? moduleOverride.delay : undefined;
             
             return {
               id: module.id,
               name: module.title,
               type: 'module' as const,
               order: module.order || index,
-              hasAccess: isNewAccess ? true : moduleAccess?.hasAccess ?? true,
-              ...(moduleAccess?.accessDelay ? { accessDelay: moduleAccess.accessDelay } : {}),
-              isHidden: module.is_hidden ?? false,
+              hasAccess: moduleAccess,
+              ...(moduleDelay && { accessDelay: moduleDelay }),
               children: module.media?.map((media: any, mediaIndex: number) => {
-                const mediaAccess = moduleAccess?.children?.find((m: any) => m.id === media.id);
-                
-                const mediaItems = [];
-                
-                if (media.video_id) {
-                  mediaItems.push({
-                    id: `${media.id}-video`,
-                    name: media.video_name || 'Video',
-                    type: 'media' as const,
-                    order: 0,
-                    mediaType: 'video',
-                    hasAccess: isNewAccess ? true : mediaAccess?.hasAccess ?? true,
-                    ...(mediaAccess?.accessDelay ? { accessDelay: mediaAccess.accessDelay } : {}),
-                    isHidden: media.is_hidden ?? false
-                  });
-                }
-
-                if (media.content_text) {
-                  mediaItems.push({
-                    id: `${media.id}-text`,
-                    name: media.text_title || 'Text Content',
-                    type: 'media' as const,
-                    order: 1,
-                    mediaType: 'text',
-                    hasAccess: isNewAccess ? true : mediaAccess?.hasAccess ?? true,
-                    ...(mediaAccess?.accessDelay ? { accessDelay: mediaAccess.accessDelay } : {}),
-                    isHidden: media.is_hidden ?? false
-                  });
-                }
-
-                if (media.tool) {
-                  mediaItems.push({
-                    id: `${media.id}-tool`,
-                    name: media.tool.title || 'AI Tool',
-                    type: 'media' as const,
-                    order: 2,
-                    mediaType: 'tool',
-                    hasAccess: isNewAccess ? true : mediaAccess?.hasAccess ?? true,
-                    ...(mediaAccess?.accessDelay ? { accessDelay: mediaAccess.accessDelay } : {}),
-                    isHidden: media.is_hidden ?? false
-                  });
-                }
-
-                if (media.pdf_url) {
-                  mediaItems.push({
-                    id: `${media.id}-pdf`,
-                    name: media.pdf_title || 'PDF',
-                    type: 'media' as const,
-                    order: 3,
-                    mediaType: 'pdf',
-                    hasAccess: isNewAccess ? true : mediaAccess?.hasAccess ?? true,
-                    ...(mediaAccess?.accessDelay ? { accessDelay: mediaAccess.accessDelay } : {}),
-                    isHidden: media.is_hidden ?? false
-                  });
-                }
-
-                if (media.quiz_data) {
-                  mediaItems.push({
-                    id: `${media.id}-quiz`,
-                    name: media.quiz_title || 'Quiz',
-                    type: 'media' as const,
-                    order: 4,
-                    mediaType: 'quiz',
-                    hasAccess: isNewAccess ? true : mediaAccess?.hasAccess ?? true,
-                    ...(mediaAccess?.accessDelay ? { accessDelay: mediaAccess.accessDelay } : {}),
-                    isHidden: media.is_hidden ?? false
-                  });
-                }
+                const mediaOverride = accessData.user_access?.access_overrides?.media?.[media.id];
+                const mediaAccess = mediaOverride?.status !== 'locked';
+                const mediaDelay = mediaOverride?.status === 'pending' ? mediaOverride.delay : undefined;
 
                 return {
                   id: media.id,
                   name: media.title,
                   type: 'media' as const,
                   order: mediaIndex,
-                  hasAccess: isNewAccess ? true : mediaAccess?.hasAccess ?? true,
-                  ...(mediaAccess?.accessDelay ? { accessDelay: mediaAccess.accessDelay } : {}),
-                  isHidden: media.is_hidden ?? false,
-                  children: mediaItems
+                  hasAccess: mediaAccess,
+                  ...(mediaDelay && { accessDelay: mediaDelay }),
+                  children: []
                 };
               }) || []
             };
@@ -240,6 +168,22 @@ export function AccessStructureEditor({
 
   useEffect(() => {
     async function fetchStructure() {
+      if (initialStructure) {
+        // For instant access mode, ensure all nodes are accessible
+        if (accessMethod === 'instant') {
+          const makeAllAccessible = (node: StructureNodeType): StructureNodeType => ({
+            ...node,
+            hasAccess: true,
+            children: node.children?.map(makeAllAccessible) || []
+          });
+          setStructure(makeAllAccessible(initialStructure));
+        } else {
+          setStructure(initialStructure);
+        }
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       try {
@@ -248,8 +192,8 @@ export function AccessStructureEditor({
           return;
         }
 
-        // For existing access, check current access state
-        if (!isNewAccess) {
+        // For existing access in drip mode, check current access state
+        if (!isNewAccess && accessMethod === 'drip') {
           const { data: accessData } = await supabase
             .rpc('check_user_access', {
               p_user_id: targetUserId || (await supabase.auth.getUser()).data.user?.id,
@@ -286,15 +230,43 @@ export function AccessStructureEditor({
             };
             
             setAccessMethod(hasDripSettings(accessData.access_overrides) ? 'drip' : 'instant');
-          } else {
-            setAccessMethod('instant');
           }
         }
 
-        const rootNode = await fetchNodeDetails(selectedId, selectedType);
-        if (rootNode) {
-          setStructure(rootNode);
-        }
+        // Get the content structure
+        const { data: contentData, error: contentError } = await supabase
+          .rpc('get_content_structure', {
+            p_content_id: selectedId
+          });
+
+        if (contentError) throw contentError;
+        if (!contentData) throw new Error('No content structure found');
+
+        // Transform raw data into structure, setting all nodes as accessible for instant access
+        const contentNode: StructureNodeType = {
+          id: contentData.content.id,
+          name: contentData.content.title,
+          type: 'content',
+          order: 0,
+          hasAccess: true,
+          children: contentData.modules?.map((module: any, index: number) => ({
+            id: module.id,
+            name: module.title,
+            type: 'module' as const,
+            order: module.order || index,
+            hasAccess: true,
+            children: module.media?.map((media: any, mediaIndex: number) => ({
+              id: media.id,
+              name: media.title,
+              type: 'media' as const,
+              order: mediaIndex,
+              hasAccess: true,
+              children: []
+            })) || []
+          })) || []
+        };
+
+        setStructure(contentNode);
       } catch (error) {
         console.error('Error fetching structure:', error);
         setError('Failed to load content structure');
@@ -307,7 +279,20 @@ export function AccessStructureEditor({
     setSelectedNode(null);
     setExpandedNodes(new Set());
     fetchStructure();
-  }, [selectedId, selectedType, targetUserId, isAdmin, isSuperAdmin, isNewAccess]);
+  }, [selectedId, selectedType, targetUserId, isAdmin, isSuperAdmin, isNewAccess, initialStructure, accessMethod]);
+
+  // Add effect to handle access method changes
+  useEffect(() => {
+    if (structure && accessMethod === 'instant') {
+      // When switching to instant mode, make all nodes accessible
+      const makeAllAccessible = (node: StructureNodeType): StructureNodeType => ({
+        ...node,
+        hasAccess: true,
+        children: node.children?.map(makeAllAccessible) || []
+      });
+      setStructure(makeAllAccessible(structure));
+    }
+  }, [accessMethod]);
 
   const handleNodeClick = async (node: StructureNodeType) => {
     if (!node.children) {
@@ -321,98 +306,74 @@ export function AccessStructureEditor({
     }
   };
 
+  const buildOverrides = (node: StructureNodeType): AccessOverrides => {
+    const overrides: AccessOverrides = {
+      modules: {},
+      media: {}
+    };
+
+    const processNode = (currNode: StructureNodeType) => {
+      // Handle module nodes
+      if (currNode.type === 'module') {
+        if (!currNode.hasAccess) {
+          overrides.modules[currNode.id] = {
+            status: 'locked'
+          };
+        } else if (currNode.accessDelay) {
+          overrides.modules[currNode.id] = {
+            status: 'pending',
+            delay: currNode.accessDelay
+          };
+        }
+      }
+      // Handle media nodes
+      else if (currNode.type === 'media') {
+        if (!currNode.hasAccess) {
+          overrides.media[currNode.id] = {
+            status: 'locked'
+          };
+        } else if (currNode.accessDelay) {
+          overrides.media[currNode.id] = {
+            status: 'pending',
+            delay: currNode.accessDelay
+          };
+        }
+      }
+
+      currNode.children?.forEach(processNode);
+    };
+
+    processNode(node);
+    return overrides;
+  };
+
   const handleGrantAccess = async () => {
     try {
-      if (!structure) return;
-      setIsLoading(true);
-
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) throw userError;
-      if (!user) throw new Error('No user found');
-
-      const effectiveUserId = targetUserId || user.id;
-
-      // Convert the structure to access_overrides format
-      const buildOverrides = (node: StructureNodeType): AccessOverrides => {
-        const overrides: AccessOverrides = {
-          modules: {},
-          media: {}
-        };
-
-        const processNode = (currNode: StructureNodeType) => {
-          // Skip content level overrides - content is always accessible
-          if (currNode.type === 'content') {
-            if (currNode.children) {
-              currNode.children.forEach(child => processNode(child));
-            }
-            return;
-          }
-
-          if (currNode.type === 'module' && currNode.hasAccess === false) {
-            overrides.modules[currNode.id] = {
-              status: 'locked'
-            };
-          } else if (currNode.type === 'module' && currNode.accessDelay) {
-            overrides.modules[currNode.id] = {
-              status: 'pending',
-              delay: currNode.accessDelay
-            };
-          }
-
-          if (currNode.type === 'media' && !currNode.mediaType) {
-            if (currNode.hasAccess === false) {
-              overrides.media[currNode.id] = {
-                status: 'locked'
-              };
-            } else if (currNode.accessDelay) {
-              overrides.media[currNode.id] = {
-                status: 'pending',
-                delay: currNode.accessDelay
-              };
-            }
-          }
-
-          if (currNode.children) {
-            currNode.children.forEach(child => processNode(child));
-          }
-        };
-
-        processNode(node);
-        return overrides;
-      };
-
-      const access_overrides = buildOverrides(structure);
-
-      // Calculate access_starts_at based on content level delay
-      const access_starts_at = structure.accessDelay 
-        ? new Date(Date.now() + (structure.accessDelay.value * 24 * 60 * 60 * 1000))
-        : new Date();
-
-      const { data, error } = await supabase.rpc('grant_user_access', {
-        p_user_id: effectiveUserId,
-        p_content_id: structure.id,
-        p_granted_by: user.id,
-        p_access_overrides: access_overrides,
-        p_access_starts_at: access_starts_at.toISOString()
-      });
+      const overrides = buildOverrides(structure!);
+      const { data: user } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .rpc('grant_user_access', {
+          p_user_id: targetUserId || user.user?.id,
+          p_content_id: selectedId,
+          p_granted_by: user.user?.id,
+          p_access_overrides: overrides
+        });
 
       if (error) throw error;
 
-      setToastMessage('Access granted successfully');
+      setToastMessage('Access settings saved successfully');
       setToastType('success');
       setShowToast(true);
-
+      
       if (onRefreshContentHistory) {
         onRefreshContentHistory();
       }
-
-    } catch (error) {
-      console.error('Error granting access:', error);
-      setToastMessage(error instanceof Error ? error.message : 'An unexpected error occurred');
+    } catch (err) {
+      console.error('Error granting access:', err);
+      setToastMessage('Failed to save access settings');
       setToastType('error');
       setShowToast(true);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -564,6 +525,37 @@ export function AccessStructureEditor({
     });
   };
 
+  const handleSaveTemplate = async (templateName: string) => {
+    try {
+      // Build overrides from current structure state, exactly like regular save
+      const overrides = buildOverrides(structure!);
+      
+      const { data, error } = await supabase
+        .rpc('save_content_template', {
+          p_name: templateName,
+          p_content_id: selectedId,
+          p_access_overrides: overrides
+        });
+
+      if (error) {
+        console.error('Template save error:', error);
+        throw error;
+      }
+
+      setToastMessage('Template saved successfully');
+      setToastType('success');
+      setShowToast(true);
+      
+      // Close the modal
+      setShowTemplateModal(false);
+    } catch (err) {
+      console.error('Error saving template:', err);
+      setToastMessage('Failed to save template');
+      setToastType('error');
+      setShowToast(true);
+    }
+  };
+
   if (showPreview) {
     return (
       <div className="p-8 rounded-xl border border-[var(--border-color)] bg-[var(--background)]">
@@ -627,50 +619,86 @@ export function AccessStructureEditor({
   }
 
   return (
-    <div className="p-8 rounded-xl border border-[var(--border-color)] bg-[var(--background)]">
-      <Header
-        isEditMode={isEditMode}
-        accessMethod={accessMethod}
-        onEditModeToggle={() => setIsEditMode(!isEditMode)}
-        onAccessMethodChange={setAccessMethod}
-        onSave={handleGrantAccess}
-        onPreview={() => setShowPreview(true)}
-        isAdmin={isAdmin}
-        isSuperAdmin={isSuperAdmin}
-        hasExistingAccess={Boolean(!isNewAccess && structure?.hasAccess)}
-        isNewAccess={isNewAccess}
-      />
-
-      <div ref={structureRef} className="relative">
-        <StructureNode
-          node={structure}
-          level={0}
-          hasAncestorWithNoAccess={false}
+    <>
+      <div className="p-8 rounded-xl border border-[var(--border-color)] bg-[var(--background)]" ref={structureRef}>
+        <Header
           isEditMode={isEditMode}
           accessMethod={accessMethod}
-          structure={structure}
-          isNewAccess={Boolean(isNewAccess)}
-          loadingNodes={loadingNodes}
-          expandedNodes={expandedNodes}
-          selectedNode={selectedNode}
-          onNodeClick={handleNodeClick}
-          onNodeSelect={setSelectedNode}
-          onToggleExpansion={(nodeId) => {
-            setExpandedNodes(prev => {
-              const newSet = new Set(prev);
-              if (newSet.has(nodeId)) {
-                newSet.delete(nodeId);
-              } else {
-                newSet.add(nodeId);
-              }
-              return newSet;
-            });
-          }}
-          onUpdateNodeAccessDelay={updateNodeAccessDelay}
-          onRemoveDrip={handleRemoveDrip}
-          onToggleAccess={handleToggleAccess}
+          onEditModeToggle={() => setIsEditMode(!isEditMode)}
+          onAccessMethodChange={setAccessMethod}
+          onSave={handleGrantAccess}
+          onSaveTemplate={() => setShowTemplateModal(true)}
+          onPreview={() => setShowPreview(true)}
+          isAdmin={isAdmin}
+          isSuperAdmin={isSuperAdmin}
+          hasExistingAccess={false}
+          isNewAccess={isNewAccess}
         />
+        {accessMethod === 'drip' && (
+          <TemplateList 
+            contentId={selectedId}
+            onTemplateSelect={(template) => {
+              // Apply the template's access overrides to the current structure
+              const makeStructureFromTemplate = (node: StructureNodeType): StructureNodeType => {
+                const moduleOverride = template.access_overrides.modules?.[node.id];
+                const mediaOverride = template.access_overrides.media?.[node.id];
+                
+                return {
+                  ...node,
+                  hasAccess: moduleOverride?.status !== 'locked' && mediaOverride?.status !== 'locked',
+                  ...(moduleOverride?.status === 'pending' && { 
+                    accessDelay: moduleOverride.delay 
+                  }),
+                  ...(mediaOverride?.status === 'pending' && { 
+                    accessDelay: mediaOverride.delay 
+                  }),
+                  children: node.children?.map(makeStructureFromTemplate) || []
+                };
+              };
+              
+              setStructure(prevStructure => 
+                prevStructure ? makeStructureFromTemplate(prevStructure) : null
+              );
+            }}
+          />
+        )}
+        <div ref={structureRef} className="relative">
+          <StructureNode
+            node={structure}
+            level={0}
+            hasAncestorWithNoAccess={false}
+            isEditMode={isEditMode}
+            accessMethod={accessMethod}
+            structure={structure}
+            isNewAccess={Boolean(isNewAccess)}
+            loadingNodes={loadingNodes}
+            expandedNodes={expandedNodes}
+            selectedNode={selectedNode}
+            onNodeClick={handleNodeClick}
+            onNodeSelect={setSelectedNode}
+            onToggleExpansion={(nodeId) => {
+              setExpandedNodes(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(nodeId)) {
+                  newSet.delete(nodeId);
+                } else {
+                  newSet.add(nodeId);
+                }
+                return newSet;
+              });
+            }}
+            onUpdateNodeAccessDelay={updateNodeAccessDelay}
+            onRemoveDrip={handleRemoveDrip}
+            onToggleAccess={handleToggleAccess}
+          />
+        </div>
       </div>
+
+      <SaveTemplateModal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        onSave={handleSaveTemplate}
+      />
 
       {showToast && (
         <Toast
@@ -679,6 +707,6 @@ export function AccessStructureEditor({
           onClose={() => setShowToast(false)}
         />
       )}
-    </div>
+    </>
   );
 } 

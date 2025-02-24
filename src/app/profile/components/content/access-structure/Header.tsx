@@ -1,4 +1,4 @@
-import { Eye, Zap, Clock } from 'lucide-react';
+import { Eye, Zap, Clock, Save, FilePlus } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { AccessMethod } from './types';
 
@@ -8,6 +8,7 @@ interface HeaderProps {
   onEditModeToggle: () => void;
   onAccessMethodChange: (method: AccessMethod) => void;
   onSave: () => void;
+  onSaveTemplate: () => void;
   onPreview?: () => void;
   isAdmin: boolean;
   isSuperAdmin: boolean;
@@ -21,6 +22,7 @@ export function Header({
   onEditModeToggle,
   onAccessMethodChange,
   onSave,
+  onSaveTemplate,
   onPreview,
   isAdmin,
   isSuperAdmin,
@@ -69,15 +71,27 @@ export function Header({
           <Clock className="w-5 h-5" />
         </button>
       </div>
-      <button
-        onClick={onSave}
-        className={cn(
-          "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
-          "bg-[var(--accent)] text-white hover:opacity-90"
-        )}
-      >
-        Save
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onSaveTemplate}
+          title="Save as Template"
+          className={cn(
+            "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+            "bg-[var(--muted)] text-[var(--muted-foreground)] hover:opacity-90"
+          )}
+        >
+          <FilePlus className="w-5 h-5" />
+        </button>
+        <button
+          onClick={onSave}
+          className={cn(
+            "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+            "bg-[var(--accent)] text-white hover:opacity-90"
+          )}
+        >
+          Save
+        </button>
+      </div>
     </div>
   );
 } 

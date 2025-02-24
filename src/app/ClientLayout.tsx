@@ -2,7 +2,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Header from '@/app/layout/Header';
 import ScrollProgress from '@/app/content/components/ScrollProgress';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
@@ -15,31 +15,44 @@ export default function ClientLayout({
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClientComponentClient();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   
   // Hide header on auth pages and AI tool pages
   const hideHeader = pathname?.startsWith('/auth/') || pathname?.startsWith('/ai/tools/');
 
-  // Protect routes
+  // List of public routes that don't require authentication
+  const publicRoutes = ['/auth/login', '/auth/signup', '/auth/reset'];
+  const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route));
+
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        // List of public routes that don't require authentication
-        const publicRoutes = ['/auth/login', '/auth/signup', '/auth/reset'];
-        const isPublicRoute = publicRoutes.some(route => pathname?.startsWith(route));
-        
-        if (!session && !isPublicRoute && pathname !== '/auth/login') {
-          router.push('/auth/login');
-        }
-      } catch (error) {
-        console.error('Auth check error:', error);
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setIsAuthenticated(!!session);
+      
+      // Handle navigation based on auth state
+      if (!session && !isPublicRoute && pathname !== '/auth/login') {
         router.push('/auth/login');
       }
-    };
+    });
 
-    checkAuth();
-  }, [pathname, router, supabase.auth]);
+    // Initial auth check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsAuthenticated(!!session);
+      
+      if (!session && !isPublicRoute && pathname !== '/auth/login') {
+        router.push('/auth/login');
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [pathname, router, supabase.auth, isPublicRoute]);
+
+  // Show loading state while checking auth
+  if (isAuthenticated === null && !isPublicRoute) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <>

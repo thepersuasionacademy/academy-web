@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Loader2, AlertCircle, Clock, Pencil, ChevronDown } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { AccessNode } from './types';
+import { AccessNode, StructureNode } from './types';
 import { NodeTypeIcon } from './NodeTypeIcon';
 import { AccessStructureEditor } from './AccessStructureEditor';
 
@@ -287,6 +287,24 @@ export function AccessStructureView({
     );
   };
 
+  const transformToStructureNode = (node: AccessNode): StructureNode => {
+    return {
+      id: node.id,
+      name: node.name,
+      type: node.type,
+      hasAccess: node.has_access,
+      order: node.order || 0,
+      ...(node.access_delay && { 
+        accessDelay: {
+          value: node.access_delay.value,
+          unit: node.access_delay.unit as 'days' | 'weeks' | 'months'
+        }
+      }),
+      ...(node.mediaType && { mediaType: node.mediaType }),
+      children: node.children?.map(transformToStructureNode) || []
+    };
+  };
+
   if (isEditMode) {
     return (
       <AccessStructureEditor
@@ -296,6 +314,7 @@ export function AccessStructureView({
         isAdmin={isAdmin}
         isSuperAdmin={isSuperAdmin}
         isNewAccess={false}
+        initialStructure={structure === null ? undefined : transformToStructureNode(structure)}
       />
     );
   }

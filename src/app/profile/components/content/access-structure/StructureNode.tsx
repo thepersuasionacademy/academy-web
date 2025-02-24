@@ -61,14 +61,14 @@ export function StructureNode({
     // Content level uses foreground color (white/black based on theme)
     if (node.type === 'content') return 'bg-[var(--foreground)]';
 
-    // First check for explicit locked status (via eye icon)
-    if (node.hasAccess === false) return 'bg-red-500';
-
-    // Check for drip delay - if in drip mode and has any delay settings, show as blue
+    // Check for drip delay first - if in drip mode and has any delay settings, show as blue
     const delayValue = node.accessDelay?.value;
     if (accessMethod === 'drip' && typeof delayValue === 'number' && delayValue > 0) {
       return 'bg-blue-500';
     }
+
+    // Then check for explicit locked status (via eye icon)
+    if (node.hasAccess === false) return 'bg-red-500';
 
     // Otherwise show as having access
     return 'bg-green-500';
