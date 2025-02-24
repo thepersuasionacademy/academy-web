@@ -6,7 +6,7 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 type AccessType = 'ai' | 'content' | null;
 
 interface BundleAccessSelectorProps {
-  onSubmit: (type: AccessType, id: string) => void;
+  onSubmit: (type: AccessType, id: string, templateInfo?: any) => void;
   onCancel: () => void;
 }
 
@@ -17,7 +17,7 @@ interface ContentItem {
   templates?: {
     id: string;
     name: string;
-    type: 'drip' | 'full' | 'basic' | 'premium';
+    type: string;
   }[];
 }
 
@@ -32,6 +32,15 @@ interface SearchResult {
   updated_at: string;
 }
 
+interface ContentTemplate {
+  id: string;
+  name: string;
+  access_overrides: any;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
 export function BundleAccessSelector({ onSubmit, onCancel }: BundleAccessSelectorProps) {
   const [selectedType, setSelectedType] = useState<AccessType>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -41,6 +50,7 @@ export function BundleAccessSelector({ onSubmit, onCancel }: BundleAccessSelecto
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
   const [isAddingTemplate, setIsAddingTemplate] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const supabase = createClientComponentClient();
 
   const accessTypes = [
@@ -48,12 +58,7 @@ export function BundleAccessSelector({ onSubmit, onCancel }: BundleAccessSelecto
     { id: 'ai', label: 'AI', icon: Package },
   ];
 
-  // Mock templates for different types
-  const mockContentTemplates = {
-    drip: { id: 'drip', name: 'Drip Access', type: 'drip' as const },
-    full: { id: 'full', name: 'Full Access', type: 'full' as const }
-  };
-
+  // Mock AI templates
   const mockAITemplates = {
     basic: { id: 'basic', name: 'Basic Access', type: 'basic' as const },
     premium: { id: 'premium', name: 'Premium Access', type: 'premium' as const }
@@ -85,7 +90,7 @@ export function BundleAccessSelector({ onSubmit, onCancel }: BundleAccessSelecto
             id: item.id,
             name: item.title,
             description: item.description || undefined,
-            templates: [mockContentTemplates.drip, mockContentTemplates.full]
+            templates: [] // Templates will be loaded when an item is selected
           }));
         } else if (selectedType === 'ai') {
           // Mock AI search results with templates
@@ -117,7 +122,51 @@ export function BundleAccessSelector({ onSubmit, onCancel }: BundleAccessSelecto
     return () => clearTimeout(debounceTimeout);
   }, [searchQuery, selectedType, supabase]);
 
+  // Load content templates when an item is selected
+  useEffect(() => {
+    const fetchContentTemplates = async () => {
+      if (selectedType !== 'content' || !selectedItem) return;
+      
+      setIsLoadingTemplates(true);
+      try {
+        const { data, error } = await supabase
+          .rpc('get_content_templates', {
+            p_content_id: selectedItem
+          });
+
+        if (error) {
+          console.error('Error fetching content templates:', error);
+          return;
+        }
+
+        // Update the selected item with the fetched templates
+        setSearchResults(prev => prev.map(item => {
+          if (item.id === selectedItem) {
+            return {
+              ...item,
+              templates: (data as ContentTemplate[] || []).map(template => ({
+                id: template.id,
+                name: template.name,
+                type: 'content'
+              }))
+            };
+          }
+          return item;
+        }));
+      } catch (error) {
+        console.error('Error fetching content templates:', error);
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+
+    fetchContentTemplates();
+  }, [selectedItem, selectedType, supabase]);
+
   const selectedItemData = selectedItem ? searchResults.find(item => item.id === selectedItem) : null;
+  const selectedTemplateData = selectedTemplate && selectedItemData?.templates 
+    ? selectedItemData.templates.find(t => t.id === selectedTemplate) 
+    : null;
 
   const handleAddTemplate = () => {
     if (!isAddingTemplate) {
@@ -131,7 +180,7 @@ export function BundleAccessSelector({ onSubmit, onCancel }: BundleAccessSelecto
       const newTemplate = {
         id: crypto.randomUUID(),
         name: newTemplateName.trim(),
-        type: selectedType === 'content' ? ('full' as const) : ('basic' as const)
+        type: selectedType === 'content' ? 'content' : 'basic'
       };
       
       // Add the new template to the selected item's templates
@@ -158,6 +207,24 @@ export function BundleAccessSelector({ onSubmit, onCancel }: BundleAccessSelecto
     } else if (e.key === 'Escape') {
       setIsAddingTemplate(false);
       setNewTemplateName('');
+    }
+  };
+
+  const handleSubmit = () => {
+    if (selectedType && selectedItem) {
+      if (selectedTemplate && selectedTemplateData) {
+        // Submit with template info
+        onSubmit(selectedType, selectedTemplate, {
+          contentId: selectedItem,
+          contentName: selectedItemData?.name,
+          templateName: selectedTemplateData.name
+        });
+      } else {
+        // Submit without template (for new template creation)
+        onSubmit(selectedType, selectedItem, {
+          contentName: selectedItemData?.name
+        });
+      }
     }
   };
 
@@ -251,23 +318,36 @@ export function BundleAccessSelector({ onSubmit, onCancel }: BundleAccessSelecto
           {selectedItemData && (
             <div className="space-y-2">
               <div className="text-sm font-medium text-[var(--text-secondary)]">Select Template:</div>
-              <div className="flex flex-wrap gap-2">
-                {selectedItemData.templates?.map((template) => (
-                  <button
-                    key={template.id}
-                    onClick={() => setSelectedTemplate(selectedTemplate === template.id ? null : template.id)}
-                    className={cn(
-                      "px-3 py-1.5 rounded-full text-sm",
-                      "border transition-all",
-                      selectedTemplate === template.id
-                        ? "border-[var(--accent)] bg-[var(--accent)] text-white"
-                        : "border-[var(--border-color)] hover:border-[var(--accent)] text-[var(--text-secondary)]"
-                    )}
-                  >
-                    {template.name}
-                  </button>
-                ))}
-              </div>
+              {isLoadingTemplates ? (
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Loading templates...</span>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {selectedItemData.templates && selectedItemData.templates.length > 0 ? (
+                    selectedItemData.templates.map((template) => (
+                      <button
+                        key={template.id}
+                        onClick={() => setSelectedTemplate(selectedTemplate === template.id ? null : template.id)}
+                        className={cn(
+                          "px-3 py-1.5 rounded-full text-sm",
+                          "border transition-all",
+                          selectedTemplate === template.id
+                            ? "border-[var(--accent)] bg-[var(--accent)] text-white"
+                            : "border-[var(--border-color)] hover:border-[var(--accent)] text-[var(--text-secondary)]"
+                        )}
+                      >
+                        {template.name}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-sm text-[var(--text-secondary)] py-1">
+                      No templates available for this content
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -280,14 +360,7 @@ export function BundleAccessSelector({ onSubmit, onCancel }: BundleAccessSelecto
               Cancel
             </button>
             <button
-              onClick={() => {
-                if (selectedTemplate && selectedType && selectedItem) {
-                  onSubmit(selectedType, selectedItem);
-                } else {
-                  // Handle new template creation
-                  console.log('Create new template');
-                }
-              }}
+              onClick={handleSubmit}
               disabled={!selectedType || !selectedItem}
               className={cn(
                 "px-3 py-1.5 rounded-lg transition-all text-sm flex items-center gap-2",

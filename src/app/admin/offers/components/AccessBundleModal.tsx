@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { cn } from "@/lib/utils"
-import { ArrowRight, Plus, Package, FileText, ChevronDown } from 'lucide-react'
+import { ArrowRight, Plus, Package, FileText, ChevronDown, Loader2 } from 'lucide-react'
 import { AccessStructureView } from '@/app/profile/components/content/access-structure/AccessStructureView'
 import { BundleAccessSelector } from './BundleAccessSelector'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { TemplateMixedAccessView } from '@/app/admin/offers/components/TemplateMixedAccessView'
 
 interface Template {
   id: string;
@@ -12,6 +14,9 @@ interface Template {
   name: string;
   description?: string;
   contentName?: string;
+  contentId?: string;
+  templateData?: any;
+  isLoadingTemplateData?: boolean;
 }
 
 interface Variation {
@@ -37,37 +42,63 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
   const [showAddAccess, setShowAddAccess] = useState(false);
   const [selectedVariationTemplates, setSelectedVariationTemplates] = useState<Template[]>([]);
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
-
-  // Mock templates for demonstration
-  const mockTemplates: Template[] = [
-    {
-      id: '1',
-      type: 'content',
-      name: 'Basic Access',
-      description: 'Access to fundamental patterns and concepts',
-      contentName: 'Power Patterns'
-    },
-    {
-      id: '2',
-      type: 'content',
-      name: 'Full Access',
-      description: 'Complete access to leadership materials',
-      contentName: 'Leadership Course'
-    }
-  ];
+  const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
-    // In a real implementation, this would fetch templates for the selected variation
-    if (selectedVariationId) {
-      setSelectedVariationTemplates(mockTemplates);
-    } else {
-      setSelectedVariationTemplates([]);
-    }
-  }, [selectedVariationId]);
+    // Fetch templates for the selected variation
+    const fetchTemplatesForVariation = async () => {
+      if (!selectedVariationId) {
+        setSelectedVariationTemplates([]);
+        return;
+      }
 
-  const handleAddAccess = (type: 'ai' | 'content' | null, id: string) => {
-    // Here you would handle adding the selected access to the variation
-    console.log('Adding access:', { type, id });
+      const selectedVariation = variations.find(v => v.id === selectedVariationId);
+      if (!selectedVariation || !selectedVariation.templates || selectedVariation.templates.length === 0) {
+        setSelectedVariationTemplates([]);
+        return;
+      }
+
+      setIsLoadingTemplates(true);
+      try {
+        // Use the templates from the selected variation
+        setSelectedVariationTemplates(selectedVariation.templates);
+      } catch (error) {
+        console.error('Error fetching templates for variation:', error);
+      } finally {
+        setIsLoadingTemplates(false);
+      }
+    };
+
+    fetchTemplatesForVariation();
+  }, [selectedVariationId, variations]);
+
+  const handleAddAccess = (type: 'ai' | 'content' | null, id: string, templateInfo?: any) => {
+    console.log('Adding access:', { type, id, templateInfo });
+    
+    if (!selectedVariationId || !type || !id) return;
+    
+    // Create a new template with the provided information
+    const newTemplate: Template = {
+      id,
+      type,
+      name: templateInfo?.templateName || 'New Template',
+      contentName: templateInfo?.contentName || (type === 'content' ? 'Content' : 'AI Tool'),
+      description: templateInfo?.description || '',
+      contentId: templateInfo?.contentId || ''
+    };
+    
+    // Add the template to the selected variation
+    setVariations(prev => prev.map(variation => {
+      if (variation.id === selectedVariationId) {
+        return {
+          ...variation,
+          templates: [...(variation.templates || []), newTemplate]
+        };
+      }
+      return variation;
+    }));
+    
     setShowAddAccess(false);
   };
 
@@ -144,6 +175,73 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
       return unlockScroll
     }
   }, [isOpen, lockScroll, unlockScroll])
+
+  const handleTemplateExpand = async (template: Template) => {
+    if (expandedTemplateId === template.id) {
+      setExpandedTemplateId(null);
+      return;
+    }
+    
+    setExpandedTemplateId(template.id);
+    
+    if (template.type !== 'content' || template.templateData || !template.contentId) {
+      return;
+    }
+    
+    setVariations(prev => prev.map(variation => {
+      if (variation.id === selectedVariationId) {
+        return {
+          ...variation,
+          templates: variation.templates?.map(t => 
+            t.id === template.id ? { ...t, isLoadingTemplateData: true } : t
+          )
+        };
+      }
+      return variation;
+    }));
+    
+    try {
+      const { data, error } = await supabase.rpc('get_mixed_template_structure', {
+        p_content_id: template.contentId,
+        p_template_id: template.id
+      });
+      
+      if (error) {
+        console.error('Error fetching template data:', error);
+        throw error;
+      }
+      
+      setVariations(prev => prev.map(variation => {
+        if (variation.id === selectedVariationId) {
+          return {
+            ...variation,
+            templates: variation.templates?.map(t => 
+              t.id === template.id ? { 
+                ...t, 
+                templateData: data,
+                isLoadingTemplateData: false 
+              } : t
+            )
+          };
+        }
+        return variation;
+      }));
+    } catch (err) {
+      console.error('Failed to load template data:', err);
+      
+      setVariations(prev => prev.map(variation => {
+        if (variation.id === selectedVariationId) {
+          return {
+            ...variation,
+            templates: variation.templates?.map(t => 
+              t.id === template.id ? { ...t, isLoadingTemplateData: false } : t
+            )
+          };
+        }
+        return variation;
+      }));
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -311,65 +409,91 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
 
                   {/* Content Templates List */}
                   <div className="space-y-4">
-                    {selectedVariationTemplates.map((template) => (
-                      <div key={template.id} className="space-y-3">
-                        <div
-                          onClick={() => setExpandedTemplateId(
-                            expandedTemplateId === template.id ? null : template.id
-                          )}
-                          className={cn(
-                            "group relative rounded-xl p-6",
-                            "border border-[var(--border-color)]",
-                            "transition-all duration-300",
-                            "bg-[#fafafa] hover:bg-white dark:bg-[var(--card-bg)]",
-                            "hover:border-[var(--accent)]",
-                            "cursor-pointer",
-                            expandedTemplateId === template.id && "border-[var(--accent)]"
-                          )}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              {template.type === 'content' ? (
-                                <FileText className="w-5 h-5 text-[var(--text-secondary)]" />
-                              ) : (
-                                <Package className="w-5 h-5 text-[var(--text-secondary)]" />
-                              )}
-                              <div>
-                                <h4 className="text-lg font-semibold text-[var(--foreground)]">{template.contentName} → {template.name}</h4>
-                                {template.description && (
-                                  <p className="text-sm text-[var(--text-secondary)] line-clamp-2 group-hover:text-[var(--foreground)] transition-colors">
-                                    {template.description}
-                                  </p>
+                    {isLoadingTemplates ? (
+                      <div className="flex items-center justify-center p-4">
+                        <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span>Loading templates...</span>
+                        </div>
+                      </div>
+                    ) : selectedVariationTemplates.length === 0 ? (
+                      <div className="text-center p-4 text-[var(--text-secondary)]">
+                        <p>No templates added to this variation yet.</p>
+                        <p className="text-sm mt-1">Click "Add Template" to get started.</p>
+                      </div>
+                    ) : (
+                      selectedVariationTemplates.map((template) => (
+                        <div key={template.id} className="space-y-3">
+                          <div
+                            onClick={() => handleTemplateExpand(template)}
+                            className={cn(
+                              "group relative rounded-xl p-6",
+                              "border border-[var(--border-color)]",
+                              "transition-all duration-300",
+                              "bg-[#fafafa] hover:bg-white dark:bg-[var(--card-bg)]",
+                              "hover:border-[var(--accent)]",
+                              "cursor-pointer",
+                              expandedTemplateId === template.id && "border-[var(--accent)]"
+                            )}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                {template.type === 'content' ? (
+                                  <FileText className="w-5 h-5 text-[var(--text-secondary)]" />
+                                ) : (
+                                  <Package className="w-5 h-5 text-[var(--text-secondary)]" />
                                 )}
+                                <div>
+                                  <h4 className="text-lg font-semibold text-[var(--foreground)]">{template.contentName} → {template.name}</h4>
+                                  {template.description && (
+                                    <p className="text-sm text-[var(--text-secondary)] line-clamp-2 group-hover:text-[var(--foreground)] transition-colors">
+                                      {template.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className={cn(
+                                "w-5 h-5 rounded-full border border-[var(--text-secondary)] flex items-center justify-center text-[var(--text-secondary)]",
+                                "transition-colors",
+                                "group-hover:border-[var(--accent)] group-hover:text-[var(--accent)]",
+                                expandedTemplateId === template.id && "border-[var(--accent)] text-[var(--accent)] rotate-180"
+                              )}>
+                                <ChevronDown className="w-4 h-4" />
                               </div>
                             </div>
-                            <div className={cn(
-                              "w-5 h-5 rounded-full border border-[var(--text-secondary)] flex items-center justify-center text-[var(--text-secondary)]",
-                              "transition-colors",
-                              "group-hover:border-[var(--accent)] group-hover:text-[var(--accent)]",
-                              expandedTemplateId === template.id && "border-[var(--accent)] text-[var(--accent)] rotate-180"
-                            )}>
-                              <ChevronDown className="w-4 h-4" />
-                            </div>
                           </div>
-                        </div>
 
-                        {/* Expanded Access Structure View */}
-                        {expandedTemplateId === template.id && (
-                          <div className={cn(
-                            "rounded-xl p-6",
-                            "border border-[var(--border-color)]",
-                            "bg-[#fafafa] dark:bg-[var(--card-bg)]"
-                          )}>
-                            <AccessStructureView
-                              selectedType="content"
-                              selectedId={template.id}
-                              isAdmin={true}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                          {/* Expanded Access Structure View */}
+                          {expandedTemplateId === template.id && (
+                            <div className={cn(
+                              "p-6",
+                              "border-t border-[var(--border-color)]"
+                            )}>
+                              {template.isLoadingTemplateData ? (
+                                <div className="flex items-center justify-center p-4">
+                                  <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                    <span>Loading template structure...</span>
+                                  </div>
+                                </div>
+                              ) : template.type === 'content' ? (
+                                <TemplateMixedAccessView
+                                  templateId={template.id}
+                                  contentId={template.contentId || ''}
+                                  templateData={template.templateData}
+                                />
+                              ) : (
+                                <AccessStructureView
+                                  selectedType="content"
+                                  selectedId={template.id}
+                                  isAdmin={true}
+                                />
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}

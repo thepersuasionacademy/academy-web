@@ -1,4 +1,4 @@
-import { Youtube, Type, Bot, FileText, HelpCircle } from 'lucide-react';
+import { Youtube, Type, Bot, FileText, HelpCircle, FileIcon } from 'lucide-react';
 import { cn } from "@/lib/utils";
 
 interface NodeTypeIconProps {
@@ -26,6 +26,7 @@ export function NodeTypeIcon({ mediaType, hasNoAccess }: NodeTypeIconProps) {
     case 'quiz':
       return <HelpCircle className={iconClasses} />;
     default:
-      return null;
+      // If no mediaType is provided, use a generic file icon
+      return <FileIcon className={iconClasses} />;
   }
 } 
