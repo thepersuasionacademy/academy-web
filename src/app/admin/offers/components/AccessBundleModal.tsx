@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { cn } from "@/lib/utils"
-import { ArrowRight, Plus, Package, FileText, ChevronDown, Loader2 } from 'lucide-react'
+import { ArrowRight, Plus, Package, FileText, ChevronDown, Loader2, Bot } from 'lucide-react'
 import { AccessStructureView } from '@/app/profile/components/content/access-structure/AccessStructureView'
 import { BundleAccessSelector } from './BundleAccessSelector'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -17,6 +17,15 @@ interface Template {
   contentId?: string;
   templateData?: any;
   isLoadingTemplateData?: boolean;
+  // AI specific properties
+  categoryId?: string;
+  categoryName?: string;
+  suiteId?: string;
+  suiteName?: string;
+  toolName?: string;
+  // Support for multiple tools
+  toolIds?: string[];
+  toolNames?: string[];
 }
 
 interface Variation {
@@ -42,6 +51,7 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
   const [showAddAccess, setShowAddAccess] = useState(false);
   const [selectedVariationTemplates, setSelectedVariationTemplates] = useState<Template[]>([]);
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
   const supabase = createClientComponentClient();
 
@@ -82,10 +92,24 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
     const newTemplate: Template = {
       id,
       type,
-      name: templateInfo?.templateName || 'New Template',
-      contentName: templateInfo?.contentName || (type === 'content' ? 'Content' : 'AI Tool'),
+      name: type === 'content' 
+        ? templateInfo?.templateName || 'New Template'
+        : templateInfo?.toolName || 'New AI Tool',
+      contentName: type === 'content' 
+        ? templateInfo?.contentName 
+        : null,
       description: templateInfo?.description || '',
-      contentId: templateInfo?.contentId || ''
+      contentId: type === 'content' ? templateInfo?.contentId || '' : null,
+      
+      // AI specific properties
+      categoryId: type === 'ai' ? templateInfo?.categoryId : null,
+      categoryName: type === 'ai' ? templateInfo?.categoryName : null,
+      suiteId: type === 'ai' ? templateInfo?.suiteId : null,
+      suiteName: type === 'ai' ? templateInfo?.suiteName : null,
+      toolName: type === 'ai' ? templateInfo?.toolName : null,
+      // Store multiple tools data if available
+      toolIds: type === 'ai' ? templateInfo?.toolIds : null,
+      toolNames: type === 'ai' ? templateInfo?.toolNames : null,
     };
     
     // Add the template to the selected variation
@@ -179,11 +203,20 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
   const handleTemplateExpand = async (template: Template) => {
     if (expandedTemplateId === template.id) {
       setExpandedTemplateId(null);
+      setEditingTemplateId(null);
       return;
     }
     
     setExpandedTemplateId(template.id);
     
+    // If it's an AI template, automatically set it to edit mode
+    if (template.type === 'ai') {
+      setEditingTemplateId(template.id);
+    } else {
+      setEditingTemplateId(null);
+    }
+    
+    // Only fetch data for content templates, no data fetching needed for AI templates
     if (template.type !== 'content' || template.templateData || !template.contentId) {
       return;
     }
@@ -241,6 +274,117 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
         return variation;
       }));
     }
+  };
+
+  // Function to render template title based on template type
+  const renderTemplateTitle = (template: Template) => {
+    if (template.type === 'content') {
+      return `${template.contentName} → ${template.name}`;
+    } else if (template.type === 'ai') {
+      // Create hierarchical path based on how deep the selection was
+      if (template.toolIds && template.toolIds.length > 0) {
+        if (template.toolIds.length === 1) {
+          return `${template.categoryName} → ${template.suiteName} → ${template.toolNames?.[0] || template.toolName}`;
+        } else {
+          return `${template.categoryName} → ${template.suiteName} → ${template.toolIds.length} Tools`;
+        }
+      } else if (template.toolName) {
+        return `${template.categoryName} → ${template.suiteName} → ${template.toolName}`;
+      } else if (template.suiteName) {
+        return `${template.categoryName} → ${template.suiteName}`;
+      } else {
+        return `${template.categoryName}`;
+      }
+    }
+    return template.name;
+  };
+
+  // Function to handle editing a template
+  const handleEditTemplate = (template: Template) => {
+    setEditingTemplateId(template.id);
+  };
+  
+  // Function to handle updates when an AI template is edited
+  const handleAITemplateUpdate = (type: 'ai' | 'content' | null, id: string, templateInfo?: any) => {
+    if (!selectedVariationId || !type || !id || type !== 'ai') return;
+    
+    // Update the template with the new information
+    setVariations(prev => prev.map(variation => {
+      if (variation.id === selectedVariationId) {
+        return {
+          ...variation,
+          templates: variation.templates?.map(template => 
+            template.id === editingTemplateId ? {
+              ...template,
+              id, // This might be the same as editingTemplateId
+              categoryId: templateInfo?.categoryId,
+              categoryName: templateInfo?.categoryName,
+              suiteId: templateInfo?.suiteId,
+              suiteName: templateInfo?.suiteName,
+              toolName: templateInfo?.toolName,
+              toolIds: templateInfo?.toolIds,
+              toolNames: templateInfo?.toolNames,
+            } : template
+          )
+        };
+      }
+      return variation;
+    }));
+    
+    // Close the editing mode
+    setEditingTemplateId(null);
+  };
+
+  // Function to render the appropriate template content
+  const renderTemplateContent = (template: Template) => {
+    if (template.isLoadingTemplateData) {
+      return (
+        <div className="flex items-center justify-center p-4">
+          <div className="flex items-center gap-2 text-[var(--text-secondary)]">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span>Loading template structure...</span>
+          </div>
+        </div>
+      );
+    }
+
+    // For AI templates, always show the BundleAccessSelector
+    if (template.type === 'ai') {
+      return (
+        <BundleAccessSelector
+          onSubmit={handleAITemplateUpdate}
+          onCancel={() => {
+            setEditingTemplateId(null);
+            setExpandedTemplateId(null);
+          }}
+          initialSelection={{
+            type: 'ai',
+            categoryId: template.categoryId,
+            categoryName: template.categoryName,
+            suiteId: template.suiteId,
+            suiteName: template.suiteName,
+            toolIds: template.toolIds,
+            toolNames: template.toolNames
+          }}
+        />
+      );
+    }
+
+    if (template.type === 'content') {
+      return (
+        <TemplateMixedAccessView
+          templateId={template.id}
+          contentId={template.contentId || ''}
+          templateData={template.templateData}
+        />
+      );
+    }
+
+    return (
+      <div className="text-center text-[var(--text-secondary)]">
+        No preview available for this template type.
+      </div>
+    );
   };
 
   if (!isOpen) return null;
@@ -323,7 +467,7 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
                     onDoubleClick={() => handleVariationDoubleClick(variation)}
                   >
                     <div className={cn(
-                      "px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer",
+                      "px-4 py-2 rounded-lg text-base font-medium cursor-pointer",
                       "border bg-[var(--card-bg)]",
                       "transition-all duration-200",
                       selectedVariationId === variation.id
@@ -376,7 +520,7 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
                     placeholder="Enter variation name..."
                     autoFocus
                     className={cn(
-                      "px-3 py-1.5 rounded-lg text-sm font-medium",
+                      "px-4 py-2 rounded-lg text-base font-medium",
                       "border border-[var(--accent)] bg-[var(--card-bg)]",
                       "text-[var(--text-secondary)]",
                       "focus:outline-none",
@@ -407,6 +551,11 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
                     />
                   ) : null}
 
+                  {/* Divider after Add Template button */}
+                  {(!showAddAccess && selectedVariationTemplates.length > 0) && (
+                    <div className="h-px bg-[var(--border-color)] w-full my-6" />
+                  )}
+
                   {/* Content Templates List */}
                   <div className="space-y-4">
                     {isLoadingTemplates ? (
@@ -419,7 +568,7 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
                     ) : selectedVariationTemplates.length === 0 ? (
                       <div className="text-center p-4 text-[var(--text-secondary)]">
                         <p>No templates added to this variation yet.</p>
-                        <p className="text-sm mt-1">Click "Add Template" to get started.</p>
+                        <p className="text-sm mt-1">Click &quot;Add Template&quot; to get started.</p>
                       </div>
                     ) : (
                       selectedVariationTemplates.map((template) => (
@@ -441,10 +590,12 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
                                 {template.type === 'content' ? (
                                   <FileText className="w-5 h-5 text-[var(--text-secondary)]" />
                                 ) : (
-                                  <Package className="w-5 h-5 text-[var(--text-secondary)]" />
+                                  <Bot className="w-5 h-5 text-[var(--text-secondary)]" />
                                 )}
                                 <div>
-                                  <h4 className="text-lg font-semibold text-[var(--foreground)]">{template.contentName} → {template.name}</h4>
+                                  <h4 className="text-lg font-semibold text-[var(--foreground)]">
+                                    {renderTemplateTitle(template)}
+                                  </h4>
                                   {template.description && (
                                     <p className="text-sm text-[var(--text-secondary)] line-clamp-2 group-hover:text-[var(--foreground)] transition-colors">
                                       {template.description}
@@ -469,26 +620,7 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
                               "p-6",
                               "border-t border-[var(--border-color)]"
                             )}>
-                              {template.isLoadingTemplateData ? (
-                                <div className="flex items-center justify-center p-4">
-                                  <div className="flex items-center gap-2 text-[var(--text-secondary)]">
-                                    <Loader2 className="h-5 w-5 animate-spin" />
-                                    <span>Loading template structure...</span>
-                                  </div>
-                                </div>
-                              ) : template.type === 'content' ? (
-                                <TemplateMixedAccessView
-                                  templateId={template.id}
-                                  contentId={template.contentId || ''}
-                                  templateData={template.templateData}
-                                />
-                              ) : (
-                                <AccessStructureView
-                                  selectedType="content"
-                                  selectedId={template.id}
-                                  isAdmin={true}
-                                />
-                              )}
+                              {renderTemplateContent(template)}
                             </div>
                           )}
                         </div>
