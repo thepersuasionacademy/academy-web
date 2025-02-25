@@ -2,11 +2,12 @@
 
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { cn } from "@/lib/utils"
-import { ArrowRight, Plus, Package, FileText, ChevronDown, Loader2, Bot } from 'lucide-react'
+import { ArrowRight, Plus, Package, FileText, ChevronDown, Loader2, Bot, Save } from 'lucide-react'
 import { AccessStructureView } from '@/app/profile/components/content/access-structure/AccessStructureView'
 import { BundleAccessSelector } from './BundleAccessSelector'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { TemplateMixedAccessView } from '@/app/admin/offers/components/TemplateMixedAccessView'
+import { toast } from 'sonner'
 
 interface Template {
   id: string;
@@ -26,6 +27,8 @@ interface Template {
   // Support for multiple tools
   toolIds?: string[];
   toolNames?: string[];
+  // For merged templates
+  originalTemplates?: Template[];
 }
 
 interface Variation {
@@ -37,11 +40,26 @@ interface Variation {
 interface AccessBundleModalProps {
   isOpen: boolean;
   onClose: () => void;
+  bundle?: {
+    id: string;
+    name: string;
+    description: string;
+    variations: {
+      id: string;
+      name: string;
+      variation_name?: string;
+      templates?: any[];
+      description?: string;
+    }[];
+    createdAt?: string;
+    updatedAt?: string;
+    createdBy?: string;
+  };
 }
 
-export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
-  const [bundleName, setBundleName] = useState('');
-  const [bundleDescription, setBundleDescription] = useState('');
+export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModalProps) {
+  const [bundleName, setBundleName] = useState(bundle?.name || '');
+  const [bundleDescription, setBundleDescription] = useState(bundle?.description || '');
   const [variations, setVariations] = useState<Variation[]>([]);
   const [isAddingVariation, setIsAddingVariation] = useState(false);
   const [newVariationName, setNewVariationName] = useState('');
@@ -53,35 +71,181 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
   const [expandedTemplateId, setExpandedTemplateId] = useState<string | null>(null);
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [bundleId, setBundleId] = useState<string | null>(bundle?.id || null);
   const supabase = createClientComponentClient();
+
+  // Initialize state from bundle prop when provided
+  useEffect(() => {
+    if (bundle) {
+      console.log('Initializing modal with bundle data:', bundle);
+      setBundleName(bundle.name || '');
+      setBundleDescription(bundle.description || '');
+      setBundleId(bundle.id);
+      
+      // Transform variations data if needed
+      const transformedVariations = bundle.variations.map(variation => ({
+        id: variation.id,
+        name: variation.name || variation.variation_name || '',
+        templates: variation.templates || [],
+      }));
+      
+      setVariations(transformedVariations);
+      
+      // Set the first variation as selected by default if available
+      if (transformedVariations.length > 0) {
+        setSelectedVariationId(transformedVariations[0].id);
+      }
+    } else {
+      // Clear bundleId if no bundle is provided
+      setBundleId(null);
+    }
+  }, [bundle]);
 
   useEffect(() => {
     // Fetch templates for the selected variation
     const fetchTemplatesForVariation = async () => {
-      if (!selectedVariationId) {
-        setSelectedVariationTemplates([]);
-        return;
-      }
-
-      const selectedVariation = variations.find(v => v.id === selectedVariationId);
-      if (!selectedVariation || !selectedVariation.templates || selectedVariation.templates.length === 0) {
+      if (!selectedVariationId || !bundleId) {
         setSelectedVariationTemplates([]);
         return;
       }
 
       setIsLoadingTemplates(true);
       try {
-        // Use the templates from the selected variation
-        setSelectedVariationTemplates(selectedVariation.templates);
-      } catch (error) {
-        console.error('Error fetching templates for variation:', error);
+        console.log(`Fetching details for bundle ${bundleId} and variation ${selectedVariationId}`);
+        
+        // Call the RPC function to get detailed template information
+        const { data, error } = await supabase.rpc('get_access_bundle_variation_details', {
+          p_bundle_id: bundleId,
+          p_variation_id: selectedVariationId
+        });
+        
+        if (error) {
+          console.error('Error fetching variation details:', error);
+          throw error;
+        }
+        
+        console.log('Variation details response:', data);
+        
+        if (data?.success && Array.isArray(data?.templates)) {
+          console.log(`Found ${data.templates.length} templates for variation ${selectedVariationId}`);
+          
+          // Transform the templates from the API to match our component's expected format
+          const transformedTemplates = data.templates.map((template: any) => {
+            // Common template properties
+            const baseTemplate: Template = {
+              id: template.id,
+              type: template.type,
+              name: template.name,
+              description: template.description,
+            };
+            
+            // Add content-specific properties
+            if (template.type === 'content') {
+              return {
+                ...baseTemplate,
+                contentId: template.contentId,
+                contentName: template.contentName,
+              };
+            }
+            
+            // Add AI-specific properties
+            if (template.type === 'ai') {
+              return {
+                ...baseTemplate,
+                categoryId: template.categoryId,
+                categoryName: template.categoryName,
+                suiteId: template.suiteId,
+                suiteName: template.suiteName,
+                toolIds: template.toolIds,
+                toolNames: template.toolNames,
+              };
+            }
+            
+            return baseTemplate;
+          });
+          
+          setSelectedVariationTemplates(transformedTemplates);
+        } else {
+          // If no templates data or error, set empty array
+          console.log('No templates found or invalid data format');
+          setSelectedVariationTemplates([]);
+        }
+      } catch (err) {
+        console.error('Failed to load templates:', err);
+        setSelectedVariationTemplates([]);
       } finally {
         setIsLoadingTemplates(false);
       }
     };
 
     fetchTemplatesForVariation();
-  }, [selectedVariationId, variations]);
+  }, [selectedVariationId, bundleId, supabase]);
+
+  // Helper function to merge AI templates by suite
+  const getMergedTemplates = (templates: Template[]): Template[] => {
+    if (!templates || templates.length === 0) return [];
+    
+    // First, separate AI and non-AI templates
+    const aiTemplates = templates.filter(t => t.type === 'ai');
+    const nonAiTemplates = templates.filter(t => t.type !== 'ai');
+    
+    // Group AI templates by suite ID
+    const templatesBySuite: Record<string, Template[]> = {};
+    
+    aiTemplates.forEach(template => {
+      if (template.suiteId) {
+        const key = `${template.categoryId}-${template.suiteId}`;
+        if (!templatesBySuite[key]) {
+          templatesBySuite[key] = [];
+        }
+        templatesBySuite[key].push(template);
+      } else {
+        // For templates without a suite (like category-level templates), treat individually
+        const key = `${template.categoryId}-individual-${template.id}`;
+        templatesBySuite[key] = [template];
+      }
+    });
+    
+    // Create merged templates for suites with multiple tools
+    const mergedAiTemplates: Template[] = [];
+    
+    Object.keys(templatesBySuite).forEach(key => {
+      const suiteTemplates = templatesBySuite[key];
+      
+      if (suiteTemplates.length === 1) {
+        // Only one template for this suite, no merging needed
+        mergedAiTemplates.push(suiteTemplates[0]);
+      } else if (suiteTemplates.length > 1) {
+        // Multiple templates for this suite, merge them
+        const first = suiteTemplates[0];
+        const toolIds = suiteTemplates.map(t => t.toolIds || []).flat().filter(Boolean);
+        const toolNames = suiteTemplates.map(t => t.toolNames || []).flat().filter(Boolean);
+        
+        // Create a merged template
+        const mergedTemplate: Template = {
+          id: `merged-${first.suiteId}`,
+          type: 'ai',
+          name: first.suiteName || 'AI Suite',
+          description: `${toolNames.length} tools from ${first.suiteName}`,
+          categoryId: first.categoryId,
+          categoryName: first.categoryName,
+          suiteId: first.suiteId,
+          suiteName: first.suiteName,
+          // Include all tool IDs and names
+          toolIds: toolIds,
+          toolNames: toolNames,
+          // Store original templates for reference when expanded
+          originalTemplates: suiteTemplates
+        };
+        
+        mergedAiTemplates.push(mergedTemplate);
+      }
+    });
+    
+    // Combine merged AI templates with non-AI templates
+    return [...mergedAiTemplates, ...nonAiTemplates];
+  };
 
   const handleAddAccess = (type: 'ai' | 'content' | null, id: string, templateInfo?: any) => {
     console.log('Adding access:', { type, id, templateInfo });
@@ -308,28 +472,92 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
   const handleAITemplateUpdate = (type: 'ai' | 'content' | null, id: string, templateInfo?: any) => {
     if (!selectedVariationId || !type || !id || type !== 'ai') return;
     
-    // Update the template with the new information
-    setVariations(prev => prev.map(variation => {
-      if (variation.id === selectedVariationId) {
-        return {
-          ...variation,
-          templates: variation.templates?.map(template => 
-            template.id === editingTemplateId ? {
-              ...template,
-              id, // This might be the same as editingTemplateId
-              categoryId: templateInfo?.categoryId,
-              categoryName: templateInfo?.categoryName,
-              suiteId: templateInfo?.suiteId,
-              suiteName: templateInfo?.suiteName,
-              toolName: templateInfo?.toolName,
-              toolIds: templateInfo?.toolIds,
-              toolNames: templateInfo?.toolNames,
-            } : template
-          )
-        };
+    // Check if this is a merged template being updated
+    const editingTemplate = selectedVariationTemplates.find(t => t.id === editingTemplateId);
+    const isMergedTemplate = editingTemplate?.id.startsWith('merged-');
+    
+    if (isMergedTemplate && editingTemplate?.originalTemplates) {
+      // This is a merged template update
+      // We need to update all the original templates or remove them based on the new selection
+      
+      console.log('Updating merged template with info:', templateInfo);
+      
+      // If we still have tools selected, update them
+      if (templateInfo.toolIds && templateInfo.toolIds.length > 0) {
+        // Get the original variation templates excluding the ones from this merged group
+        const updatedVariationTemplates = selectedVariationTemplates.filter(
+          t => t.id !== editingTemplateId && !editingTemplate.originalTemplates?.some(ot => ot.id === t.id)
+        );
+        
+        // Create new templates based on the selected tools
+        const newToolTemplates = templateInfo.toolIds.map((toolId: string, index: number) => ({
+          id: toolId, // Use tool ID as template ID
+          type: 'ai',
+          name: templateInfo.toolNames?.[index] || 'AI Tool',
+          categoryId: templateInfo.categoryId,
+          categoryName: templateInfo.categoryName,
+          suiteId: templateInfo.suiteId,
+          suiteName: templateInfo.suiteName,
+          toolIds: [toolId],
+          toolNames: [templateInfo.toolNames?.[index]]
+        }));
+        
+        // Update the variation templates
+        setSelectedVariationTemplates([...updatedVariationTemplates, ...newToolTemplates]);
+        
+        // Also update the variations state to persist these changes
+        setVariations(prev => prev.map(variation => {
+          if (variation.id === selectedVariationId) {
+            return {
+              ...variation,
+              templates: [...updatedVariationTemplates, ...newToolTemplates]
+            };
+          }
+          return variation;
+        }));
+      } else {
+        // If no tools are selected, remove all the original templates
+        const updatedVariationTemplates = selectedVariationTemplates.filter(
+          t => t.id !== editingTemplateId && !editingTemplate.originalTemplates?.some(ot => ot.id === t.id)
+        );
+        
+        setSelectedVariationTemplates(updatedVariationTemplates);
+        
+        setVariations(prev => prev.map(variation => {
+          if (variation.id === selectedVariationId) {
+            return {
+              ...variation,
+              templates: updatedVariationTemplates
+            };
+          }
+          return variation;
+        }));
       }
-      return variation;
-    }));
+    } else {
+      // Regular template update
+      // Update the template with the new information
+      setVariations(prev => prev.map(variation => {
+        if (variation.id === selectedVariationId) {
+          return {
+            ...variation,
+            templates: variation.templates?.map(template => 
+              template.id === editingTemplateId ? {
+                ...template,
+                id, // This might be the same as editingTemplateId
+                categoryId: templateInfo?.categoryId,
+                categoryName: templateInfo?.categoryName,
+                suiteId: templateInfo?.suiteId,
+                suiteName: templateInfo?.suiteName,
+                toolName: templateInfo?.toolName,
+                toolIds: templateInfo?.toolIds,
+                toolNames: templateInfo?.toolNames,
+              } : template
+            )
+          };
+        }
+        return variation;
+      }));
+    }
     
     // Close the editing mode
     setEditingTemplateId(null);
@@ -387,6 +615,60 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
     );
   };
 
+  // Function to handle saving the entire bundle
+  const handleSaveBundle = async () => {
+    if (!bundleName.trim()) {
+      toast.error("Please enter a bundle name");
+      return;
+    }
+
+    if (variations.length === 0) {
+      toast.error("Please add at least one variation");
+      return;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      // Prepare the bundle data structure for saving
+      const bundleData = {
+        id: bundleId,
+        name: bundleName.trim(),
+        description: bundleDescription.trim(),
+        variations: variations.map(variation => ({
+          id: variation.id,
+          name: variation.name,
+          templates: variation.templates || []
+        }))
+      };
+      
+      // Call the RPC to save the bundle
+      const { data, error } = await supabase.rpc('save_access_bundle', {
+        p_bundle: bundleData
+      });
+      
+      if (error) {
+        console.error('Error saving bundle:', error);
+        toast.error("Failed to save bundle");
+        throw error;
+      }
+      
+      console.log('Bundle saved successfully:', data);
+      toast.success("Bundle saved successfully");
+      
+      // Update local state with the returned data
+      if (data) {
+        setBundleId(data.id);
+        // Update other state as needed based on the response
+      }
+    } catch (err) {
+      console.error('Failed to save bundle:', err);
+      toast.error("An error occurred while saving");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -412,10 +694,37 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
             {/* Title Section */}
             <div className="mb-8">
               <div className="flex flex-col">
-                <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)] mb-2">
-                  <span>Access Control</span>
-                  <ArrowRight className="w-4 h-4" />
-                  <span>Bundles</span>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                    <span>Access Control</span>
+                    <ArrowRight className="w-4 h-4" />
+                    <span>Bundles</span>
+                  </div>
+                  
+                  {/* Save Button */}
+                  <button
+                    onClick={handleSaveBundle}
+                    disabled={isSaving}
+                    className={cn(
+                      "px-4 py-2 rounded-lg text-base font-medium",
+                      "border transition-colors flex items-center gap-2",
+                      isSaving
+                        ? "bg-[var(--hover-bg)]/50 text-[var(--text-secondary)] cursor-not-allowed"
+                        : "bg-[var(--accent)] text-white hover:opacity-90"
+                    )}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        <span>Save Bundle</span>
+                      </>
+                    )}
+                  </button>
                 </div>
                 <div className="h-px bg-[var(--border-color)] w-full mb-4" />
               </div>
@@ -571,7 +880,7 @@ export function AccessBundleModal({ isOpen, onClose }: AccessBundleModalProps) {
                         <p className="text-sm mt-1">Click &quot;Add Template&quot; to get started.</p>
                       </div>
                     ) : (
-                      selectedVariationTemplates.map((template) => (
+                      getMergedTemplates(selectedVariationTemplates).map((template) => (
                         <div key={template.id} className="space-y-3">
                           <div
                             onClick={() => handleTemplateExpand(template)}
