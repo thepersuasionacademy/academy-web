@@ -276,7 +276,10 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
       toolNames: type === 'ai' ? templateInfo?.toolNames : null,
     };
     
-    // Add the template to the selected variation
+    // Add the template to selectedVariationTemplates (used for UI rendering)
+    setSelectedVariationTemplates(prev => [...prev, newTemplate]);
+    
+    // Also add the template to the selected variation in the variations state
     setVariations(prev => prev.map(variation => {
       if (variation.id === selectedVariationId) {
         return {
@@ -288,6 +291,7 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
     }));
     
     setShowAddAccess(false);
+    toast.success("Template added successfully");
   };
 
   const handleAddVariation = () => {
@@ -635,12 +639,25 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
         id: bundleId,
         name: bundleName.trim(),
         description: bundleDescription.trim(),
-        variations: variations.map(variation => ({
-          id: variation.id,
-          name: variation.name,
-          templates: variation.templates || []
-        }))
+        variations: variations.map(variation => {
+          // For the selected variation, use the selectedVariationTemplates which has the most up-to-date state
+          if (variation.id === selectedVariationId) {
+            return {
+              id: variation.id,
+              name: variation.name,
+              templates: selectedVariationTemplates // Use the most current state
+            };
+          }
+          // For other variations, use their existing templates
+          return {
+            id: variation.id,
+            name: variation.name,
+            templates: variation.templates || []
+          };
+        })
       };
+      
+      console.log('Saving bundle data:', bundleData);
       
       // Call the RPC to save the bundle
       const { data, error } = await supabase.rpc('save_access_bundle', {
@@ -666,6 +683,46 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
       toast.error("An error occurred while saving");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  // Function to handle deleting a template from the variation
+  const handleDeleteTemplate = (template: Template) => {
+    if (!selectedVariationId) return;
+    
+    try {
+      // If this is a merged template, we need to delete all the original templates
+      const templatesToDelete = template.originalTemplates || [template];
+      
+      // Get the IDs of templates to delete
+      const templateIds = templatesToDelete.map(t => t.id);
+      
+      // If the template was expanded, collapse it
+      if (expandedTemplateId === template.id) {
+        setExpandedTemplateId(null);
+        setEditingTemplateId(null);
+      }
+      
+      // Update the local state to remove the deleted template(s)
+      setSelectedVariationTemplates(prev => 
+        prev.filter(t => !templateIds.includes(t.id))
+      );
+      
+      // Also update the variations state
+      setVariations(prev => prev.map(variation => {
+        if (variation.id === selectedVariationId) {
+          return {
+            ...variation,
+            templates: variation.templates?.filter(t => !templateIds.includes(t.id))
+          };
+        }
+        return variation;
+      }));
+      
+      toast.success("Template removed");
+    } catch (err) {
+      console.error('Failed to delete template:', err);
+      toast.error("Failed to remove template");
     }
   };
 
@@ -894,6 +951,20 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
                               expandedTemplateId === template.id && "border-[var(--accent)]"
                             )}
                           >
+                            {/* Add Delete Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTemplate(template);
+                              }}
+                              className="absolute top-2 right-2 w-6 h-6 rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                              aria-label="Delete template"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                            
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 {template.type === 'content' ? (
