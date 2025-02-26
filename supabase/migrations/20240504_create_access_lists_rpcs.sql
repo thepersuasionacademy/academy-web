@@ -223,8 +223,8 @@ CREATE OR REPLACE FUNCTION "access"."get_list_members"(
     created_at TIMESTAMPTZ
 ) AS $$
 BEGIN
-    -- Check if current user is admin
-    IF auth.jwt() ->> 'role' != 'admin' THEN
+    -- Check if current user is admin or super_admin
+    IF auth.jwt() ->> 'role' != 'admin' AND auth.jwt() ->> 'role' != 'super_admin' THEN
         RAISE EXCEPTION 'Only administrators can view list members';
     END IF;
 

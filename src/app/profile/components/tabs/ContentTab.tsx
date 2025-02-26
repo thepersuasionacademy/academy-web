@@ -14,6 +14,7 @@ interface ContentGroup {
   granted_at: string;
   access_starts_at: string;
   has_access: boolean;
+  access_overrides: Record<string, any>;
 }
 
 interface StructureNode {
