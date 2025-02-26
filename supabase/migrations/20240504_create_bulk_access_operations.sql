@@ -1,6 +1,18 @@
 -- Create RPC functions for bulk access operations through lists
 -- Description: Functions for efficiently managing user access in bulk through access lists
 
+-- Check if required tables exist
+DO $$
+BEGIN
+    -- Check that prerequisite tables exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'access' AND table_name = 'access_lists'
+    ) THEN
+        RAISE EXCEPTION 'Prerequisite table "access.access_lists" does not exist. Please run prior migrations first.';
+    END IF;
+END $$;
+
 -- Function to grant access to all users in a list
 CREATE OR REPLACE FUNCTION "access"."grant_list_access"(
     p_list_id UUID,
@@ -130,8 +142,10 @@ BEGIN
         SELECT 
             "content_id", 
             "access_settings"
-        FROM "access"."access_bundle_variations"
-        WHERE "id" = v_variation_id
+        FROM "access"."bundle_templates" bt
+        JOIN "access"."content_templates" ct ON bt."template_id" = ct."id"
+        WHERE bt."bundle_variation_id" = v_variation_id
+        AND bt."template_type" = 'content'
     ),
     user_access_changes AS (
         INSERT INTO "access"."user_access" ("user_id", "content_id", "access_settings")
@@ -181,8 +195,10 @@ BEGIN
             al."name" AS list_name
         FROM "access"."list_members" lm
         JOIN "access"."access_lists" al ON lm."list_id" = al."id"
-        JOIN "access"."access_bundle_variations" abv ON al."variation_id" = abv."id"
-        WHERE abv."content_id" = p_content_id
+        JOIN "access"."bundle_variations" bv ON al."variation_id" = bv."id"
+        JOIN "access"."bundle_templates" bt ON bt."bundle_variation_id" = bv."id"
+        JOIN "access"."content_templates" ct ON bt."template_id" = ct."id"
+        WHERE bt."template_type" = 'content' AND ct."content_id" = p_content_id
     ),
     combined_access AS (
         SELECT * FROM direct_access

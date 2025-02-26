@@ -1,6 +1,7 @@
 // src/app/api/ai/models/claude/utils.ts
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const CLAUDE_MODEL = process.env.CLAUDE_MODEL || 'claude-3-7-opus'; // Default to 3.7 Opus if not specified
 const BASE_URL = 'https://api.anthropic.com/v1/messages';
 
 interface FieldInputs {
@@ -13,6 +14,7 @@ export const generateClaudeCompletion = async (promptTemplate: string, inputs: F
   // Log that we have an API key (without revealing it)
   console.log('API Key present:', !!ANTHROPIC_API_KEY);
   console.log('API Key length:', ANTHROPIC_API_KEY?.length || 0);
+  console.log('Using Claude model:', CLAUDE_MODEL);
 
   if (!ANTHROPIC_API_KEY) {
     throw new Error('Anthropic API key not configured');
@@ -41,7 +43,7 @@ export const generateClaudeCompletion = async (promptTemplate: string, inputs: F
       method: 'POST',
       headers,
       body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
+        model: CLAUDE_MODEL,
         max_tokens: 5000,
         temperature: 0.7,
         messages: [{

@@ -1,6 +1,25 @@
 -- Create RPC functions for access list management
 -- Description: Functions to create, update, delete, and query access lists and their members
 
+-- Check if required tables exist
+DO $$
+BEGIN
+    -- Check that prerequisite tables exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'access' AND table_name = 'access_lists'
+    ) THEN
+        RAISE EXCEPTION 'Prerequisite table "access.access_lists" does not exist. Please run prior migrations first.';
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'access' AND table_name = 'list_members'
+    ) THEN
+        RAISE EXCEPTION 'Prerequisite table "access.list_members" does not exist. Please run prior migrations first.';
+    END IF;
+END $$;
+
 -- Function to create a new access list
 CREATE OR REPLACE FUNCTION "access"."create_access_list"(
     p_name TEXT,

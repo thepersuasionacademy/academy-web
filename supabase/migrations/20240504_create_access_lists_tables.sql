@@ -1,12 +1,31 @@
 -- Create access lists tables for bulk user access management
 -- Description: Tables to manage lists of users and associate them with access bundle variations
 
+-- Check if required tables exist
+DO $$
+BEGIN
+    -- Check that prerequisite tables exist
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'access' AND table_name = 'bundle_variations'
+    ) THEN
+        RAISE EXCEPTION 'Prerequisite table "access.bundle_variations" does not exist. Please run prior migrations first.';
+    END IF;
+    
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.tables 
+        WHERE table_schema = 'access' AND table_name = 'user_access'
+    ) THEN
+        RAISE EXCEPTION 'Prerequisite table "access.user_access" does not exist. Please run prior migrations first.';
+    END IF;
+END $$;
+
 -- Create access_lists table
 CREATE TABLE IF NOT EXISTS "access"."access_lists" (
     "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     "name" TEXT NOT NULL,
     "description" TEXT,
-    "variation_id" UUID REFERENCES "access"."access_bundle_variations"("id") ON DELETE SET NULL,
+    "variation_id" UUID REFERENCES "access"."bundle_variations"("id") ON DELETE SET NULL,
     "created_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
     "updated_at" TIMESTAMPTZ NOT NULL DEFAULT now(),
     CONSTRAINT "access_lists_name_unique" UNIQUE ("name")
