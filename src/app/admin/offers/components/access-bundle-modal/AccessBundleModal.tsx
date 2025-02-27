@@ -150,53 +150,40 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
     fetchTemplatesForVariation();
   }, [selectedVariationId, bundleId, supabase]);
 
-  const handleAddAccess = (data: any) => {
-    console.log('Adding access:', data);
+  const handleAddAccess = (template: any) => {
+    console.log('HANDLE ADD ACCESS:', template);
     
-    if (!selectedVariationId || !data.type || !data.bundleId) return;
-    
-    // Create a new template with the provided information
+    // Convert to our template format with proper typing
     const newTemplate: Template = {
-      id: crypto.randomUUID(),
-      type: data.type,
-      name: data.type === 'content' 
-        ? data.templateName || 'New Template'
-        : data.categoryName || 'New AI Access',
-      contentName: data.type === 'content' 
-        ? data.contentName 
-        : null,
-      description: '',
-      contentId: data.type === 'content' ? data.contentId || '' : null,
-      
-      // AI specific properties
-      categoryId: data.type === 'ai' ? data.categoryId : null,
-      categoryName: data.type === 'ai' ? data.categoryName : null,
-      suiteId: data.type === 'ai' ? data.suiteId : null,
-      suiteName: data.type === 'ai' ? data.suiteName : null,
-      toolIds: data.type === 'ai' ? data.toolIds : null,
-      
-      // Drip settings
-      ...(data.dripSettings?.collectionDrip && { collectionDripSettings: data.dripSettings.collectionDrip }),
-      ...(data.dripSettings?.suiteDrip && { suiteDripSettings: data.dripSettings.suiteDrip }),
-      ...(data.dripSettings?.toolDrip && { dripSettings: data.dripSettings.toolDrip })
+      id: template.id,
+      type: template.type,
+      name: template.name || 'Unnamed Template',
+      description: template.description,
+      // If content template, add content specific fields
+      ...(template.type === 'content' && {
+        contentName: template.content_name,
+        contentId: template.content_id,
+      }),
+      // If AI template, add AI specific fields
+      ...(template.type === 'ai' && {
+        categoryId: template.category_id,
+        categoryName: template.category_name,
+        suiteId: template.suite_id,
+        suiteName: template.suite_name,
+        toolName: template.name,
+        toolIds: template.tool_ids || [],
+        toolNames: template.tool_names || [],
+      }),
+      // Initialize with empty access_overrides that has the correct structure
+      access_overrides: { media: {} },
+      // Extract any drip settings if they exist
+      dripSettings: template.dripSettings || {},
+      collectionDripSettings: template.collectionDripSettings,
+      suiteDripSettings: template.suiteDripSettings
     };
     
-    // Add the template to selectedVariationTemplates (used for UI rendering)
-    setSelectedVariationTemplates(prev => [...prev, newTemplate]);
-    
-    // Also add the template to the selected variation in the variations state
-    setVariations(prev => prev.map(variation => {
-      if (variation.id === selectedVariationId) {
-        return {
-          ...variation,
-          templates: [...(variation.templates || []), newTemplate]
-        };
-      }
-      return variation;
-    }));
-    
-    setShowAddAccess(false);
-    toast.success("Template added successfully");
+    // Add this template to the selected variation
+    updateSelectedVariationTemplate(newTemplate);
   };
 
   const handleAddVariation = () => {
@@ -354,24 +341,70 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
     if (!data.type || !data.bundleId) return;
     
     console.log('Updating AI template with info:', data);
+    console.log('Drip settings from update:', data.dripSettings);
     
     // If there's an existing template being edited, update it
     if (editingTemplateId) {
       setSelectedVariationTemplates(currentTemplates => 
-        currentTemplates.map(t => 
-          t.id === editingTemplateId ? {
-            ...t,
-            categoryId: data.categoryId,
-            categoryName: data.categoryName,
-            suiteId: data.suiteId,
-            suiteName: data.suiteName,
-            toolIds: data.toolIds || [],
-            // Include drip settings if present
-            ...(data.dripSettings?.collectionDrip && { collectionDripSettings: data.dripSettings.collectionDrip }),
-            ...(data.dripSettings?.suiteDrip && { suiteDripSettings: data.dripSettings.suiteDrip }),
-            ...(data.dripSettings?.toolDrip && { dripSettings: data.dripSettings.toolDrip })
-          } : t
-        )
+        currentTemplates.map(t => {
+          if (t.id === editingTemplateId) {
+            // Create a new template with updated properties
+            const updatedTemplate = {
+              ...t,
+              categoryId: data.categoryId,
+              categoryName: data.categoryName,
+              suiteId: data.suiteId,
+              suiteName: data.suiteName,
+              toolIds: data.toolIds || [],
+            };
+            
+            // Add drip settings explicitly to make sure they're passed correctly
+            if (data.dripSettings) {
+              console.log('Processing drip settings for updated AI template:', data.dripSettings);
+              
+              // Add collection drip settings
+              if (data.dripSettings.collectionDrip) {
+                console.log('- Adding collection drip settings:', data.dripSettings.collectionDrip);
+                updatedTemplate.collectionDripSettings = data.dripSettings.collectionDrip;
+              } else {
+                // Clear existing collection drip settings if not present in the update
+                console.log('- Clearing collection drip settings');
+                updatedTemplate.collectionDripSettings = undefined;
+              }
+              
+              // Add suite drip settings
+              if (data.dripSettings.suiteDrip) {
+                console.log('- Adding suite drip settings:', data.dripSettings.suiteDrip);
+                updatedTemplate.suiteDripSettings = data.dripSettings.suiteDrip;
+              } else {
+                // Clear existing suite drip settings if not present in the update
+                console.log('- Clearing suite drip settings');
+                updatedTemplate.suiteDripSettings = undefined;
+              }
+              
+              // Add tool drip settings
+              if (data.dripSettings.toolDrip) {
+                console.log('- Adding tool drip settings for', Object.keys(data.dripSettings.toolDrip).length, 'tools');
+                updatedTemplate.dripSettings = data.dripSettings.toolDrip;
+              } else {
+                // Clear existing tool drip settings if not present in the update
+                console.log('- Clearing tool drip settings');
+                updatedTemplate.dripSettings = {};
+              }
+            } else {
+              // Clear all drip settings if they're not in the update data
+              updatedTemplate.collectionDripSettings = undefined;
+              updatedTemplate.suiteDripSettings = undefined;
+              updatedTemplate.dripSettings = {};
+            }
+            
+            // Apply prepare function to properly set access_overrides immediately
+            const preparedTemplate = prepareTemplatesForSaving([updatedTemplate])[0];
+            console.log('Template after preparation:', preparedTemplate);
+            return preparedTemplate;
+          }
+          return t;
+        })
       );
       
       // Also update the template in the variations state
@@ -379,20 +412,56 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
         if (variation.id === selectedVariationId) {
           return {
             ...variation,
-            templates: variation.templates?.map(t => 
-              t.id === editingTemplateId ? {
-                ...t,
-                categoryId: data.categoryId,
-                categoryName: data.categoryName,
-                suiteId: data.suiteId,
-                suiteName: data.suiteName,
-                toolIds: data.toolIds || [],
-                // Include drip settings if present
-                ...(data.dripSettings?.collectionDrip && { collectionDripSettings: data.dripSettings.collectionDrip }),
-                ...(data.dripSettings?.suiteDrip && { suiteDripSettings: data.dripSettings.suiteDrip }),
-                ...(data.dripSettings?.toolDrip && { dripSettings: data.dripSettings.toolDrip })
-              } : t
-            )
+            templates: variation.templates?.map(t => {
+              if (t.id === editingTemplateId) {
+                // Create a new template with updated properties
+                const updatedTemplate = {
+                  ...t,
+                  categoryId: data.categoryId,
+                  categoryName: data.categoryName,
+                  suiteId: data.suiteId,
+                  suiteName: data.suiteName,
+                  toolIds: data.toolIds || [],
+                };
+                
+                // Add drip settings explicitly to make sure they're passed correctly
+                if (data.dripSettings) {
+                  // Add collection drip settings
+                  if (data.dripSettings.collectionDrip) {
+                    updatedTemplate.collectionDripSettings = data.dripSettings.collectionDrip;
+                  } else {
+                    // Clear existing collection drip settings if not present in the update
+                    updatedTemplate.collectionDripSettings = undefined;
+                  }
+                  
+                  // Add suite drip settings
+                  if (data.dripSettings.suiteDrip) {
+                    updatedTemplate.suiteDripSettings = data.dripSettings.suiteDrip;
+                  } else {
+                    // Clear existing suite drip settings if not present in the update
+                    updatedTemplate.suiteDripSettings = undefined;
+                  }
+                  
+                  // Add tool drip settings
+                  if (data.dripSettings.toolDrip) {
+                    updatedTemplate.dripSettings = data.dripSettings.toolDrip;
+                  } else {
+                    // Clear existing tool drip settings if not present in the update
+                    updatedTemplate.dripSettings = {};
+                  }
+                } else {
+                  // Clear all drip settings if they're not in the update data
+                  updatedTemplate.collectionDripSettings = undefined;
+                  updatedTemplate.suiteDripSettings = undefined;
+                  updatedTemplate.dripSettings = {};
+                }
+                
+                // Apply prepare function to properly set access_overrides immediately
+                const preparedTemplate = prepareTemplatesForSaving([updatedTemplate])[0];
+                return preparedTemplate;
+              }
+              return t;
+            })
           };
         }
         return variation;
@@ -460,6 +529,8 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
     
     try {
       // Prepare the bundle data structure for saving
+      console.log("🔄 Starting save process - preparing bundle data...");
+      
       const bundleData = {
         id: bundleId,
         name: bundleName.trim(),
@@ -467,35 +538,159 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
         variations: variations.map(variation => {
           // For the selected variation, use the selectedVariationTemplates which has the most up-to-date state
           if (variation.id === selectedVariationId) {
+            console.log(`🔍 Processing templates for selected variation "${variation.name}"`);
+            console.log(`Found ${selectedVariationTemplates.length} templates to process`);
+            
+            // Process the selected variation's templates before saving
+            const processedTemplates = prepareTemplatesForSaving(selectedVariationTemplates);
+            
+            // Debug the processed templates
+            processedTemplates.forEach((template, index) => {
+              console.log(`🔍 ${template.type === 'ai' ? 'AI' : 'Content'} Template ${index + 1} "${template.name}" after processing:`);
+              
+              // Check if access_overrides exists and has keys
+              if (template.access_overrides) {
+                console.log(`✅ access_overrides exists with ${Object.keys(template.access_overrides).length} keys`);
+                console.log(`Keys: ${Object.keys(template.access_overrides).join(', ')}`);
+                
+                // For AI templates, ensure drip settings exist directly in access_overrides (NOT in media)
+                if (template.type === 'ai') {
+                  // Check for placeholder - indicates no real drip settings
+                  const hasPlaceholder = template.access_overrides.__placeholder;
+                  const realOverrides = Object.keys(template.access_overrides)
+                    .filter(key => key !== '__placeholder' && key !== '__error_placeholder');
+                  
+                  if (realOverrides.length === 0) {
+                    console.log(`⚠️ No real drip settings found for this AI template`);
+                  } else {
+                    console.log(`✅ Found ${realOverrides.length} real drip settings`);
+                    realOverrides.forEach(key => {
+                      const setting = template.access_overrides[key];
+                      if (setting?.delay) {
+                        console.log(`   - ${key}: ${setting.delay.value} ${setting.delay.unit}`);
+                      }
+                    });
+                  }
+                }
+              } else {
+                console.log(`⚠️ No access_overrides found`);
+                // Initialize with empty object if missing
+                template.access_overrides = template.type === 'ai' ? {} : {};
+              }
+            });
+            
+            // Final check for access_overrides - ensure they exist in all templates before sending to backend
+            console.log(`📤 Preparing to save bundle data with ${processedTemplates.length} templates`);
+            
             return {
               id: variation.id,
               name: variation.name,
-              templates: prepareTemplatesForSaving(selectedVariationTemplates)
+              templates: processedTemplates
             };
           }
+          
           // For other variations, use their existing templates
+          console.log(`🔍 Processing templates for other variation "${variation.name}"`);
+          
+          if (!variation.templates || variation.templates.length === 0) {
+            console.log(`No templates found for variation ${variation.name}`);
+            return {
+              id: variation.id,
+              name: variation.name,
+              templates: []
+            };
+          }
+          
+          console.log(`Found ${variation.templates.length} templates to process`);
+          const processedTemplates = prepareTemplatesForSaving(variation.templates);
+          
           return {
             id: variation.id,
             name: variation.name,
-            templates: variation.templates ? prepareTemplatesForSaving(variation.templates) : []
+            templates: processedTemplates
           };
         })
       };
       
-      console.log('Saving bundle data:', bundleData);
+      // CRITICAL: Deep debugging to ensure access_overrides are intact
+      console.log("----- FINAL DRIP SETTINGS CHECK -----");
+      bundleData.variations.forEach((variation, vIndex) => {
+        console.log(`⭐ Variation ${vIndex + 1}: ${variation.name} (${variation.id})`);
+        
+        const aiTemplates = variation.templates.filter(t => t.type === 'ai');
+        console.log(`  AI templates: ${aiTemplates.length}`);
+        
+        aiTemplates.forEach((template, tIndex) => {
+          console.log(`  [${tIndex + 1}] Template: ${template.name} (${template.id})`);
+          
+          if (!template.access_overrides) {
+            console.error(`  ❌ NO ACCESS_OVERRIDES FOR TEMPLATE ${template.id}`);
+            // Critical fix - if somehow access_overrides is missing, add empty object
+            template.access_overrides = { media: {} };
+          } else {
+            // Check for real drip settings in the media property
+            const mediaContent = template.access_overrides.media || {};
+            
+            // Count real drip settings (exclude dummy keys)
+            const realOverrides = Object.entries(mediaContent)
+              .filter(([key, value]) => !key.startsWith('__') && value !== null);
+            
+            if (realOverrides.length === 0) {
+              console.log(`  ⚠️ No real drip settings found in media`);
+            } else {
+              console.log(`  ✅ Found ${realOverrides.length} real drip settings in media:`);
+              realOverrides.forEach(([key, value]) => {
+                if (key === template.categoryId) {
+                  console.log(`    Collection drip: ${key} -> ${JSON.stringify(value)}`);
+                } else if (key === template.suiteId) {
+                  console.log(`    Suite drip: ${key} -> ${JSON.stringify(value)}`);
+                } else {
+                  console.log(`    Tool drip: ${key} -> ${JSON.stringify(value)}`);
+                }
+              });
+            }
+          }
+        });
+      });
+      console.log("----- END OF FINAL DRIP CHECK -----");
+      
+      // Final verification of JSON serialization
+      console.log("🔄 Checking JSON serialization...");
+      const bundleDataJson = JSON.stringify(bundleData);
+      console.log(`JSON string length: ${bundleDataJson.length}`);
+      
+      // Verify access_overrides are preserved in JSON serialization
+      const reparsedBundle = JSON.parse(bundleDataJson);
+      let allAccessOverridesIntact = true;
+      
+      reparsedBundle.variations.forEach((variation: any) => {
+        variation.templates.forEach((template: any) => {
+          if (template.type === 'ai' && !template.access_overrides) {
+            console.error(`❌ CRITICAL: Template ${template.id} lost access_overrides in JSON serialization!`);
+            allAccessOverridesIntact = false;
+          }
+        });
+      });
+      
+      if (allAccessOverridesIntact) {
+        console.log("✅ All access_overrides survived JSON serialization");
+      } else {
+        console.error("❌ Some access_overrides were lost in JSON serialization!");
+      }
       
       // Call the RPC to save the bundle
+      console.log("🔄 Calling save_access_bundle RPC...");
       const { data, error } = await supabase.rpc('save_access_bundle', {
         p_bundle: bundleData
       });
       
       if (error) {
-        console.error('Error saving bundle:', error);
+        console.error('❌ Error saving bundle:', error);
         toast.error("Failed to save bundle");
         throw error;
       }
       
-      console.log('Bundle saved successfully:', data);
+      console.log('✅ Bundle saved successfully:', data);
       toast.success("Bundle saved successfully");
       
       // Update local state with the returned data
@@ -508,6 +703,30 @@ export function AccessBundleModal({ isOpen, onClose, bundle }: AccessBundleModal
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Helper to add a new template to the selected variation
+  const updateSelectedVariationTemplate = (newTemplate: Template) => {
+    if (!selectedVariationId) return;
+    
+    console.log('Adding template to variation:', newTemplate);
+    
+    // Add template to selectedVariationTemplates (used for UI rendering)
+    setSelectedVariationTemplates(prev => [...prev, newTemplate]);
+    
+    // Also add the template to the selected variation in the variations state
+    setVariations(prev => prev.map(variation => {
+      if (variation.id === selectedVariationId) {
+        return {
+          ...variation,
+          templates: [...(variation.templates || []), newTemplate]
+        };
+      }
+      return variation;
+    }));
+    
+    setShowAddAccess(false);
+    toast.success("Template added successfully");
   };
 
   if (!isOpen) return null;

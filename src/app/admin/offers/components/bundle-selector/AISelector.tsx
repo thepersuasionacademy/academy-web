@@ -141,35 +141,45 @@ export function AISelector({ onComplete, initialData }: AISelectorProps) {
 
   // Handle drip settings
   const toggleCollectionDrip = () => {
-    setCollectionDripEnabled(prev => !prev);
-    if (!collectionDripEnabled) {
+    const newValue = !collectionDripEnabled;
+    console.log(`🔥 COLLECTION DRIP TOGGLED: ${newValue ? 'ENABLED' : 'DISABLED'}`);
+    setCollectionDripEnabled(newValue);
+    if (newValue) {
       // Disable suite and tool drip when collection drip is enabled
+      console.log(`🔥 DISABLING SUITE/TOOL DRIPS (Collection drip enabled)`);
       setSuiteDripEnabled(false);
       setToolDripEnabled({});
     }
   };
 
   const updateCollectionDripValue = (value: number) => {
+    console.log(`🔥 COLLECTION DRIP VALUE CHANGED: ${value} ${collectionDripSettings.unit}`);
     setCollectionDripSettings(prev => ({ ...prev, value }));
   };
 
   const updateCollectionDripUnit = (unit: 'days' | 'weeks' | 'months') => {
+    console.log(`🔥 COLLECTION DRIP UNIT CHANGED: ${collectionDripSettings.value} ${unit}`);
     setCollectionDripSettings(prev => ({ ...prev, unit }));
   };
 
   const toggleSuiteDrip = () => {
-    setSuiteDripEnabled(prev => !prev);
-    if (!suiteDripEnabled) {
+    const newValue = !suiteDripEnabled;
+    console.log(`🔥 SUITE DRIP TOGGLED: ${newValue ? 'ENABLED' : 'DISABLED'}`);
+    setSuiteDripEnabled(newValue);
+    if (newValue) {
       // Disable tool drip when suite drip is enabled
+      console.log(`🔥 DISABLING TOOL DRIPS (Suite drip enabled)`);
       setToolDripEnabled({});
     }
   };
 
   const updateSuiteDripValue = (value: number) => {
+    console.log(`🔥 SUITE DRIP VALUE CHANGED: ${value} ${suiteDripSettings.unit}`);
     setSuiteDripSettings(prev => ({ ...prev, value }));
   };
 
   const updateSuiteDripUnit = (unit: 'days' | 'weeks' | 'months') => {
+    console.log(`🔥 SUITE DRIP UNIT CHANGED: ${suiteDripSettings.value} ${unit}`);
     setSuiteDripSettings(prev => ({ ...prev, unit }));
   };
 
@@ -196,41 +206,62 @@ export function AISelector({ onComplete, initialData }: AISelectorProps) {
 
   // Create final data structure for submission
   const handleSubmit = () => {
-    const toolIds = Object.keys(selectedToolIds).filter(id => selectedToolIds[id]);
+    console.log('AISelector handleSubmit called');
     
-    // Create drip settings object
+    if (!selectedCategoryId || !selectedSuiteId || Object.keys(selectedToolIds).filter(id => selectedToolIds[id]).length === 0) {
+      console.error('Cannot submit, missing required selections');
+      return;
+    }
+    
+    // Create drip settings object - ensure it matches DripSetting type
     const dripSettings: {
       collectionDrip?: DripSetting;
       suiteDrip?: DripSetting;
       toolDrip?: Record<string, DripSetting>;
     } = {};
     
-    if (collectionDripEnabled) {
+    // Collection level drip
+    if (collectionDripEnabled && collectionDripSettings.value && collectionDripSettings.unit) {
+      console.log(`  Collection drip: ${collectionDripSettings.value} ${collectionDripSettings.unit}`);
       dripSettings.collectionDrip = collectionDripSettings;
-    } else if (suiteDripEnabled) {
-      dripSettings.suiteDrip = suiteDripSettings;
-    } else {
-      // Only include enabled tool drip settings
-      const enabledToolDripSettings: Record<string, DripSetting> = {};
-      Object.keys(toolDripEnabled)
-        .filter(id => toolDripEnabled[id] && selectedToolIds[id])
-        .forEach(id => {
-          enabledToolDripSettings[id] = toolDripSettings[id];
-        });
-      
-      if (Object.keys(enabledToolDripSettings).length > 0) {
-        dripSettings.toolDrip = enabledToolDripSettings;
-      }
     }
     
-    onComplete({
-      categoryId: selectedCategoryId!,
+    // Suite level drip
+    if (suiteDripEnabled && suiteDripSettings.value && suiteDripSettings.unit) {
+      console.log(`  Suite drip: ${suiteDripSettings.value} ${suiteDripSettings.unit}`);
+      dripSettings.suiteDrip = suiteDripSettings;
+    }
+    
+    // Tool level drips
+    const toolDrips: Record<string, DripSetting> = {};
+    Object.keys(toolDripEnabled)
+      .filter(id => toolDripEnabled[id] && selectedToolIds[id])
+      .forEach(id => {
+        if (toolDripSettings[id]?.value && toolDripSettings[id]?.unit) {
+          toolDrips[id] = toolDripSettings[id];
+          console.log(`  Tool drip for ${id}: ${toolDripSettings[id].value} ${toolDripSettings[id].unit}`);
+        }
+      });
+    
+    if (Object.keys(toolDrips).length > 0) {
+      dripSettings.toolDrip = toolDrips;
+      console.log(`Found ${Object.keys(toolDrips).length} tool drips`);
+    }
+    
+    // Build the complete data structure for submission
+    const toolIds = Object.keys(selectedToolIds).filter(id => selectedToolIds[id]);
+    const data = {
+      categoryId: selectedCategoryId,
       categoryName: selectedCategoryName!,
-      suiteId: selectedSuiteId || undefined,
-      suiteName: selectedSuiteName || undefined,
+      suiteId: selectedSuiteId,
+      suiteName: selectedSuiteName!,
       toolIds,
       dripSettings
-    });
+    };
+    
+    console.log('💧 Final drip settings object:', dripSettings);
+    console.log('Complete AISelector submission data:', data);
+    onComplete(data);
   };
 
   return (

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Package, FileText } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { AccessType, ContentItem, ContentTemplate } from './types';
+import { AccessType, ContentItem, ContentTemplate, DripSetting } from './types';
 import { AccessTypeSelector } from './AccessTypeSelector';
 import { ContentSelector } from './ContentSelector';
 import { AISelector } from './AISelector';
@@ -66,18 +66,58 @@ export function BundleAccessSelector({ bundleId, onSave, onCancel, initialData }
   };
 
   // Handle AI selection completion
-  const handleAISelectionComplete = (data: any) => {
-    setAiSelectionData(data);
-    setAiSelectionComplete(true);
+  const handleAISelectionComplete = (data: {
+    categoryId: string;
+    categoryName: string;
+    suiteId?: string;
+    suiteName?: string;
+    toolIds: string[];
+    dripSettings: {
+      collectionDrip?: DripSetting;
+      suiteDrip?: DripSetting;
+      toolDrip?: Record<string, DripSetting>;
+    };
+  }) => {
+    console.log('🔥 AI SELECTION COMPLETE - CAPTURING DRIP SETTINGS', data);
     
-    // Save the bundle access
-    const saveData = {
-      bundleId,
+    // Capture detailed logging of drip settings
+    if (data.dripSettings.collectionDrip) {
+      console.log(`🔥 SAVING COLLECTION DRIP: ${data.categoryId} (${data.categoryName}) - ${data.dripSettings.collectionDrip.value} ${data.dripSettings.collectionDrip.unit}`);
+    }
+    if (data.dripSettings.suiteDrip && data.suiteId) {
+      console.log(`🔥 SAVING SUITE DRIP: ${data.suiteId} (${data.suiteName}) - ${data.dripSettings.suiteDrip.value} ${data.dripSettings.suiteDrip.unit}`);
+    }
+    if (data.dripSettings.toolDrip) {
+      Object.keys(data.dripSettings.toolDrip).forEach(toolId => {
+        console.log(`🔥 SAVING TOOL DRIP: ${toolId} - ${data.dripSettings.toolDrip?.[toolId].value} ${data.dripSettings.toolDrip?.[toolId].unit}`);
+      });
+    }
+    
+    // Create template with full drip settings
+    const template = {
+      id: data.suiteId || data.categoryId,
+      name: data.suiteName || data.categoryName,
       type: 'ai',
-      ...data
+      level: data.suiteId ? 'suite' : 'category',
+      categoryId: data.categoryId,
+      categoryName: data.categoryName,
+      suiteId: data.suiteId,
+      suiteName: data.suiteName,
+      toolIds: data.toolIds.length > 0 ? data.toolIds : null,
+      toolNames: null,
+      // For drip settings persistence - add flags and settings
+      hasCollectionDrip: !!data.dripSettings.collectionDrip,
+      hasSuiteDrip: !!data.dripSettings.suiteDrip,
+      hasToolDrip: !!(data.dripSettings.toolDrip && Object.keys(data.dripSettings.toolDrip).length > 0),
+      collectionDripSettings: data.dripSettings.collectionDrip,
+      suiteDripSettings: data.dripSettings.suiteDrip,
+      toolDripSettings: data.dripSettings.toolDrip || {}
     };
     
-    onSave(saveData);
+    // Set AI selection complete and call parent handler
+    console.log('🔥 FINAL TEMPLATE WITH DRIP SETTINGS:', template);
+    setAiSelectionComplete(true);
+    onSave(template);
   };
 
   // Handle content selection completion

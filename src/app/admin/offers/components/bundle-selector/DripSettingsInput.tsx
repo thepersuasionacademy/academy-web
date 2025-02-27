@@ -15,7 +15,7 @@ export function DripSettingsInput({
   disabled = false 
 }: DripSettingsInputProps) {
   return (
-    <div className="flex items-center gap-0">
+    <div className="flex items-center gap-0 drip-settings-container">
       <input
         type="number"
         min="1"

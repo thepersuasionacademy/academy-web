@@ -55,6 +55,17 @@ export function SuiteSelector({
   useEffect(() => {
     function handleOutsideClick(e: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        // Don't close if target is within drip settings components
+        const target = e.target as HTMLElement;
+        const closestDripSettings = target.closest('.drip-settings-container');
+        if (closestDripSettings) {
+          // Clicking within drip settings - don't close dropdown
+          console.log('🔥 PRESERVING DROPDOWN STATE - clicked within drip settings');
+          return;
+        }
+        
+        // Safe to close dropdown (click was outside)
+        console.log('🔥 CLOSING DROPDOWN - outside click detected');
         setIsDropdownOpen(false);
       }
     }

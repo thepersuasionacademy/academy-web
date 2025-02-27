@@ -1,45 +1,19 @@
 import { Template } from './types';
 
 // Helper function to extract drip settings from access_overrides
-export const extractDripSettings = (template: any) => {
-  if (!template?.access_overrides?.media) return undefined;
+export const extractDripSettings = (template: Template): Template['access_overrides'] => {
+  // If template already has access_overrides, return it
+  if (template.access_overrides) {
+    return template.access_overrides;
+  }
   
-  const dripSettings: Record<string, { unit: 'days' | 'weeks' | 'months', value: number }> = {};
-  let collectionDripSettings = undefined;
-  let suiteDripSettings = undefined;
+  // For content templates, create standard media wrapper
+  if (template.type === 'content') {
+    return { media: {} };
+  }
   
-  // Check which items have drip settings in the media overrides
-  Object.entries(template.access_overrides.media).forEach(([itemId, settings]: [string, any]) => {
-    if (settings?.delay && settings.status === 'pending') {
-      // Check if this is a collection ID (matches the template's categoryId)
-      if (template.categoryId === itemId) {
-        collectionDripSettings = {
-          unit: settings.delay.unit as 'days' | 'weeks' | 'months',
-          value: settings.delay.value
-        };
-      }
-      // Check if this is a suite ID (matches the template's suiteId)
-      else if (template.suiteId === itemId) {
-        suiteDripSettings = {
-          unit: settings.delay.unit as 'days' | 'weeks' | 'months',
-          value: settings.delay.value
-        };
-      }
-      // Otherwise, it's a tool ID
-      else {
-        dripSettings[itemId] = {
-          unit: settings.delay.unit as 'days' | 'weeks' | 'months',
-          value: settings.delay.value
-        };
-      }
-    }
-  });
-  
-  return { 
-    toolDripSettings: Object.keys(dripSettings).length > 0 ? dripSettings : undefined,
-    collectionDripSettings,
-    suiteDripSettings
-  };
+  // For AI templates, create an empty access_overrides object
+  return { media: {} };
 };
 
 // Helper function to merge AI templates by suite
@@ -107,67 +81,97 @@ export const getMergedTemplates = (templates: Template[]): Template[] => {
   return [...mergedAiTemplates, ...nonAiTemplates];
 };
 
-// Function to prepare templates for saving by consolidating drip settings
-export const prepareTemplatesForSaving = (templates: Template[]) => {
+// Take AI template objects and ensure all associated data is correctly formatted for saving
+export function prepareTemplatesForSaving(templates: any[]): any[] {
+  console.log(`🔥 PREPARING TEMPLATES FOR SAVING - COUNT: ${templates.length}`);
+  
   return templates.map(template => {
-    if (template.type !== 'ai') return template;
-    
-    // Collection, suite, and tool level drip settings can all be present
-    let hasAnyDripSettings = false;
-    const mediaOverrides: Record<string, { delay?: { unit: string; value: number }, status: string }> = {
-      ...(template.access_overrides?.media || {})
-    };
-    
-    // Collection level drip
-    if (template.collectionDripSettings && template.categoryId) {
-      hasAnyDripSettings = true;
-      mediaOverrides[template.categoryId] = {
-        delay: {
-          unit: template.collectionDripSettings.unit,
-          value: template.collectionDripSettings.value
-        },
-        status: 'pending'
-      };
-    }
-    
-    // Suite level drip
-    if (template.suiteDripSettings && template.suiteId) {
-      hasAnyDripSettings = true;
-      mediaOverrides[template.suiteId] = {
-        delay: {
-          unit: template.suiteDripSettings.unit,
-          value: template.suiteDripSettings.value
-        },
-        status: 'pending'
-      };
-    }
-    
-    // Tool level drip
-    if (template.dripSettings && Object.keys(template.dripSettings).length > 0) {
-      hasAnyDripSettings = true;
-      // Add each tool drip setting
-      Object.entries(template.dripSettings).forEach(([toolId, setting]) => {
-        mediaOverrides[toolId] = {
-          delay: {
-            unit: setting.unit,
-            value: setting.value
-          },
-          status: 'pending'
-        };
-      });
-    }
-    
-    // Return template with updated access_overrides
-    if (hasAnyDripSettings) {
+    try {
+      console.log(`🔄 Processing template: ${template.id} (${template.type}) with name: ${template.name}`);
+      
+      // Skip processing for non-AI templates - they're already properly formatted
+      if (template.type !== 'ai') {
+        console.log(`  Skipping non-AI template: ${template.name}`);
+        return template;
+      }
+
+      // For AI templates, we need to ensure access_overrides are properly set
+      // Debug the template's drip settings
+      console.log(`  Drip settings debug for ${template.name}: {` +
+        `collection: ${template.hasCollectionDrip ? 'YES' : 'NONE'}, ` +
+        `suite: ${template.hasSuiteDrip ? 'YES' : 'NONE'}, ` + 
+        `tools: ${template.hasToolDrip ? 'YES' : 'NONE'}}`);
+      
+      // Create fresh access_overrides - NO MEDIA OBJECT FOR AI TEMPLATES
+      const access_overrides: Record<string, any> = {};
+      let foundDripSettings = false;
+      
+      // Add collection level drip if present
+      if (template.hasCollectionDrip && template.collectionDripSettings) {
+        console.log(`  ✅ Adding collection drip: ${template.collectionDripSettings.value} ${template.collectionDripSettings.unit}`);
+        if (template.categoryId) {
+          access_overrides[template.categoryId] = {
+            delay: {
+              value: template.collectionDripSettings.value,
+              unit: template.collectionDripSettings.unit
+            },
+            status: "enabled"
+          };
+          foundDripSettings = true;
+        }
+      }
+      
+      // Add suite level drip if present
+      if (template.hasSuiteDrip && template.suiteDripSettings) {
+        console.log(`  ✅ Adding suite drip: ${template.suiteDripSettings.value} ${template.suiteDripSettings.unit}`);
+        if (template.suiteId) {
+          access_overrides[template.suiteId] = {
+            delay: {
+              value: template.suiteDripSettings.value,
+              unit: template.suiteDripSettings.unit
+            },
+            status: "enabled"
+          };
+          foundDripSettings = true;
+        }
+      }
+      
+      // Add tool level drips if present
+      if (template.hasToolDrip && template.toolDripSettings) {
+        Object.keys(template.toolDripSettings).forEach(toolId => {
+          console.log(`  ✅ Adding tool drip for ${toolId}: ${template.toolDripSettings[toolId].value} ${template.toolDripSettings[toolId].unit}`);
+          access_overrides[toolId] = {
+            delay: {
+              value: template.toolDripSettings[toolId].value,
+              unit: template.toolDripSettings[toolId].unit
+            },
+            status: "enabled"
+          };
+          foundDripSettings = true;
+        });
+      }
+      
+      // If no drip settings were found, add a placeholder to ensure the field exists
+      if (!foundDripSettings) {
+        console.log(`  ⚠️ NO DRIP SETTINGS FOUND - adding placeholder`);
+        access_overrides["__placeholder"] = { status: "enabled" };
+      }
+      
+      // Set the access_overrides property directly - NO MEDIA WRAPPING
+      console.log(`  📊 Final access_overrides contains ${Object.keys(access_overrides).length} items`);
+      console.log(`  📊 access_overrides keys: ${Object.keys(access_overrides).join(', ')}`);
+      
       return {
         ...template,
-        access_overrides: {
-          ...(template.access_overrides || {}),
-          media: mediaOverrides
-        }
+        access_overrides
+      };
+    } catch (error) {
+      console.error(`Error preparing template ${template.name}:`, error);
+      // Return the template with a valid access_overrides structure even in error case
+      return {
+        ...template,
+        access_overrides: { "__error_placeholder": { status: "enabled" } }
       };
     }
-    
-    return template;
   });
-}; 
+} 
