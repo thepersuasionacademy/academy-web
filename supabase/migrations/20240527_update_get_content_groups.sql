@@ -386,4 +386,94 @@ $$;
 GRANT EXECUTE ON FUNCTION public.get_user_content_groups(UUID) TO authenticated;
 
 -- Add comment
-COMMENT ON FUNCTION public.get_user_content_groups(UUID) IS 'Returns content groups a user has access to with granular access control based on access_overrides, updated for the new user_access table structure'; 
+COMMENT ON FUNCTION public.get_user_content_groups(UUID) IS 'Returns content groups a user has access to with granular access control based on access_overrides, updated for the new user_access table structure';
+
+-- Update get_content_by_collection function to work with the new user_access table structure
+DROP FUNCTION IF EXISTS public.get_content_by_collection(UUID, UUID);
+
+CREATE OR REPLACE FUNCTION public.get_content_by_collection(
+    p_collection_id UUID,
+    p_user_id UUID DEFAULT auth.uid()
+)
+RETURNS TABLE (
+    id UUID,
+    collection_id UUID,
+    title TEXT,
+    description TEXT,
+    status TEXT,
+    thumbnail_url TEXT,
+    created_at TIMESTAMPTZ,
+    updated_at TIMESTAMPTZ,
+    has_access BOOLEAN
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, content, access
+AS $$
+    SELECT 
+        c.id,
+        c.collection_id,
+        c.title,
+        c.description,
+        c.status,
+        c.thumbnail_url,
+        c.created_at,
+        c.updated_at,
+        -- Simple access check: if a record exists in user_access, they have access
+        EXISTS (
+            SELECT 1 
+            FROM access.user_access ua 
+            WHERE ua.user_id = p_user_id 
+            AND ua.target_id = c.id
+            AND ua.type = 'content'
+        ) as has_access
+    FROM content.content c
+    WHERE c.collection_id = p_collection_id 
+    ORDER BY c.created_at DESC;
+$$;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION public.get_content_by_collection(UUID, UUID) TO authenticated;
+
+-- Add comment
+COMMENT ON FUNCTION public.get_content_by_collection(UUID, UUID) IS 'Returns content in a collection with access information, updated for the new user_access table structure with target_id and type fields';
+
+-- Update test_get_user_access function to work with the new user_access table structure
+DROP FUNCTION IF EXISTS public.test_get_user_access(UUID, UUID);
+
+CREATE OR REPLACE FUNCTION public.test_get_user_access(
+    p_content_id UUID,
+    p_user_id UUID DEFAULT auth.uid()
+)
+RETURNS TABLE (
+    id UUID,
+    user_id UUID,
+    target_id UUID,
+    type TEXT,
+    granted_at TIMESTAMPTZ,
+    access_starts_at TIMESTAMPTZ,
+    access_overrides JSONB
+)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public, access
+AS $$
+    SELECT 
+        id,
+        user_id,
+        target_id,
+        type,
+        granted_at,
+        access_starts_at,
+        access_overrides
+    FROM access.user_access
+    WHERE user_id = p_user_id 
+    AND target_id = p_content_id
+    AND type = 'content';
+$$;
+
+-- Grant execute permissions
+GRANT EXECUTE ON FUNCTION public.test_get_user_access(UUID, UUID) TO authenticated;
+
+-- Add comment
+COMMENT ON FUNCTION public.test_get_user_access(UUID, UUID) IS 'Test function to retrieve user access records, updated for the new user_access table structure with target_id and type fields'; 
