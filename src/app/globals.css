@@ -3,23 +3,36 @@
 @tailwind utilities;
 
 :root {
-  --background: #ededef;
-  --foreground: #2c2c2c;
-  --card-bg: #f8f8f8;
-  --border-color: #d1d1d1;
-  --hover-bg: #f0f0f0;
-  --text-secondary: #4a4a4a;
-  --accent: #d92626;
+  --background: #f8f9fa;
+  --foreground: #1a202c;
+  --card-bg: #ffffff;
+  --border-color: #e2e8f0;
+  --hover-bg: #edf2f7;
+  --text-secondary: #4a5568;
+  --accent: #3182ce;
+  --button-primary: #3b82f6;
+  --button-hover: #2563eb;
+  --card-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
 .dark {
-  --background: #161618;
-  --foreground: #e8e8e3;
-  --card-bg: #1d1d20;
-  --border-color: #2d2d32;
-  --hover-bg: rgba(255, 255, 255, 0.06);
-  --text-secondary: #a8a8a8;
-  --accent: #b91c1c;
+  --background: #0A0E17;
+  --foreground: #FFFFFF;
+  --card-bg: #1A2233;
+  --border-color: #2D3747;
+  --hover-bg: rgba(0, 98, 255, 0.1);
+  --text-secondary: #B0B7C3;
+  --accent: #0062FF;
+  --button-primary: #0062FF;
+  --button-hover: #0052D6;
+  --card-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
+  --card-highlight: #2B8CFF;
+  --card-bg-alt: #171E2E;
+  --toggle-bg: #2D3747;
+  --toggle-active: #0062FF;
+  --success: #00CA72;
+  --warning: #FFAD0F;
+  --error: #FF4757;
 }
 
 @media (max-width: 1280px) {
@@ -92,9 +105,205 @@ iframe {
 }
 
 .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgb(75 85 99 / 0.5);
+  background: rgba(43, 140, 255, 0.3);
 }
 
 .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgb(107 114 128 / 0.5);
+  background: rgba(43, 140, 255, 0.5);
+}
+
+/* Pricing section inspired utility classes */
+.card-pricing {
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0.75rem;
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-pricing:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 25px 30px -12px rgba(0, 0, 0, 0.6);
+}
+
+.dark .card-pricing {
+  background: linear-gradient(145deg, var(--card-bg) 0%, var(--card-bg-alt) 100%);
+  border: 1px solid rgba(45, 55, 71, 0.7);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(43, 140, 255, 0.1);
+}
+
+.card-pricing-highlight {
+  border-color: var(--card-highlight);
+  position: relative;
+}
+
+.dark .card-pricing-highlight {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 98, 255, 0.4);
+  border: 1px solid rgba(0, 98, 255, 0.3);
+}
+
+.dark .card-pricing-highlight::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.75rem;
+  padding: 1px;
+  background: linear-gradient(45deg, rgba(0, 98, 255, 0.5), rgba(43, 140, 255, 0.5));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.btn-primary {
+  background-color: var(--button-primary);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.375rem;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.btn-primary::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--button-hover);
+  border-radius: 0.375rem;
+  z-index: -2;
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0%;
+  height: 100%;
+  background-color: var(--button-hover);
+  transition: all 0.3s;
+  border-radius: 0.375rem;
+  z-index: -1;
+}
+
+.btn-primary:hover {
+  color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 10px 20px -10px rgba(0, 98, 255, 0.7);
+}
+
+.btn-primary:hover::before {
+  width: 100%;
+}
+
+.btn-primary-highlight {
+  background-color: var(--button-primary);
+  box-shadow: 0 10px 20px -5px rgba(0, 98, 255, 0.5);
+}
+
+.dark .btn-primary-highlight {
+  background: linear-gradient(90deg, var(--button-primary), var(--card-highlight));
+  box-shadow: 0 10px 25px -5px rgba(0, 98, 255, 0.5), 0 0 15px rgba(0, 98, 255, 0.3);
+}
+
+.toggle-switch {
+  background-color: var(--toggle-bg);
+  border-radius: 9999px;
+  position: relative;
+  transition: background-color 0.3s;
+  height: 2rem;
+  width: 4rem;
+}
+
+.toggle-switch.active {
+  background-color: var(--toggle-active);
+  box-shadow: 0 0 10px rgba(0, 98, 255, 0.5);
+}
+
+.toggle-switch::before {
+  content: '';
+  position: absolute;
+  height: 1.5rem;
+  width: 1.5rem;
+  left: 0.25rem;
+  bottom: 0.25rem;
+  border-radius: 9999px;
+  background-color: white;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch.active::before {
+  transform: translateX(2rem);
+}
+
+.pricing-badge {
+  background: linear-gradient(90deg, var(--accent), var(--card-highlight));
+  color: white;
+  border-radius: 0 0 0 0.5rem;
+  padding: 0.25rem 1rem;
+  font-weight: 500;
+  font-size: 0.875rem;
+  box-shadow: 0 5px 10px -5px rgba(0, 98, 255, 0.5);
+}
+
+.pricing-table-row {
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s ease;
+}
+
+.pricing-table-cell {
+  padding: 1.5rem;
+}
+
+.dark .pricing-table-row:nth-child(odd) {
+  background-color: var(--card-bg);
+}
+
+.dark .pricing-table-row:nth-child(even) {
+  background-color: var(--card-bg-alt);
+}
+
+.dark .pricing-table-row:hover {
+  background-color: rgba(0, 98, 255, 0.05);
+}
+
+/* Status indicators */
+.status-success {
+  color: var(--success);
+}
+
+.status-warning {
+  color: var(--warning);
+}
+
+.status-error {
+  color: var(--error);
+}
+
+.bg-success {
+  background-color: var(--success);
+}
+
+.bg-warning {
+  background-color: var(--warning);
+}
+
+.bg-error {
+  background-color: var(--error);
+}
+
+/* Futuristic glowing effect for highlights */
+.glow-blue {
+  box-shadow: 0 0 15px rgba(0, 98, 255, 0.5);
+}
+
+.glow-text {
+  text-shadow: 0 0 10px rgba(43, 140, 255, 0.7);
 }

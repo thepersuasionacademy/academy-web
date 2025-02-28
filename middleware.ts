@@ -29,7 +29,7 @@ export async function middleware(req: NextRequest) {
     .join(';')
 
   // Skip auth check completely for public routes
-  const isPublicRoute = req.nextUrl.pathname.match(/^\/(public|favicon\.ico|robots\.txt|sitemap\.xml)/)
+  const isPublicRoute = req.nextUrl.pathname.match(/^\/(public|home|favicon\.ico|robots\.txt|sitemap\.xml)/)
   if (isPublicRoute) {
     return NextResponse.next()
   }
@@ -134,7 +134,7 @@ export const config = {
   matcher: [
     // Only match GET requests to pages, exclude static files and API routes
     {
-      source: '/((?!_next/static|_next/image|favicon.ico|public|assets|images|fonts|api).*)',
+      source: '/((?!_next/static|_next/image|favicon.ico|public|home|assets|images|fonts|api).*)',
       missing: [
         { type: 'header', key: 'next-router-prefetch' },
         { type: 'header', key: 'purpose', value: 'prefetch' }

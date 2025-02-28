@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Persuasion Academy - Your Path to Mastery</title>
+  <meta name="description" content="Unlock the secrets of influence and transform your ability to persuade with purpose at The Persuasion Academy.">
+  
+  <!-- Cache busting script -->
+  <script>
+    // Force cache refresh by adding timestamp to resource URLs
+    function addTimestamp(url) {
+      return url + '?v=' + new Date().getTime();
+    }
+    
+    // Apply to stylesheets and scripts after DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+      // Force reload of the Tailwind config
+      const tailwindConfig = document.querySelector('script[src*="tailwind-config.js"]');
+      if (tailwindConfig) {
+        const newScript = document.createElement('script');
+        newScript.src = addTimestamp(tailwindConfig.src);
+        tailwindConfig.parentNode.replaceChild(newScript, tailwindConfig);
+      }
+      
+      // Force reload of the styles.css
+      const styleSheet = document.querySelector('link[href*="styles.css"]');
+      if (styleSheet) {
+        styleSheet.href = addTimestamp(styleSheet.href);
+      }
+      
+      // Add debug reload button
+      const reloadButton = document.createElement('button');
+      reloadButton.innerText = '🔄 Force Refresh';
+      reloadButton.style.position = 'fixed';
+      reloadButton.style.bottom = '20px';
+      reloadButton.style.right = '20px';
+      reloadButton.style.zIndex = '9999';
+      reloadButton.style.padding = '8px 16px';
+      reloadButton.style.background = '#0062FF';
+      reloadButton.style.color = 'white';
+      reloadButton.style.borderRadius = '6px';
+      reloadButton.style.cursor = 'pointer';
+      reloadButton.style.boxShadow = '0 4px 12px rgba(0, 98, 255, 0.3)';
+      reloadButton.onclick = function() {
+        localStorage.clear();
+        sessionStorage.clear();
+        window.location.reload(true);
+      };
+      document.body.appendChild(reloadButton);
+    });
+  </script>
+  
+  <!-- Tailwind CDN for styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="js/tailwind-config.js"></script>
+  
+  <!-- Custom styles -->
+  <link rel="stylesheet" href="css/styles.css">
+  
+  <!-- Enhanced pricing table styles -->
+  <link rel="stylesheet" href="css/pricing-enhanced.css">
+  
+  <!-- Alpine.js -->
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="min-h-screen overflow-x-hidden">
+  <!-- Include theme toggle component -->
+  <div id="theme-toggle-container"></div>
+
+  <!-- Include background component -->
+  <div id="background-container"></div>
+
+  <div class="content-container">
+    <!-- Include header component -->
+    <div id="header-container"></div>
+
+    <!-- Include stats component -->
+    <div id="stats-container"></div>
+
+    <!-- Include ecosystem section component -->
+    <div id="ecosystem-container"></div>
+    
+    <!-- Include mastery section component -->
+    <div id="mastery-container"></div>
+
+    <!-- Include pricing section component -->
+    <div id="pricing-container"></div>
+  </div>
+
+  <!-- Custom JavaScript -->
+  <script src="js/main.js"></script>
+  <script>
+    // Load components
+    document.addEventListener('DOMContentLoaded', function() {
+      // Load all components first
+      loadAllComponents().then(() => {
+        console.log('All components loaded');
+        // Setup animations
+        setupAnimations();
+        
+        // Configure Tailwind
+        tailwind.config = {
+          darkMode: 'class',
+          theme: {
+            extend: {
+              colors: {
+                primary: {
+                  50: '#f0f9ff',
+                  100: '#e0f2fe',
+                  200: '#bae6fd',
+                  300: '#7dd3fc',
+                  400: '#38bdf8',
+                  500: '#0ea5e9',
+                  600: '#0284c7',
+                  700: '#0369a1',
+                  800: '#075985',
+                  900: '#0c4a6e',
+                  950: '#082f49',
+                }
+              }
+            }
+          }
+        };
+      });
+      
+      // Function to load all components
+      function loadAllComponents() {
+        // Function to load a single component
+        function loadComponent(containerId, componentPath) {
+          // Add timestamp to URL to prevent caching
+          const cacheBustUrl = componentPath + '?v=' + new Date().getTime();
+          
+          return fetch(cacheBustUrl)
+            .then(response => {
+              if (!response.ok) {
+                throw new Error(`Failed to load ${componentPath}: ${response.status} ${response.statusText}`);
+              }
+              return response.text();
+            })
+            .then(html => {
+              document.getElementById(containerId).innerHTML = html;
+              console.log(`Loaded ${componentPath}`);
+            })
+            .catch(error => {
+              console.error(`Error loading component ${componentPath}:`, error);
+            });
+        }
+        
+        // Create an array of promises for all component loads
+        const promises = [
+          loadComponent('theme-toggle-container', 'components/theme-toggle.html'),
+          loadComponent('background-container', 'components/background.html'),
+          loadComponent('header-container', 'components/header.html'),
+          loadComponent('stats-container', 'components/stats.html'),
+          loadComponent('ecosystem-container', 'components/ecosystem-section.html'),
+          loadComponent('mastery-container', 'components/mastery-section.html'),
+          loadComponent('pricing-container', 'components/pricing-section.html').then(() => {
+            console.log('Pricing section loaded successfully');
+            console.log('Checking pricing section styling...');
+            const pricingSection = document.getElementById('pricing-container');
+            if (pricingSection) {
+              console.log('Pricing section found in DOM');
+              // Check if the gradient and shadow effects are applied
+              const tableContainer = pricingSection.querySelector('.overflow-hidden.rounded-xl.shadow-2xl');
+              if (tableContainer) {
+                console.log('Enhanced pricing table found with shadow-2xl class');
+                
+                // Force apply 3D effects directly
+                applyEnhanced3DStyles();
+              } else {
+                console.log('Warning: Enhanced pricing table not found or missing shadow-2xl class');
+              }
+            }
+          })
+        ];
+        
+        // Return a promise that resolves when all components are loaded
+        return Promise.all(promises);
+      }
+      
+      // Function to apply enhanced 3D styles directly to elements
+      function applyEnhanced3DStyles() {
+        console.log('Applying enhanced 3D styles directly...');
+        
+        try {
+          // Get the pricing table main container
+          const pricingTable = document.querySelector('#pricing-container .overflow-hidden.rounded-xl');
+          if (pricingTable) {
+            // Add intense shadow for 3D effect
+            pricingTable.style.boxShadow = '0 25px 50px -12px rgba(0, 0, 0, 0.5)';
+            pricingTable.style.borderRadius = '12px';
+            pricingTable.style.backdropFilter = 'blur(8px)';
+            pricingTable.style.border = '1px solid rgba(45, 55, 71, 0.8)';
+            
+            // Apply gradient to headers
+            const headers = pricingTable.querySelectorAll('.grid.grid-cols-3:first-of-type > div');
+            if (headers.length > 0) {
+              headers[1].style.background = 'linear-gradient(135deg, #1A2233, rgba(23, 30, 46, 0.95))';
+              headers[2].style.background = 'linear-gradient(135deg, rgba(26, 34, 51, 0.95), rgba(23, 30, 46, 0.95))';
+              headers[2].style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.2)';
+            }
+            
+            // Add hover effect to buttons
+            const buttons = pricingTable.querySelectorAll('button');
+            buttons.forEach(button => {
+              button.style.background = 'linear-gradient(to right, #0062FF, #2B8CFF)';
+              button.style.boxShadow = '0 8px 20px rgba(0, 98, 255, 0.25)';
+              button.style.transition = 'all 0.3s ease';
+              
+              button.addEventListener('mouseenter', () => {
+                button.style.background = 'linear-gradient(to right, #0052D6, #0062FF)';
+                button.style.boxShadow = '0 12px 25px rgba(0, 98, 255, 0.35)';
+                button.style.transform = 'translateY(-3px)';
+              });
+              
+              button.addEventListener('mouseleave', () => {
+                button.style.background = 'linear-gradient(to right, #0062FF, #2B8CFF)';
+                button.style.boxShadow = '0 8px 20px rgba(0, 98, 255, 0.25)';
+                button.style.transform = 'translateY(0)';
+              });
+            });
+            
+            // Enhance the badge
+            const badge = pricingTable.querySelector('.absolute.top-0.right-0');
+            if (badge) {
+              badge.style.background = 'linear-gradient(to right, #0062FF, #2B8CFF)';
+              badge.style.boxShadow = '0 6px 16px rgba(0, 98, 255, 0.3)';
+            }
+            
+            console.log('Enhanced 3D styles applied directly to elements');
+          } else {
+            console.log('Pricing table container not found');
+          }
+        } catch (error) {
+          console.error('Error applying enhanced styles:', error);
+        }
+      }
+    });
+  </script>
+</body>
+</html> 

@@ -1,0 +1,391 @@
+<!-- Pricing Tables Section -->
+<section class="cards-section" id="pricing" x-data="{ annual: false }">
+  <h2 class="section-title opacity-0" id="pricing-title">Pricing Options</h2>
+  
+  <!-- Simplified Pricing Table with Alpine.js -->
+  <div class="w-full max-w-5xl mx-auto px-4 py-8">
+    <!-- Monthly/Annual Toggle -->
+    <div class="flex items-center justify-center mb-12">
+      <span class="text-lg text-dark-textSecondary cursor-pointer transition-colors duration-300" 
+            :class="{ 'text-dark-text font-medium': !annual }"
+            @click="annual = false">
+        Monthly
+      </span>
+      
+      <label class="relative inline-block w-16 h-8 mx-4 cursor-pointer">
+        <input type="checkbox" class="opacity-0 w-0 h-0" x-model="annual">
+        <span class="absolute inset-0 rounded-full bg-toggleBg transition-all duration-300 before:content-[''] before:absolute before:h-6 before:w-6 before:left-1 before:bottom-1 before:bg-white before:rounded-full before:transition-all before:duration-300 before:shadow-md"
+              :class="{ 'bg-toggleActive before:translate-x-8 before:shadow-lg before:shadow-accent/30': annual }"
+              style="box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);">
+        </span>
+      </label>
+      
+      <span class="text-lg text-dark-textSecondary cursor-pointer transition-colors duration-300" 
+            :class="{ 'text-dark-text font-medium': annual }"
+            @click="annual = true">
+        Annual 
+        <span class="inline-block bg-accent/20 text-accent text-xs py-1 px-2 rounded-full ml-1 font-medium shadow-sm shadow-accent/10">
+          Save 30%
+        </span>
+      </span>
+    </div>
+    
+    <!-- True Table-Style Pricing -->
+    <div class="overflow-hidden rounded-xl shadow-2xl shadow-cardBgAlt/50 backdrop-blur-sm relative" 
+         style="box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); border: 1px solid rgba(45, 55, 71, 0.8); position: relative; z-index: 10;">
+      
+      <!-- Subtle background glow -->
+      <div class="absolute -inset-1 bg-gradient-to-r from-accent/0 via-accent/10 to-accent/0 blur-xl opacity-50"
+           style="filter: blur(15px); opacity: 0.6; z-index: -1;"></div>
+      
+      <!-- Table Header -->
+      <div class="grid grid-cols-3 bg-gradient-to-b from-dark-bg to-dark-bg/95 relative z-10"
+           style="background: linear-gradient(to bottom, #0A0E17, rgba(10, 14, 23, 0.95));">
+        <!-- Empty cell for feature names -->
+        <div class="p-8 border-b border-dark-border/80"></div>
+        
+        <!-- Personal Mastery Header -->
+        <div class="p-8 text-center border-b border-dark-border/80 border-l border-dark-border/80 bg-gradient-to-br from-dark-card to-dark-card/95 transition-all duration-300 hover:bg-gradient-to-br hover:from-dark-card/90 hover:to-cardBgAlt"
+             style="background: linear-gradient(135deg, #1A2233, rgba(23, 30, 46, 0.95)); transition: all 0.3s ease;"
+             onmouseover="this.style.transform='translateY(-2px)'; this.style.background='linear-gradient(135deg, #1A2233, #171E2E)';"
+             onmouseout="this.style.transform='translateY(0)'; this.style.background='linear-gradient(135deg, #1A2233, rgba(23, 30, 46, 0.95)';">
+          <h3 class="text-2xl font-normal text-dark-text mb-4">Personal Mastery</h3>
+          <div x-show="!annual" class="text-4xl font-light text-dark-text">
+            $29<span class="text-base text-dark-textSecondary">/month</span>
+          </div>
+          <div x-show="annual" class="text-4xl font-light text-dark-text">
+            $249<span class="text-base text-dark-textSecondary">/year</span>
+            <div class="text-sm text-accent mt-1 drop-shadow-sm">Save $99 annually (28% off)</div>
+          </div>
+        </div>
+        
+        <!-- Strategic Advantage Header -->
+        <div class="p-8 text-center border-b border-dark-border/80 border-l border-dark-border/80 bg-gradient-to-br from-dark-card/95 to-cardBgAlt/95 relative transition-all duration-300 hover:bg-gradient-to-br hover:from-dark-card/90 hover:to-cardBgAlt shadow-md"
+             style="background: linear-gradient(135deg, rgba(26, 34, 51, 0.95), rgba(23, 30, 46, 0.95)); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2); transition: all 0.3s ease;"
+             onmouseover="this.style.transform='translateY(-2px)'; this.style.background='linear-gradient(135deg, #1A2233, #171E2E)';"
+             onmouseout="this.style.transform='translateY(0)'; this.style.background='linear-gradient(135deg, rgba(26, 34, 51, 0.95), rgba(23, 30, 46, 0.95)';">
+          <!-- Popular badge with enhanced style -->
+          <div class="absolute top-0 right-0 bg-gradient-to-r from-buttonPrimary to-cardHighlight text-white text-sm py-1 px-4 rounded-bl-lg font-medium shadow-lg shadow-accent/20"
+               style="background: linear-gradient(to right, #0062FF, #2B8CFF); box-shadow: 0 6px 16px rgba(0, 98, 255, 0.3);">
+            Most Popular
+          </div>
+          <!-- Subtle highlight border -->
+          <div class="absolute inset-0 border border-accent/20 rounded-none pointer-events-none"></div>
+          
+          <h3 class="text-2xl font-normal text-dark-text mb-4">Strategic Advantage</h3>
+          <div x-show="!annual" class="text-4xl font-light text-dark-text">
+            $99<span class="text-base text-dark-textSecondary">/month</span>
+          </div>
+          <div x-show="annual" class="text-4xl font-light text-dark-text">
+            $499<span class="text-base text-dark-textSecondary">/year</span>
+            <div class="text-sm text-accent mt-1 drop-shadow-sm">Save $689 annually (58% off)</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Table Rows -->
+      <!-- Neuro-Imprinting Master Collection -->
+      <div class="grid grid-cols-3 border-b border-dark-border/50 relative z-10">
+        <div class="p-6 bg-gradient-to-r from-dark-bg/95 to-dark-bg/90 flex items-center">
+          <span class="text-dark-textSecondary">Neuro-Imprinting Master Collection</span>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/95 to-dark-card/90 border-l border-dark-border/80 flex justify-center items-center">
+          <svg class="w-6 h-6 text-accent drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/90 to-cardBgAlt/95 border-l border-dark-border/80 flex justify-center items-center shadow-sm">
+          <svg class="w-6 h-6 text-accent drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- Personal Mastery AI Engine -->
+      <div class="grid grid-cols-3 border-b border-dark-border/50 relative z-10">
+        <div class="p-6 bg-gradient-to-r from-dark-bg/90 to-dark-bg/85 flex items-center">
+          <span class="text-dark-textSecondary">Personal Mastery AI Engine</span>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/90 to-dark-card/85 border-l border-dark-border/80 flex justify-center items-center">
+          <svg class="w-6 h-6 text-accent drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/85 to-cardBgAlt/90 border-l border-dark-border/80 flex justify-center items-center shadow-sm">
+          <svg class="w-6 h-6 text-accent drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- Reality Creation -->
+      <div class="grid grid-cols-3 border-b border-dark-border/50 relative z-10">
+        <div class="p-6 bg-gradient-to-r from-dark-bg/85 to-dark-bg/80 flex items-center">
+          <span class="text-dark-textSecondary">Reality Creation</span>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/85 to-dark-card/80 border-l border-dark-border/80 flex justify-center items-center">
+          <svg class="w-6 h-6 text-accent drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/80 to-cardBgAlt/85 border-l border-dark-border/80 flex justify-center items-center shadow-sm">
+          <svg class="w-6 h-6 text-accent drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- Persuasion Pulse Newsletter -->
+      <div class="grid grid-cols-3 border-b border-dark-border/50 relative z-10">
+        <div class="p-6 bg-gradient-to-r from-dark-bg/83 to-dark-bg/78 flex items-center">
+          <span class="text-dark-textSecondary">Persuasion Pulse Newsletter</span>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/83 to-dark-card/78 border-l border-dark-border/80 flex justify-center items-center">
+          <svg class="w-6 h-6 text-dark-textSecondary opacity-80" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/78 to-cardBgAlt/83 border-l border-dark-border/80 flex justify-center items-center shadow-sm">
+          <svg class="w-6 h-6 text-accent drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- Classical Persuaders Drip -->
+      <div class="grid grid-cols-3 border-b border-dark-border/50 relative z-10">
+        <div class="p-6 bg-gradient-to-r from-dark-bg/80 to-dark-bg/75 flex items-center">
+          <span class="text-dark-textSecondary">Classical Persuaders Drip</span>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/80 to-dark-card/75 border-l border-dark-border/80 flex justify-center items-center">
+          <svg class="w-6 h-6 text-dark-textSecondary opacity-80" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/75 to-cardBgAlt/80 border-l border-dark-border/80 flex justify-center items-center shadow-sm">
+          <svg class="w-6 h-6 text-accent drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- Strategic Advantage AI Collection -->
+      <div class="grid grid-cols-3 border-b border-dark-border/50 relative z-10">
+        <div class="p-6 bg-gradient-to-r from-dark-bg/75 to-dark-bg/70 flex items-center">
+          <span class="text-dark-textSecondary">Strategic Advantage AI Collection</span>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/75 to-dark-card/70 border-l border-dark-border/80 flex justify-center items-center">
+          <svg class="w-6 h-6 text-dark-textSecondary opacity-80" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/70 to-cardBgAlt/75 border-l border-dark-border/80 flex justify-center items-center shadow-sm">
+          <svg class="w-6 h-6 text-accent drop-shadow-md" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+          </svg>
+        </div>
+      </div>
+      
+      <!-- BONUS Row - only shows in annual toggle mode -->
+      <div x-show="annual" class="grid grid-cols-3 border-b border-dark-border/50 relative z-10 shadow-lg overflow-hidden">
+        <!-- Enhanced glow effect for the entire row -->
+        <div class="absolute inset-0 bg-gradient-to-r from-buttonPrimary/20 via-accent/15 to-buttonPrimary/20 z-0 opacity-80"
+             style="filter: blur(3px);"></div>
+        
+        <!-- BONUS header cell -->
+        <div class="p-6 bg-gradient-to-r from-buttonPrimary to-cardHighlight flex items-center justify-center relative z-10"
+             style="box-shadow: 0 0 25px rgba(0, 98, 255, 0.5);">
+          <span class="text-white font-bold text-2xl tracking-wide drop-shadow-lg">BONUS</span>
+        </div>
+        
+        <!-- Personal Mastery bonus -->
+        <div class="p-6 bg-gradient-to-b from-dark-card to-dark-card/95 border-l border-dark-border/80 flex justify-center items-center flex-col relative z-10">
+          <!-- Subtle accent border and glow -->
+          <div class="absolute inset-0 border-t-2 border-b-2 border-buttonPrimary/30 pointer-events-none"></div>
+          <div class="absolute inset-0 bg-buttonPrimary/5 pointer-events-none"></div>
+          <span class="text-accent font-medium text-center text-lg">Conquering Confidence</span>
+          <span class="text-dark-textSecondary text-sm mt-2 font-medium">($495 value)</span>
+        </div>
+        
+        <!-- Strategic Advantage bonus -->
+        <div class="p-6 bg-gradient-to-b from-dark-card to-dark-card/95 border-l border-dark-border/80 flex justify-center items-center flex-col shadow-sm relative z-10">
+          <!-- Subtle accent border and glow -->
+          <div class="absolute inset-0 border-t-2 border-b-2 border-buttonPrimary/30 pointer-events-none"></div>
+          <div class="absolute inset-0 bg-buttonPrimary/5 pointer-events-none"></div>
+          <span class="text-accent font-medium text-center text-lg">Renegade Persuaders Master Collection</span>
+          <span class="text-dark-textSecondary text-sm mt-2 font-medium">($997 value)</span>
+        </div>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div class="grid grid-cols-3 relative z-10">
+        <div class="p-6 bg-gradient-to-r from-dark-bg/70 to-dark-bg/65"
+             style="background: linear-gradient(to right, rgba(10, 14, 23, 0.7), rgba(10, 14, 23, 0.65));"></div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/70 to-dark-card/65 border-l border-dark-border/80"
+             style="background: linear-gradient(to right, rgba(26, 34, 51, 0.7), rgba(26, 34, 51, 0.65));">
+          <button class="w-full py-3 px-6 bg-gradient-to-r from-buttonPrimary/90 to-buttonPrimary/80 hover:from-buttonHover to-buttonHover text-white rounded-md transition-all duration-300 transform hover:-translate-y-1 shadow-md shadow-buttonPrimary/20 hover:shadow-lg hover:shadow-buttonPrimary/30"
+                  style="background: linear-gradient(to right, #0062FF, #0062FF); box-shadow: 0 8px 20px rgba(0, 98, 255, 0.25); transition: all 0.3s ease;"
+                  onmouseover="this.style.transform='translateY(-3px)'; this.style.background='linear-gradient(to right, #0052D6, #0062FF)'; this.style.boxShadow='0 12px 25px rgba(0, 98, 255, 0.35)';"
+                  onmouseout="this.style.transform='translateY(0)'; this.style.background='linear-gradient(to right, #0062FF, #0062FF)'; this.style.boxShadow='0 8px 20px rgba(0, 98, 255, 0.25)';">
+            Get Started
+          </button>
+        </div>
+        <div class="p-6 bg-gradient-to-r from-dark-card/65 to-cardBgAlt/70 border-l border-dark-border/80 shadow-sm"
+             style="background: linear-gradient(to right, rgba(26, 34, 51, 0.65), rgba(23, 30, 46, 0.7));">
+          <button class="w-full py-3 px-6 bg-gradient-to-r from-buttonPrimary to-cardHighlight hover:from-buttonHover hover:to-buttonPrimary text-white rounded-md transition-all duration-300 transform hover:-translate-y-1 shadow-lg shadow-buttonPrimary/30 hover:shadow-xl hover:shadow-buttonPrimary/40 relative overflow-hidden group"
+                  style="background: linear-gradient(to right, #0062FF, #2B8CFF); box-shadow: 0 10px 25px rgba(0, 98, 255, 0.3); transition: all 0.3s ease; position: relative; overflow: hidden;"
+                  onmouseover="this.style.transform='translateY(-3px)'; this.style.background='linear-gradient(to right, #0052D6, #0062FF)'; this.style.boxShadow='0 15px 30px rgba(0, 98, 255, 0.4)';"
+                  onmouseout="this.style.transform='translateY(0)'; this.style.background='linear-gradient(to right, #0062FF, #2B8CFF)'; this.style.boxShadow='0 10px 25px rgba(0, 98, 255, 0.3)';">
+            <span class="absolute inset-0 w-full h-full bg-gradient-to-r from-cardHighlight/10 to-buttonPrimary/10 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></span>
+            <span class="relative z-10">Get Started</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Mobile Version -->
+    <div class="md:hidden mt-8 space-y-8">
+      <!-- Personal Mastery Mobile Card -->
+      <div class="bg-gradient-to-br from-dark-card/95 to-dark-card/85 border border-dark-border rounded-xl overflow-hidden shadow-lg transition-all duration-300 hover:shadow-xl hover:shadow-dark-border/20 hover:-translate-y-1">
+        <div class="p-6 text-center border-b border-dark-border/70 bg-gradient-to-r from-dark-card/90 to-dark-card/80">
+          <h3 class="text-2xl font-normal text-dark-text mb-4">Personal Mastery</h3>
+          <div x-show="!annual" class="text-4xl font-light text-dark-text">
+            $29<span class="text-base text-dark-textSecondary">/month</span>
+          </div>
+          <div x-show="annual" class="text-4xl font-light text-dark-text">
+            $249<span class="text-base text-dark-textSecondary">/year</span>
+            <div class="text-sm text-accent mt-1 drop-shadow-sm">Save $99 annually (28% off)</div>
+          </div>
+        </div>
+        
+        <div class="p-6 space-y-4 bg-gradient-to-br from-dark-card/85 to-cardBgAlt/90">
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Neuro-Imprinting Master Collection</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Personal Mastery AI Engine</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Reality Creation</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Classical Persuaders Drip</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-dark-textSecondary mr-3 flex-shrink-0 opacity-80" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Persuasion Pulse Newsletter</span>
+          </div>
+          
+          <!-- Annual bonus for Personal Mastery mobile -->
+          <div x-show="annual" class="flex flex-col bg-gradient-to-r from-buttonPrimary to-cardHighlight rounded-md mb-3 mt-3 overflow-hidden shadow-xl shadow-buttonPrimary/30">
+            <div class="w-full py-3 px-3 text-center">
+              <span class="text-white font-bold text-xl tracking-wide drop-shadow-md">BONUS</span>
+            </div>
+            <div class="w-full bg-dark-card p-4 border-t border-white/10">
+              <div class="text-accent font-medium text-center text-lg">Conquering Confidence</div>
+              <div class="text-dark-textSecondary text-sm mt-1 text-center">($495 value)</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-6 pt-2 bg-gradient-to-b from-cardBgAlt/90 to-dark-card/90">
+          <button class="w-full py-3 px-6 bg-gradient-to-r from-buttonPrimary/90 to-buttonPrimary/80 hover:from-buttonHover hover:to-buttonHover text-white rounded-md transition-all duration-300 transform hover:-translate-y-1 shadow-md shadow-buttonPrimary/20 hover:shadow-lg hover:shadow-buttonPrimary/30">
+            Get Started
+          </button>
+        </div>
+      </div>
+      
+      <!-- Strategic Advantage Mobile Card -->
+      <div class="bg-gradient-to-br from-dark-card/95 to-cardBgAlt/95 border border-accent/30 rounded-xl overflow-hidden shadow-xl shadow-buttonPrimary/5 relative transition-all duration-300 hover:shadow-2xl hover:shadow-accent/10 hover:-translate-y-1">
+        <!-- Slight glow effect -->
+        <div class="absolute -inset-0.5 bg-gradient-to-r from-accent/0 via-accent/20 to-accent/0 blur-md opacity-20 -z-10"></div>
+        
+        <div class="absolute top-0 right-0 bg-gradient-to-r from-buttonPrimary to-cardHighlight text-white text-sm py-1 px-4 rounded-bl-lg font-medium shadow-lg shadow-accent/20">
+          Most Popular
+        </div>
+        
+        <div class="p-6 text-center border-b border-dark-border/70 bg-gradient-to-r from-dark-card/90 to-cardBgAlt/90">
+          <h3 class="text-2xl font-normal text-dark-text mb-4">Strategic Advantage</h3>
+          <div x-show="!annual" class="text-4xl font-light text-dark-text">
+            $99<span class="text-base text-dark-textSecondary">/month</span>
+          </div>
+          <div x-show="annual" class="text-4xl font-light text-dark-text">
+            $499<span class="text-base text-dark-textSecondary">/year</span>
+            <div class="text-sm text-accent mt-1 drop-shadow-sm">Save $689 annually (58% off)</div>
+          </div>
+        </div>
+        
+        <div class="p-6 space-y-4 bg-gradient-to-br from-dark-card/85 to-cardBgAlt/90">
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Neuro-Imprinting Master Collection</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Personal Mastery AI Engine</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Reality Creation</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Classical Persuaders Drip</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Persuasion Pulse Newsletter</span>
+          </div>
+          <div class="flex items-center">
+            <svg class="w-5 h-5 text-accent mr-3 flex-shrink-0 drop-shadow-sm" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+              <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-dark-textSecondary">Strategic Advantage AI Collection</span>
+          </div>
+          
+          <!-- Annual bonus for Strategic Advantage mobile -->
+          <div x-show="annual" class="flex flex-col bg-gradient-to-r from-buttonPrimary to-cardHighlight rounded-md mb-3 mt-3 overflow-hidden shadow-xl shadow-buttonPrimary/30">
+            <div class="w-full py-3 px-3 text-center">
+              <span class="text-white font-bold text-xl tracking-wide drop-shadow-md">BONUS</span>
+            </div>
+            <div class="w-full bg-dark-card p-4 border-t border-white/10">
+              <div class="text-accent font-medium text-center text-lg">Renegade Persuaders Master Collection</div>
+              <div class="text-dark-textSecondary text-sm mt-1 text-center">($997 value)</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-6 pt-2 bg-gradient-to-b from-cardBgAlt/90 to-dark-card/90">
+          <button class="w-full py-3 px-6 bg-gradient-to-r from-buttonPrimary to-cardHighlight hover:from-buttonHover hover:to-buttonPrimary text-white rounded-md transition-all duration-300 transform hover:-translate-y-1 shadow-lg shadow-buttonPrimary/30 hover:shadow-xl hover:shadow-buttonPrimary/40 relative overflow-hidden group">
+            <span class="absolute inset-0 w-full h-full bg-gradient-to-r from-cardHighlight/10 to-buttonPrimary/10 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-500"></span>
+            <span class="relative z-10">Get Started</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section> 

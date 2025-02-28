@@ -1,0 +1,140 @@
+/* Enhanced Pricing Table Styles */
+#pricing-container .overflow-hidden.rounded-xl {
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  backdrop-filter: blur(8px) !important;
+  position: relative !important;
+  z-index: 10 !important;
+  border: 1px solid rgba(45, 55, 71, 0.8) !important;
+}
+
+/* Add glow effect */
+#pricing-container .overflow-hidden.rounded-xl::before {
+  content: '' !important;
+  position: absolute !important;
+  top: -2px !important;
+  left: -2px !important;
+  right: -2px !important;
+  bottom: -2px !important;
+  background: linear-gradient(45deg, rgba(0, 98, 255, 0), rgba(0, 98, 255, 0.2), rgba(0, 98, 255, 0)) !important;
+  z-index: -1 !important;
+  filter: blur(15px) !important;
+  opacity: 0.6 !important;
+}
+
+/* Table Header Styling */
+#pricing-container .grid.grid-cols-3:first-of-type {
+  background: linear-gradient(to bottom, #0A0E17, rgba(10, 14, 23, 0.95)) !important;
+}
+
+/* Personal Mastery Header */
+#pricing-container .grid.grid-cols-3:first-of-type > div:nth-child(2) {
+  background: linear-gradient(135deg, #1A2233, rgba(23, 30, 46, 0.95)) !important;
+  transition: all 0.3s ease !important;
+}
+
+#pricing-container .grid.grid-cols-3:first-of-type > div:nth-child(2):hover {
+  background: linear-gradient(135deg, #1A2233, #171E2E) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Strategic Advantage Header */
+#pricing-container .grid.grid-cols-3:first-of-type > div:nth-child(3) {
+  background: linear-gradient(135deg, rgba(26, 34, 51, 0.95), rgba(23, 30, 46, 0.95)) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
+  position: relative !important;
+}
+
+#pricing-container .grid.grid-cols-3:first-of-type > div:nth-child(3):hover {
+  background: linear-gradient(135deg, #1A2233, #171E2E) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Most Popular Badge */
+#pricing-container .absolute.top-0.right-0.bg-gradient-to-r {
+  background: linear-gradient(to right, #0062FF, #2B8CFF) !important;
+  box-shadow: 0 6px 16px rgba(0, 98, 255, 0.3) !important;
+}
+
+/* Pricing Table Rows */
+#pricing-container .grid.grid-cols-3:not(:first-of-type) > div:first-child {
+  background: linear-gradient(to right, rgba(10, 14, 23, 0.95), rgba(10, 14, 23, 0.9)) !important;
+}
+
+#pricing-container .grid.grid-cols-3:not(:first-of-type) > div:nth-child(2) {
+  background: linear-gradient(to right, rgba(26, 34, 51, 0.95), rgba(26, 34, 51, 0.9)) !important;
+}
+
+#pricing-container .grid.grid-cols-3:not(:first-of-type) > div:nth-child(3) {
+  background: linear-gradient(to right, rgba(26, 34, 51, 0.9), rgba(23, 30, 46, 0.95)) !important;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Accent Checkmarks */
+#pricing-container svg.text-accent {
+  filter: drop-shadow(0 2px 3px rgba(0, 98, 255, 0.2)) !important;
+  color: #0062FF !important;
+}
+
+/* Button Styles */
+#pricing-container button {
+  background: linear-gradient(to right, #0062FF, #2B8CFF) !important;
+  box-shadow: 0 8px 20px rgba(0, 98, 255, 0.25) !important;
+  transition: all 0.3s ease !important;
+  transform: translateY(0) !important;
+}
+
+#pricing-container button:hover {
+  background: linear-gradient(to right, #0052D6, #0062FF) !important;
+  box-shadow: 0 12px 25px rgba(0, 98, 255, 0.35) !important;
+  transform: translateY(-3px) !important;
+}
+
+/* Premium button with extra effects */
+#pricing-container .grid.grid-cols-3:last-of-type > div:nth-child(3) button {
+  background: linear-gradient(to right, #0062FF, #2B8CFF) !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+/* Button shine effect */
+#pricing-container .grid.grid-cols-3:last-of-type > div:nth-child(3) button::after {
+  content: '' !important;
+  position: absolute !important;
+  top: -50% !important;
+  left: -50% !important;
+  width: 200% !important;
+  height: 200% !important;
+  background: linear-gradient(transparent, rgba(255, 255, 255, 0.1), transparent) !important;
+  transform: rotate(30deg) !important;
+  transition: all 0.6s ease !important;
+  opacity: 0 !important;
+}
+
+#pricing-container .grid.grid-cols-3:last-of-type > div:nth-child(3) button:hover::after {
+  animation: shine 1.5s infinite !important;
+}
+
+@keyframes shine {
+  0% { left: -100%; opacity: 0.7; }
+  100% { left: 100%; opacity: 0; }
+}
+
+/* Toggle switch enhancement */
+#pricing-container .bg-toggleActive {
+  background-color: #0062FF !important;
+  box-shadow: 0 0 10px rgba(0, 98, 255, 0.4) !important;
+}
+
+/* Mobile card enhancements */
+#pricing-container .md\\:hidden .bg-gradient-to-br {
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.25) !important;
+  transform: translateY(0) !important;
+  transition: all 0.3s ease !important;
+}
+
+#pricing-container .md\\:hidden .bg-gradient-to-br:hover {
+  transform: translateY(-5px) !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35) !important;
+} 
